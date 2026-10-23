@@ -1,0 +1,124 @@
+---
+description: Product copy, UX writing, terminology, voice, and tone
+globs: apps/dashboard/src/**/*.{ts,tsx}
+---
+
+# Product copy
+
+Write for the person using the product, not for the implementation. Copy should make the current
+state and the next useful action obvious.
+
+## Voice and tone
+
+- Be clear, warm, and concise. Prefer familiar words, active voice, and one idea per sentence.
+- Use sentence case and natural contractions. Address the reader as "you" when it makes an action
+  or consequence clearer.
+- Avoid hype, blame, and generic reassurance. State concrete outcomes instead.
+- Say what is true, not what is not happening. "Delivered by email and push" beats "No delivery
+  failed": naming a failure scenario to deny it plants the worry.
+- Reassure at the wall, not on the walk. "Nothing was sent" belongs on a failed or canceled send,
+  where the reader already has the question. On the happy path it invents one.
+- Do not answer an objection the reader has not formed yet. This is the same preemption wearing a
+  positive costume, and it is harder to catch because the sentence is true and promises nothing.
+  Ask whether the reader could have that worry *at this point in the flow*.
+- Never invent an affordance. Rewriting a negative into an active verb tempts you to promise a
+  choice or capability that does not exist: "choose a channel" when the template only has email.
+  Check the verb against the screen it describes.
+
+## Product language
+
+- Use the same term for the same concept across navigation, headings, actions, and messages.
+- Use **notification** for what an app sends to a contact, **delivery** for one notification going
+  out through one channel, **channel** for email, push, and in-app, and **template** for the
+  content a notification is rendered from.
+- Use **contact** for the person who receives notifications, **preference** for a contact's choice
+  of what they receive and where, and **feed** for the in-app list of a contact's notifications.
+- Avoid synonyms such as "message", "recipient", or "subscriber" unless they describe a genuinely
+  different concept.
+- Match established labels in the dashboard before adding a new term. Reuse shared actions when the
+  meaning is identical.
+
+## UI patterns
+
+### Actions
+
+- Start button and link labels with a concrete verb and name the result when useful: "Save changes",
+  "Add contact", or "Duplicate template". Avoid "Submit" and "Click here"; use the concrete result.
+- Keep labels short and distinguish adjacent actions without relying on color or position.
+- Use `Continue` only when the destination is already clear from the flow.
+- Use `→` only to reinforce navigation or forward movement, not as decoration on every action.
+
+### Help text
+
+- Default to no help text. Add it only when the label and control are not enough to prevent a likely
+  mistake, explain a non-obvious constraint, set an important expectation, or help the reader make
+  a decision.
+- Remove help text that paraphrases the heading, label, placeholder, selected value, or action. For
+  example, do not put "Enter your email address" below a field labeled "Email".
+- Make useful help text concrete and verifiable. Prefer "Use at least 12 characters" over "Choose a
+  strong password" when 12 characters is the actual requirement.
+- Do not use permanent help text for validation feedback. Show a specific field error when the
+  requirement is violated.
+- A placeholder is an example or format hint, not a replacement for a label and not another place
+  to repeat the help text.
+
+### Errors and validation
+
+- Explain what failed in user terms, then give a next step when one exists. Never blame the reader
+  or expose raw backend errors.
+- **Opener: `We couldn’t <verb> …`.** Always name the actor. The product speaks as "we" everywhere
+  else, so a subject-less "Couldn’t load …" is the odd voice out. Never write "Could not"; the
+  voice is contracted throughout.
+- **Closer: `Please try again.`** Use `Try again in a moment.` only when waiting is the actual fix,
+  such as a rate limit or a job still running. Omit the closer entirely when retrying will not help.
+  `Try again` with no period is a button label, not a closer.
+- Keep field errors specific and local. Do not repeat the same failure in field, form, toast, and
+  page copy.
+- When a send fails, say whether any delivery went out when that information is known.
+- Use retry copy only when retrying can help. Otherwise offer the relevant recovery path.
+
+### Empty, loading, and success states
+
+- An empty state should say what is absent and, when useful, how to create or find it. Include a
+  primary action when the reader can resolve the state.
+- Keep self-explanatory empty states brief. Do not add decorative body copy just to fill space.
+- Use a present participle plus the ellipsis character for in-progress labels, such as "Saving…"
+  or "Sending…". Preserve the original action label when layout stability or accessibility
+  requires it.
+- Keep success feedback neutral and specific: "Saved", "Contact added", or "Template duplicated".
+
+### Confirmations and destructive actions
+
+- Name the action and its object: "Delete template", "Remove contact", or "Cancel notification".
+- Confirmation copy must state the immediate consequence and any important irreversible or timing
+  effect. Do not manufacture urgency.
+- The cancel button dismisses the dialog; the destructive button describes the destructive action.
+
+## Mechanics and localization
+
+- Do not assemble sentences from JSX fragments, so the copy can move to translation files.
+- Use interpolation for names, dates, and counts. Pluralize with plural keys instead of branching
+  on English strings in components.
+- Preserve placeholders exactly when editing translation values.
+- Prefer numerals for times, counts, and limits. State the relevant timezone, duration, or deadline
+  when ambiguity could change a decision, such as when a scheduled notification goes out.
+- Icon-only controls need an accessible label that describes the action, not the icon's appearance.
+
+### Punctuation
+
+- Never use an em dash (`—`) in authored user-facing copy. Split the thought into two sentences or
+  use a comma, colon, or period.
+- Do not replace an em dash with an en dash as sentence punctuation. Reserve the en dash (`–`) for
+  ranges and unavailable-value placeholders, and the middle dot (`·`) for compact metadata.
+- When editing a copy block, replace any existing em dash in that block as part of the change.
+- Use the typographic apostrophe `’` (U+2019) in every contraction and possessive, never the
+  straight `'`. Quoted text inside copy uses curly quotes `“ ”`, which also avoids escaping them
+  in JSON. The ellipsis is always the `…` character, never three periods.
+
+## Review checklist
+
+- Read the copy in its full UI state, including the heading, control labels, and surrounding
+  context.
+- Check related screens for terminology drift and duplicate messages.
+- Verify every error, empty state, and confirmation answers the reader's likely next question.
+- Check interpolation, plurals, punctuation, and narrow-screen button length before merging.

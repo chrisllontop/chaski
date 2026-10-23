@@ -1,0 +1,20 @@
+---
+description: Git commit and pull request conventions
+---
+
+## Git commits
+
+- Use imperative mood and sentence case (e.g. `Add user billing flags`, `Fix sidebar layout on mobile`).
+- Do **not** use Conventional Commits prefixes (`feat:`, `fix:`, `chore:`). The history uses plain subject lines.
+- Do **not** put issue-tracker identifiers in commit messages. Link the work from the pull request description instead.
+- Keep the first line under ~72 characters; use the body for extra detail if needed.
+
+## Pull requests
+
+- Write the PR **title** and **description** in **English**.
+- Do **not** put issue identifiers or tracking links in the PR **title**. Reference them inline in the description if needed.
+- **Title:** same tone as commits — imperative mood, sentence case, short (under ~72 characters), no Conventional-Commits prefixes.
+- **Description** — use only these two sections:
+  - **Summary** — what changed for maintainers and any user-visible behavior (2–4 sentences).
+  - **Changes** — bullet list by area (e.g. API routes, services, UI routes).
+- Run **`pnpm check`** from the repository root before every push, including a push to an open pull request. Fix failures first.

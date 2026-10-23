@@ -1,0 +1,36 @@
+---
+description: Code style and TypeScript conventions
+alwaysApply: true
+---
+
+## Functions
+
+- Use arrow functions (`const fn = () => {}`) over named function declarations in
+  application code. Preserve upstream function declarations in the dashboard's
+  registry-managed shadcn files (`components/ui/**`) so registry updates remain
+  reviewable.
+
+## Comments
+
+**Always enforced:** do not add inline comments, JSDoc, or section banners that restate what the code already says. If a comment only repeats the function name, variable name, or the next few lines of logic, delete it.
+
+- Comment only what the code can't reveal on its own — non-obvious "why", subtle invariants, workarounds, gotchas, a contract another module or future integration relies on.
+- Do **not** comment every function, block, or export. Prefer self-explanatory names over comments.
+- Do not reference product screen/task numbers (`#10`, `#11`, …) in code comments — those are product identifiers, not technical ones. Describe the behavior in words.
+- Keep JSDoc (`/** */`) blocks to roughly **3 lines** by default. A longer block is
+  allowed only for a non-obvious cross-module contract, invariant, or workaround
+  that would be unsafe to lose; move reusable policy into `.cursor/rules/*.mdc`.
+- Section dividers (`// ─── … ───`) are allowed in large route/service files when they group unrelated blocks; do not add them to small modules or new files.
+
+## Code Style (Biome)
+
+- 2-space indentation, single quotes, always semicolons.
+- 100 character line width.
+- Exclude generated files (such as `routeTree.gen.ts`) from linting/formatting in `biome.json`.
+
+## Path Aliases
+
+- Use `~/` when an application import crosses feature/domain boundaries (e.g.
+  `import { Button } from '~/components/ui/button'`). Relative imports are allowed
+  within one cohesive module tree, in registry-managed files, and from root build or
+  Worker entrypoints where the relative graph is clearer.
