@@ -1,0 +1,54 @@
+{
+  "name": "chaski",
+  "version": "0.0.1",
+  "description": "Embeddable notification infrastructure for Cloudflare Workers, dashboard included.",
+  "keywords": [
+    "cloudflare-workers",
+    "notifications",
+    "email",
+    "web-push",
+    "push-notifications",
+    "in-app-notifications",
+    "notification-feed",
+    "durable-objects",
+    "cloudflare-d1",
+    "hono",
+    "typescript",
+    "dashboard"
+  ],
+  "homepage": "https://chaski.sh",
+  "bugs": {
+    "url": "https://github.com/chrisllontop/chaski/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chrisllontop/chaski.git",
+    "directory": "packages/chaski"
+  },
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run --passWithNoTests"
+  },
+  "devDependencies": {
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

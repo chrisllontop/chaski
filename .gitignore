@@ -11,3 +11,4 @@ playwright-report
 .wrangler
 .t3
 .plans
+*.tgz
