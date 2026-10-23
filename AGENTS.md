@@ -6,12 +6,13 @@ on that project's Cloudflare resources: email, web push and in-app notifications
 scheduling, retries and a dashboard. Open source (MIT), published on npm as `chaski`.
 
 **Current stage: repository base, no engine code yet.** Tooling, conventions, CI and docs are in
-place, and `packages/chaski` builds an empty entry point. `docs/architecture.md` lists what is
-decided and what is still open; read it before writing engine code.
+place, and the package builds an empty entry point. `docs/architecture.md` lists what is decided and
+what is still open; read it before writing engine code.
 
 ## Run it
 
-- `pnpm i` installs the workspace (Node 24 and pnpm 11; `engine-strict` is on).
+- `pnpm i` installs the dependencies (Node 24 and pnpm 11). `devEngines` holds contributors to
+  Node 24 without putting that constraint on the people who install `chaski`.
 - `pnpm typecheck` (tsc), `pnpm lint` (Biome), `pnpm format` (Biome with fixes), `pnpm test`
   (Vitest), `pnpm build` (tsdown).
 - `pnpm check` runs typecheck, lint and test, the same gate CI runs before the build.
@@ -23,15 +24,15 @@ decided and what is still open; read it before writing engine code.
 - **Release Drafter** keeps a draft release from merged pull requests (labels `breaking`,
   `feature`/`enhancement` pick the version bump; patch is the default). `v0.0.1` is the baseline.
 - **Release** runs when a `v*` release is published: it checks that the tag matches
-  `packages/chaski/package.json`'s version and is on `main`, builds the package and publishes it to
-  npm with trusted publishing (OIDC, no token). Bump the package version before publishing.
+  `package.json`'s version and is on `main`, builds the package and publishes it to npm with
+  trusted publishing (OIDC, no token). Bump the package version before publishing.
 
 ## Layout
 
-- `packages/chaski` is the package published to npm as `chaski`. tsdown builds `src/index.ts` into
-  `dist` (ESM plus declarations); only `dist` ships.
-- `apps/*` is part of the workspace and empty for now. The dashboard is expected at
-  `apps/dashboard`, where `copy.mdc` already points.
+- One package, no workspace: the repository root is the package published to npm as `chaski`.
+  tsdown builds `src/index.ts` into `dist` (ESM plus declarations); only `dist` ships, along with
+  `README.md` and `LICENSE`.
+- The dashboard is expected at `src/dashboard`, where `copy.mdc` already points.
 - `docs/architecture.md` holds the decisions taken and the questions still open.
 
 ## Code conventions
@@ -46,9 +47,9 @@ for the API, services, database, errors and UI arrive with the code they govern.
 - Comments say **why** (a constraint, an invariant, a quirk), never what the next line does.
 - chaski runs inside the host's Worker and only on the bindings the host declares. Do not assume
   binding names or reach for resources the host did not hand over.
-- TypeScript stays on 6.0 in the catalog: TypeScript 7 does not ship the compiler API that tsdown
-  uses to emit declarations. Moving to 7 needs `isolatedDeclarations` (declarations through Oxc)
-  or tsgo support in tsdown.
+- TypeScript stays on 6.0: TypeScript 7 does not ship the compiler API that tsdown uses to emit
+  declarations. Moving to 7 needs `isolatedDeclarations` (declarations through Oxc) or tsgo
+  support in tsdown.
 
 ## Tests
 

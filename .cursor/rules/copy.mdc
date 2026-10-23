@@ -1,6 +1,6 @@
 ---
 description: Product copy, UX writing, terminology, voice, and tone
-globs: apps/dashboard/src/**/*.{ts,tsx}
+globs: src/dashboard/**/*.{ts,tsx}
 ---
 
 # Product copy

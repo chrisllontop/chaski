@@ -12,6 +12,11 @@ chaski is single-tenant. Each project runs its own instance with its own databas
 organizations, apps or environments inside chaski. A second environment is another deployment of
 the host Worker, with its own bindings.
 
+### One package
+
+chaski ships as a single npm package, `chaski`, with the dashboard inside it. The repository is that
+package, not a monorepo.
+
 ### Mounted on a route of the host Worker
 
 The host mounts chaski on a route, the way Swagger UI or Bull Board mount into an app. The tentative
