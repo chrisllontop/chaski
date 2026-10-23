@@ -1,0 +1,57 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+# id-token lets npm exchange the workflow's OIDC token for a publish token (trusted publishing), so
+# the repository holds no npm secret.
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: release-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish to npm
+    if: ${{ !github.event.release.prerelease && startsWith(github.event.release.tag_name, 'v') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          fetch-depth: 0
+
+      # npm takes the version from packages/chaski/package.json, so the tag must match it.
+      - name: Validate release source
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]
+          git merge-base --is-ancestor HEAD origin/main
+          version="$(node -p "require('./packages/chaski/package.json').version")"
+          [[ "$RELEASE_TAG" == "v$version" ]] || { echo "Tag $RELEASE_TAG does not match packages/chaski version $version"; exit 1; }
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter chaski build
+
+      # npm publish would ship the catalog: specifiers as they are; pnpm pack resolves them (and adds
+      # the root LICENSE), then npm publishes that tarball through trusted publishing.
+      - name: Publish
+        working-directory: packages/chaski
+        run: |
+          pnpm pack --out "$RUNNER_TEMP/chaski.tgz"
+          npm publish "$RUNNER_TEMP/chaski.tgz"
