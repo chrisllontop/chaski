@@ -77,6 +77,8 @@ export type ChaskiConfig = {
     in_app?: InAppConfig;
     push?: PushConfig;
   };
+  /** Type mutes every recipient has until they save preferences of their own. */
+  defaultMutedTypes?: string[];
   /** Render and record email and push deliveries without calling the providers. */
   dryRun?: boolean;
   /** Must match `max_retries` on the host's queue consumer; defaults to 5. */
@@ -96,6 +98,7 @@ export type ResolvedConfig = {
     push?: ResolvedPush;
   };
   enabledChannels: Channel[];
+  defaultMutedTypes: string[];
   dryRun: boolean;
   maxRetries: number;
   migrationsTable: string;
@@ -205,6 +208,7 @@ export const validateConfig = (config: ChaskiConfig): ResolvedConfig => {
     bindings,
     channels: resolved,
     enabledChannels: CHANNELS.filter((channel) => resolved[channel]),
+    defaultMutedTypes: config.defaultMutedTypes ?? [],
     dryRun: config.dryRun ?? false,
     maxRetries,
     migrationsTable,

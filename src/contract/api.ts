@@ -1,7 +1,9 @@
 import type {
+  ChaskiPreferences,
   FeedPage,
   ListFeedQuery,
   MarkFeedReadInput,
+  PreferencesUpdate,
   RegisterPushSubscriptionRequest,
   SendRequest,
   SendResult,
@@ -16,6 +18,13 @@ export interface ChaskiPushApi {
   vapidPublicKey(): Promise<{ publicKey: string | null }>;
 }
 
+export interface ChaskiPreferencesApi {
+  get(recipientId: string): Promise<ChaskiPreferences>;
+  set(recipientId: string, update: PreferencesUpdate): Promise<ChaskiPreferences>;
+  /** Template types grouped by topic, to build a preferences screen from. */
+  topics(): Promise<Array<{ topic: string | null; types: string[] }>>;
+}
+
 export interface ChaskiFeedApi {
   list(query: ListFeedQuery): Promise<FeedPage>;
   unreadCount(recipientId: string): Promise<{ unread: number }>;
@@ -26,5 +35,6 @@ export interface ChaskiFeedApi {
 export interface ChaskiApi {
   send(request: SendRequest): Promise<SendResult>;
   readonly push: ChaskiPushApi;
+  readonly preferences: ChaskiPreferencesApi;
   readonly feed: ChaskiFeedApi;
 }

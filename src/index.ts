@@ -1,13 +1,20 @@
-export type { ChaskiApi, ChaskiFeedApi, ChaskiPushApi } from './contract/api';
+export type {
+  ChaskiApi,
+  ChaskiFeedApi,
+  ChaskiPreferencesApi,
+  ChaskiPushApi,
+} from './contract/api';
 export type {
   AttachmentInput,
   Channel,
+  ChaskiPreferences,
   DeliveryResult,
   FeedItem,
   FeedPage,
   FeedSocketEvent,
   ListFeedQuery,
   MarkFeedReadInput,
+  PreferencesUpdate,
   Recipient,
   RegisterPushSubscriptionRequest,
   SendOutcome,

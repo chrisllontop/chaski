@@ -6,6 +6,7 @@ import { ready } from './migrations';
 import { mountRoutes, type RoutesOptions } from './routes';
 import { FeedService } from './services/feed.service';
 import { NotificationService } from './services/notification.service';
+import { PreferenceService } from './services/preference.service';
 import { PushSubscriptionService } from './services/push-subscription.service';
 
 export type Chaski = ChaskiApi & {
@@ -40,6 +41,11 @@ export const createChaski = <E>(configure: (env: E) => ChaskiConfig): Chaski => 
       vapidPublicKey: async () => ({
         publicKey: resolveConfig().channels.push?.vapid?.publicKey ?? null,
       }),
+    },
+    preferences: {
+      get: run((recipientId) => PreferenceService.get(recipientId)),
+      set: run((recipientId, update) => PreferenceService.set(recipientId, update)),
+      topics: run(() => PreferenceService.topics()),
     },
     feed: {
       list: run((query) => FeedService.list(query)),

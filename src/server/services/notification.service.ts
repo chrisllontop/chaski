@@ -18,6 +18,7 @@ import { AttachmentService } from './attachment.service';
 import { BaseService } from './base.service';
 import type { ContactSnapshot } from './contact.service';
 import { ContactService } from './contact.service';
+import { PreferenceService } from './preference.service';
 import { TemplateService } from './template.service';
 
 const isUniqueConstraintError = (error: unknown): boolean =>
@@ -112,9 +113,10 @@ export class NotificationService extends BaseService {
   static dispatch = async (input: DispatchInput): Promise<SendResult> => {
     const { enabledChannels } = NotificationService.config;
     const requested = input.channels ?? enabledChannels;
-    const [capabilities, templateFlags] = await Promise.all([
+    const [capabilities, templateFlags, preferences] = await Promise.all([
       loadCapabilities(input.recipientId, requested),
       TemplateService.activeChannelFlags(input.type, requested),
+      input.transactional ? null : PreferenceService.get(input.recipientId),
     ]);
 
     const resolutions = resolveChannels({
@@ -122,7 +124,7 @@ export class NotificationService extends BaseService {
       transactional: input.transactional,
       type: input.type,
       enabledChannels,
-      preferences: null,
+      preferences,
       contact: input.snapshot,
       capabilities,
       templatesByChannel: templateFlags,

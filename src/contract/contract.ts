@@ -100,6 +100,21 @@ export const unregisterPushSubscriptionSchema = z
   });
 export type UnregisterPushSubscriptionQuery = z.infer<typeof unregisterPushSubscriptionSchema>;
 
+// Channel entries merge key by key (absent keys keep their value) while
+// mutedTypes overwrites the whole list: the app owns it as a set, and a merge
+// would make unmuting impossible. An entry may target one channel with a
+// `channel:` prefix ('push:reminder.*'); without one it mutes every channel.
+export const preferencesUpdateSchema = z.object({
+  channels: z.partialRecord(channelSchema, z.boolean()).optional(),
+  mutedTypes: z.array(z.string().min(1).max(128)).max(200).optional(),
+});
+export type PreferencesUpdate = z.input<typeof preferencesUpdateSchema>;
+
+export type ChaskiPreferences = {
+  channels: Partial<Record<Channel, boolean>>;
+  mutedTypes: string[];
+};
+
 export const listFeedQuerySchema = z.object({
   recipientId: z.string().min(1).max(256),
   cursor: z.string().max(512).optional(),
