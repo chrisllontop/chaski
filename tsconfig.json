@@ -17,7 +17,7 @@
     "declaration": true,
     "isolatedDeclarations": true,
     "noEmit": true,
-    "types": []
+    "types": ["@cloudflare/workers-types"]
   },
   "include": ["src"],
   "exclude": ["src/dashboard"]
