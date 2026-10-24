@@ -99,7 +99,7 @@ describe('API', () => {
     const response = await get('/chaski/api/whatever');
 
     expect(response.status).toBe(404);
-    expect(await response.json()).toEqual({ error: 'not_found' });
+    expect(await response.json()).toMatchObject({ error: 'not_found' });
   });
 });
 

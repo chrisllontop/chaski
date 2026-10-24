@@ -6,6 +6,8 @@ export default defineConfig({
   },
   format: ['esm'],
   platform: 'neutral',
-  dts: true,
+  // tsc emits the declarations (pnpm build:types): it infers the Drizzle and zod types.
+  dts: false,
+  external: ['cloudflare:workers'],
   clean: true,
 });

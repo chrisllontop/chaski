@@ -52,19 +52,15 @@ punctuation for user-facing text). Read them before committing, writing code or 
 for the API, services, database, errors and UI arrive with the code they govern.
 
 - Biome: 2 spaces, single quotes, semicolons, 100 columns. Run `pnpm lint`.
-- Arrow functions, not function declarations. Inferred types over annotations, except on exports
-  (see `isolatedDeclarations` below); no `any`.
+- Arrow functions, not function declarations. Inferred types over annotations; no `any`.
 - Comments say **why** (a constraint, an invariant, a quirk), never what the next line does.
 - chaski runs inside the host's Worker and only on the bindings the host declares. Do not assume
   binding names or reach for resources the host did not hand over.
 - Each runtime has its own types: `tsconfig.json` (the Worker side of `src`, Workers types),
   `src/dashboard/tsconfig.json` (DOM and JSX), `test/tsconfig.json` (Workers plus the Vitest
   plugin) and `tsconfig.node.json` (the config files).
-- TypeScript 7 has no classic compiler API, so tsdown emits declarations with Oxc, which needs
-  `isolatedDeclarations`: an export whose type can't be read from its own syntax needs an explicit
-  annotation. `pnpm typecheck` reports a missing one (TS9007, TS9010, TS9013), and so does
-  `pnpm build`. tsdown's tsgo generator would lift that rule; it needs TypeScript 7.1, in beta as of
-  October 2026.
+- tsdown bundles the JavaScript and TypeScript 7's compiler emits the declarations
+  (`pnpm build:types`), so exported Drizzle tables and zod schemas keep their inferred types.
 
 ## Tests
 

@@ -1,5 +1,13 @@
 import { Hono } from 'hono';
-import * as chaski from '../../src';
+import { createChaski } from '../../src';
+
+export type FixtureEnv = {
+  CHASKI_DB: D1Database;
+};
+
+export const chaski = createChaski((env: FixtureEnv) => ({
+  bindings: { db: env.CHASKI_DB },
+}));
 
 // Tests pick the authorize verdict per request; the browser gets the default and sees the dashboard.
 const dashboard = chaski.routes({

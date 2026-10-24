@@ -1,8 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "types": ["node"],
-    "isolatedDeclarations": false
+    "types": ["node"]
   },
   "include": ["*.config.ts"],
   "exclude": []

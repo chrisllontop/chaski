@@ -2,5 +2,13 @@
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "chaski-fixture-host",
   "main": "worker.ts",
-  "compatibility_date": "2026-10-15"
+  "compatibility_date": "2026-10-15",
+  "d1_databases": [
+    {
+      "binding": "CHASKI_DB",
+      "database_name": "chaski-fixture",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "../../migrations"
+    }
+  ]
 }
