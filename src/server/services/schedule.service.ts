@@ -147,6 +147,42 @@ export class ScheduleService extends BaseService {
     }));
   };
 
+  /** A page of pending schedules, soonest first, for the dashboard. */
+  static listPage = async (query: {
+    recipientId?: string;
+    groupKey?: string;
+    page: number;
+    limit: number;
+  }): Promise<{ schedules: ScheduledItem[]; total: number; page: number; limit: number }> => {
+    const where = {
+      status: 'pending',
+      ...(query.recipientId ? { recipientId: query.recipientId } : {}),
+      ...(query.groupKey ? { groupKey: query.groupKey } : {}),
+    };
+    const [rows, total] = await Promise.all([
+      ScheduleService.client.scheduledNotifications.findMany({
+        where,
+        orderBy: [{ scheduledAt: 'asc' }, { id: 'asc' }],
+        skip: query.page * query.limit,
+        take: query.limit,
+      }),
+      ScheduleService.client.scheduledNotifications.count({ where }),
+    ]);
+    return {
+      schedules: rows.map((row) => ({
+        id: row.id,
+        recipientId: row.recipientId,
+        type: row.type,
+        scheduledAt: row.scheduledAt.toISOString(),
+        groupKey: row.groupKey ?? undefined,
+        idempotencyKey: row.idempotencyKey ?? undefined,
+      })),
+      total,
+      page: query.page,
+      limit: query.limit,
+    };
+  };
+
   // Cancelling and firing both guard on status = 'pending', so whichever
   // flips the row first owns it.
   static cancel = async (rawQuery: unknown): Promise<{ cancelled: number }> => {

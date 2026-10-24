@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { channelSchema } from '../../contract/contract';
+import { channelSchema, OFFSET_TIMESTAMP_REGEX } from '../../contract/contract';
 import { ChaskiError } from '../../contract/errors';
 import {
   TEMPLATE_FILE_FORMAT,
@@ -15,6 +15,7 @@ import { parseInput } from '../lib/validate';
 import { ChannelService } from '../services/channel.service';
 import { DeliveryAdminService } from '../services/delivery-admin.service';
 import { METRIC_PERIODS, MetricsService } from '../services/metrics.service';
+import { ScheduleService } from '../services/schedule.service';
 import { TemplateService } from '../services/template.service';
 
 const templateInputSchema = z.object({
@@ -42,7 +43,14 @@ const channelContentSchema = z.object({
   textBody: z.string().nullable().optional(),
 });
 
+const instantSchema = z
+  .string()
+  .regex(OFFSET_TIMESTAMP_REGEX, { message: 'must be ISO 8601 with an explicit offset' })
+  .transform((value) => new Date(value));
+
 const deliveryFiltersSchema = z.object({
+  from: instantSchema.optional(),
+  to: instantSchema.optional(),
   status: z.enum(DELIVERY_STATUS).optional(),
   channel: channelSchema.optional(),
   type: z.string().max(128).optional(),
@@ -53,6 +61,26 @@ const deliveryFiltersSchema = z.object({
 const deliveryListSchema = deliveryFiltersSchema.extend({
   page: z.coerce.number().int().min(0).default(0),
   limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+
+const scheduleListSchema = z.object({
+  recipientId: z.string().max(256).optional(),
+  groupKey: z.string().max(512).optional(),
+  page: z.coerce.number().int().min(0).default(0),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+
+const previewSchema = z.object({
+  channel: channelSchema,
+  data: z.record(z.string(), z.unknown()).optional(),
+  // Content being edited and not saved yet; without it the stored content renders.
+  content: z
+    .object({
+      subject: z.string().max(512).nullable().optional(),
+      body: z.string(),
+      textBody: z.string().nullable().optional(),
+    })
+    .optional(),
 });
 
 const importQuerySchema = z.object({ preview: z.stringbool().default(false) });
@@ -76,6 +104,8 @@ admin.use(async (c, next) => {
   });
 });
 
+admin.get('/me', (c) => c.json({ actor: actorOf(c) ?? null }));
+
 admin.get('/templates', async (c) => c.json({ templates: await TemplateService.list() }));
 
 admin.get('/templates/export', async (c) => {
@@ -96,6 +126,16 @@ admin.post('/templates/import', async (c) => {
 admin.get('/templates/deleted', async (c) =>
   c.json({ templates: await TemplateService.listDeleted() }),
 );
+
+admin.post('/templates/:id/restore', async (c) =>
+  c.json({ template: await TemplateService.restoreTemplate(c.req.param('id')) }),
+);
+
+admin.delete('/templates/:id/permanent', async (c) => {
+  const id = c.req.param('id');
+  await TemplateService.purgeTemplate(id);
+  return c.json({ id, purged: true as const });
+});
 
 admin.post('/templates', async (c) => {
   const input = parseInput(templateInputSchema, await c.req.json());
@@ -124,14 +164,10 @@ admin.put('/templates/:id/channels/:channel', async (c) => {
 });
 
 admin.post('/templates/:id/preview', async (c) => {
-  const input = parseInput(
-    z.object({
-      channel: channelSchema,
-      data: z.record(z.string(), z.unknown()).optional(),
-    }),
-    await c.req.json(),
+  const input = parseInput(previewSchema, await c.req.json());
+  return c.json(
+    await TemplateService.preview(c.req.param('id'), input.channel, input.data, input.content),
   );
-  return c.json(await TemplateService.preview(c.req.param('id'), input.channel, input.data));
 });
 
 admin.post('/templates/:id/test-send', async (c) => {
@@ -158,6 +194,14 @@ admin.get('/events', async (c) => {
 });
 
 admin.get('/channels', (c) => c.json(ChannelService.overview()));
+
+admin.get('/schedules', async (c) =>
+  c.json(await ScheduleService.listPage(parseInput(scheduleListSchema, c.req.query()))),
+);
+
+admin.post('/schedules/:id/cancel', async (c) =>
+  c.json(await ScheduleService.cancel({ id: c.req.param('id') })),
+);
 
 admin.get('/deliveries', async (c) =>
   c.json(await DeliveryAdminService.list(parseInput(deliveryListSchema, c.req.query()))),
