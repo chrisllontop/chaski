@@ -2,8 +2,10 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { channelSchema } from '../../contract/contract';
 import { ChaskiError } from '../../contract/errors';
+import { actorOf } from '../auth';
 import { DELIVERY_STATUS } from '../db/schema';
 import { eventsStub } from '../durable/events';
+import { logger } from '../lib/log';
 import { parseInput } from '../lib/validate';
 import { ChannelService } from '../services/channel.service';
 import { DeliveryAdminService } from '../services/delivery-admin.service';
@@ -51,6 +53,21 @@ const deliveryListSchema = deliveryFiltersSchema.extend({
 const metricsQuerySchema = z.object({ period: z.enum(METRIC_PERIODS).default('30d') });
 
 export const admin = new Hono();
+
+const log = logger('admin');
+
+// Every change made through the dashboard is logged under the actor that
+// authorize let in.
+admin.use(async (c, next) => {
+  await next();
+  if (c.req.method === 'GET' || c.req.method === 'HEAD') return;
+  log.info('admin action', {
+    actor: actorOf(c)?.id,
+    method: c.req.method,
+    path: c.req.path,
+    status: c.res.status,
+  });
+});
 
 admin.get('/templates', async (c) => c.json({ templates: await TemplateService.list() }));
 

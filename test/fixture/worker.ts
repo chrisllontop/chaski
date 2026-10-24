@@ -50,12 +50,12 @@ const dashboard = chaski.routes({
     authorize: (c) => {
       const verdict = c.req.header('x-fixture-authorize');
       if (verdict === 'deny') {
-        return false;
+        return null;
       }
       if (verdict === 'redirect') {
         return c.redirect('/login', 302);
       }
-      return true;
+      return { id: c.req.header('x-fixture-actor') ?? 'admin@host.test', name: 'Fixture admin' };
     },
   },
 });

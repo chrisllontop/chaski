@@ -36,6 +36,7 @@ export {
   isChaskiError,
   isRetryableChaskiError,
 } from './contract/errors';
+export { type Actor, type Authorize, basicAuth, cloudflareAccess } from './server/auth';
 export { type Chaski, createChaski } from './server/chaski';
 export type {
   ApnsConfig,
@@ -50,7 +51,7 @@ export type {
 } from './server/config';
 export { ChaskiEvents } from './server/durable/events';
 export { ChaskiFeed } from './server/durable/feed';
-export type { Authorize, RoutesOptions } from './server/routes';
+export type { RoutesOptions } from './server/routes';
 export type {
   DeliveryMessage,
   EmailAttachment,

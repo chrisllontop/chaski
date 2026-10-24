@@ -30,7 +30,7 @@ describe('migrations', () => {
     }));
     const app = new Hono().route(
       '/chaski',
-      chaski.routes({ dashboard: { authorize: () => true } }),
+      chaski.routes({ dashboard: { authorize: () => ({ id: 'admin@host.test' }) } }),
     );
 
     const response = await app.request('/chaski/api/templates');
