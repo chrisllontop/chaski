@@ -1,7 +1,11 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { channelSchema } from '../../contract/contract';
+import { DELIVERY_STATUS } from '../db/schema';
 import { parseInput } from '../lib/validate';
+import { ChannelService } from '../services/channel.service';
+import { DeliveryAdminService } from '../services/delivery-admin.service';
+import { METRIC_PERIODS, MetricsService } from '../services/metrics.service';
 import { TemplateService } from '../services/template.service';
 
 const templateInputSchema = z.object({
@@ -28,6 +32,21 @@ const channelContentSchema = z.object({
   body: z.string().nullable().optional(),
   textBody: z.string().nullable().optional(),
 });
+
+const deliveryFiltersSchema = z.object({
+  status: z.enum(DELIVERY_STATUS).optional(),
+  channel: channelSchema.optional(),
+  type: z.string().max(128).optional(),
+  recipientId: z.string().max(256).optional(),
+  opened: z.stringbool().optional(),
+});
+
+const deliveryListSchema = deliveryFiltersSchema.extend({
+  page: z.coerce.number().int().min(0).default(0),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+
+const metricsQuerySchema = z.object({ period: z.enum(METRIC_PERIODS).default('30d') });
 
 export const admin = new Hono();
 
@@ -84,3 +103,36 @@ admin.post('/templates/:id/test-send', async (c) => {
   );
   return c.json(await TemplateService.testSend(c.req.param('id'), input));
 });
+
+admin.get('/channels', (c) => c.json(ChannelService.overview()));
+
+admin.get('/deliveries', async (c) =>
+  c.json(await DeliveryAdminService.list(parseInput(deliveryListSchema, c.req.query()))),
+);
+
+admin.get('/deliveries/counts', async (c) => {
+  const { status: _status, ...filters } = parseInput(deliveryFiltersSchema, c.req.query());
+  return c.json({ counts: await DeliveryAdminService.counts(filters) });
+});
+
+admin.post('/deliveries/replay-dead', async (c) => c.json(await DeliveryAdminService.replayDead()));
+
+admin.get('/deliveries/:id', async (c) =>
+  c.json({ delivery: await DeliveryAdminService.get(c.req.param('id')) }),
+);
+
+admin.post('/deliveries/:id/replay', async (c) =>
+  c.json(await DeliveryAdminService.replay(c.req.param('id'))),
+);
+
+admin.get('/metrics/overview', async (c) =>
+  c.json(await MetricsService.overview(parseInput(metricsQuerySchema, c.req.query()).period)),
+);
+
+admin.get('/metrics/timeseries', async (c) =>
+  c.json(await MetricsService.timeseries(parseInput(metricsQuerySchema, c.req.query()).period)),
+);
+
+admin.get('/metrics/types', async (c) =>
+  c.json(await MetricsService.byType(parseInput(metricsQuerySchema, c.req.query()).period)),
+);
