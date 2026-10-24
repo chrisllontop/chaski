@@ -1,0 +1,40 @@
+---
+description: Service layer patterns (business logic) and persistence
+---
+
+## Services
+
+Business logic lives in services under `src/server/services/`, not in route handlers. Route handlers stay thin: parse and validate input, call a service, and shape the HTTP response. The in-process API (`createChaski()`) calls the same services.
+
+- Services extend `BaseService` (`src/server/services/base.service.ts`).
+- All service methods are **static**: `TemplateService.get(id)`. No instance plumbing, no `db`, config or env passed as arguments. Never add singletons, `instance` getters, or constructors to a service.
+- `BaseService` exposes static getters: `config` (the host's resolved config), `bindings` (its D1, queue, Durable Object and Workflow bindings), `client` (better-drizzle), `db` (raw Drizzle) and `log`.
+- Only declare a local `const client = SomeService.client` when the function uses it more than once; for a single call, inline directly.
+- One service per domain concept. Keep cross-cutting helpers in `src/server/lib/`.
+
+```ts
+export class TemplateService extends BaseService {
+  static get = async (templateId: string) => {
+    // config via TemplateService.config, persistence via TemplateService.client;
+    // no Context, no passed db
+  };
+}
+```
+
+## The host owns the bindings
+
+chaski runs inside the host's Worker. Bindings and secrets arrive through the config function given to `createChaski()`, evaluated on every call. Never read a binding by a fixed name, and never assume one the host did not hand over.
+
+## Persistence
+
+The database is **better-drizzle + Drizzle ORM + the host's Cloudflare D1**:
+
+- Any **schema or data-model change** ships a **generated migration** under `migrations/` (`drizzle-kit generate --name <name>`), and its file name goes into `MIGRATIONS` in `src/server/migrations.ts`. Hosts apply the files with `wrangler d1 migrations apply`; chaski refuses to run until every listed migration is applied.
+- Use `SomeService.client` for ordinary reads/writes (`findMany`, `create`, `update`, `paginate`, `include`, `upsertMany`, `transaction`). Timestamps and soft delete are handled by plugins in `src/server/db/plugins/`.
+- **When the client API is not enough:** use the raw Drizzle handle exposed by `BaseService.db` only for D1 `batch()`, conditional writes whose `meta.changes` is part of correctness, SQL aggregation, or an explicit retention/repair hard delete. Keep raw operations local and documented because they bypass Better Drizzle plugins.
+- **Soft delete:** use `better-drizzle/soft-delete` only on recoverable business tables carrying nullable `deletedAt` (templates). Ordinary reads exclude tombstones; audit/recovery paths opt in with `deleted: 'with'` or `deleted: 'only'`; `delete()` is logical by default; and `mode: 'hard'` is restricted to explicit retention/repair purge paths. Device tokens, delivery rows and other operational data stay on hard deletion or their domain-specific terminal state.
+- Schema lives in `src/server/db/schema/`. Derive types with `InferSelectModel<typeof table>` instead of hand-written interfaces where practical.
+- **Timestamps:** persist absolute instants as UTC Unix epoch **milliseconds** in SQLite `INTEGER` columns declared through `timestamp()` / `timestampNow()` from `src/server/db/schema/timestamps.ts` (`mode: 'timestamp_ms'`). Better Drizzle and services read and write these values as `Date`; compare and index them numerically. Do not persist ISO date strings in domain timestamp columns.
+- **Date handling:** keep persisted instants as `Date` inside services. Serialize public HTTP and SDK values as RFC 3339 UTC strings with millisecond precision (`toISOString()`), and accept external instants only with an explicit timezone before normalizing once. Epoch numbers are an internal database representation and must not leak through public contracts. Name instants `*At`; name durations with their unit (`*Ms`, `*Seconds`).
+- **Idempotency:** dedupe rows with **unique indexes** (notifications and schedules by `idempotency_key`, deliveries by `(notification_id, channel)`). For one-shot side effects, claim atomically *before* running the effect and release the claim if it fails. When an insert can race a concurrent writer on a unique key, prefer one atomic upsert (`client.upsertMany` with `target`) over catch-and-retry on the constraint error.
+- Keep query logic in services; do not duplicate it across routes.

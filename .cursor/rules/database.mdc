@@ -1,0 +1,47 @@
+---
+description: Database design and normalization rules for new features
+---
+
+## Database normalization
+
+When a feature adds or changes tables in `src/server/db/schema/`, keep the data normalized by default. Denormalize only deliberately, and document why in a short schema comment.
+
+chaski is single-instance: one host, one database. Tables carry no tenant or project column.
+
+### Defaults for new tables
+
+- **Every reference between tables is a real foreign key** (`.references(...)`) with an explicit `onDelete` action. Choose the action consciously:
+  - `cascade` for owned children (rows that are meaningless without the parent, such as template channels).
+  - `set null` for optional pointers.
+  - default (`no action`) to make deletion impossible while referenced; use it for delivery and audit rows.
+- **Index every FK column you query by**, plus the columns used in `WHERE` filters.
+- **Each fact lives in exactly one table.** Do not copy a column from another table for convenience. Join or query the owning table instead.
+- **Natural keys become the primary key** when they identify the row (`contacts.recipient_id`, `preferences.recipient_id`); natural join tables get a composite primary key (`primaryKey({ columns: [...] })`), not a synthetic id plus a unique index.
+
+### JSON columns
+
+A JSON text column is acceptable **only** when all of these hold:
+
+1. The value is read and written as a whole document (never filtered, joined, or aggregated in SQL or in application code over many rows).
+2. Its inner items are not referenced by id from any other table.
+3. Its shape is heterogeneous or deeply nested (a notification payload, a device's push keys).
+
+If a list is filtered or searched in SQL or its items are referenced by id from another table, it must be a child table, even if a JSON array looks simpler at first.
+
+Closed enum arrays that are never filtered in SQL may stay JSON (a preference's muted types); revisit if a query ever needs them.
+
+### Deliberate denormalization
+
+Allowed only for:
+
+- **Immutable snapshots**: values frozen at event time must not change retroactively (a notification's `contact_snapshot`, so retries never depend on a contact row that changed).
+- **Idempotence/derived flags** documented as such.
+- **Supertype/subtype duplication** where the schema comment explains the invariant.
+
+In every case, add a comment at the column explaining the reason and the invariant that keeps it consistent.
+
+### Changing schema
+
+- Ship every change as a generated migration under `migrations/` (`drizzle-kit generate --name <name>`), hand-adjusted for D1 if needed: D1 supports `PRAGMA defer_foreign_keys` (checks deferred, **cascade actions still fire**), not `PRAGMA foreign_keys=OFF`. When recreating a parent table, stash and restore its children.
+- Never edit a migration that a release already shipped; hosts may have applied it. Add a new one.
+- When normalizing an existing JSON or duplicated column, backfill the new table **in the same migration** before dropping the column.
