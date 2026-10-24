@@ -201,6 +201,34 @@ export type FeedPage = {
   nextCursor: string | null;
 };
 
+// The user routes read the recipient from identify(), never from the
+// client, so their bodies and queries carry no recipient id.
+export const feedListParamsSchema = z.object({
+  cursor: z.string().max(512).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  unreadOnly: z.stringbool().optional(),
+});
+export type FeedListParams = z.input<typeof feedListParamsSchema>;
+
+export const markFeedReadBodySchema = markFeedReadSchema.omit({ recipientId: true });
+export type MarkFeedReadBody = z.input<typeof markFeedReadBodySchema>;
+
+export const deviceSubscriptionSchema = z.union([
+  z.object({ platform: z.literal('ios'), deviceToken: apnsDeviceTokenSchema }),
+  webPushSubscriptionSchema,
+]);
+export type DeviceSubscription = z.input<typeof deviceSubscriptionSchema>;
+
+export const deviceUnsubscriptionSchema = z
+  .object({
+    endpoint: z.string().url().max(2048).optional(),
+    deviceToken: apnsDeviceTokenSchema.optional(),
+  })
+  .refine((q) => q.endpoint || q.deviceToken, {
+    message: 'one of endpoint or deviceToken is required',
+  });
+export type DeviceUnsubscription = z.input<typeof deviceUnsubscriptionSchema>;
+
 export type DeliveryResult = {
   id?: string;
   channel: Channel;

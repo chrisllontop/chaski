@@ -12,10 +12,14 @@ export type {
   Channel,
   ChaskiPreferences,
   DeliveryResult,
+  DeviceSubscription,
+  DeviceUnsubscription,
   FeedItem,
+  FeedListParams,
   FeedPage,
   FeedSocketEvent,
   ListFeedQuery,
+  MarkFeedReadBody,
   MarkFeedReadInput,
   PreferencesUpdate,
   Recipient,
@@ -58,6 +62,7 @@ export type {
 export { ChaskiEvents } from './server/durable/events';
 export { ChaskiFeed } from './server/durable/feed';
 export type { RoutesOptions } from './server/routes';
+export type { Identify, UserRoutesOptions } from './server/routes/user';
 export type {
   DeliveryMessage,
   EmailAttachment,

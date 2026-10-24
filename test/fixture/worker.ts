@@ -60,8 +60,15 @@ const dashboard = chaski.routes({
   },
 });
 
+// The signed-in user comes from a header here; a real host reads its session.
+const notifications = chaski.userRoutes({
+  identify: (c) => c.req.header('x-fixture-user') ?? null,
+  allowedOrigins: ['https://frontend.host.test'],
+});
+
 const app = new Hono()
   .get('/', (c) => c.text('Host home'))
+  .route('/me/notifications', notifications)
   .route('/chaski', dashboard)
   .route('/admin', new Hono().route('/notifications', dashboard));
 

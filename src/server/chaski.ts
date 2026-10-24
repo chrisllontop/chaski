@@ -4,6 +4,7 @@ import { type ChaskiConfig, resolveConfig, setConfigure } from './config';
 import { handleQueueBatch, isChaskiBatch } from './consumer';
 import { ready } from './migrations';
 import { mountRoutes, type RoutesOptions } from './routes';
+import { mountUserRoutes, type UserRoutesOptions } from './routes/user';
 import { FeedService } from './services/feed.service';
 import { NotificationService } from './services/notification.service';
 import { PreferenceService } from './services/preference.service';
@@ -13,6 +14,8 @@ import { ScheduleService } from './services/schedule.service';
 export type Chaski = ChaskiApi & {
   /** The dashboard, its admin API under /api and the open-tracking pixel; mount it with app.route(). */
   routes<E extends Env = Env>(options: RoutesOptions<E>): Hono<E>;
+  /** Feed, devices and preferences of the signed-in user, for the host's frontend; mount it with app.route(). */
+  userRoutes<E extends Env = Env>(options: UserRoutesOptions<E>): Hono<E>;
   /** Handles a batch from chaski's queue and returns true; leaves any other batch untouched. */
   queue(batch: MessageBatch<unknown>, env?: unknown, ctx?: ExecutionContext): Promise<boolean>;
 };
@@ -29,6 +32,7 @@ export const createChaski = <E>(configure: (env: E) => ChaskiConfig): Chaski => 
   setConfigure(configure);
   return {
     routes: (options) => mountRoutes(options),
+    userRoutes: (options) => mountUserRoutes(options),
     queue: async (batch) => {
       if (!isChaskiBatch(batch)) return false;
       await ready();
