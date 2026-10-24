@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { publishAdminEvents } from '../lib/admin-events';
 import { TRANSPARENT_GIF } from '../lib/email-open';
 import { logger } from '../lib/log';
 import { reportError } from '../lib/report-error';
@@ -12,10 +13,12 @@ export const tracking = new Hono();
 tracking.get('/o/:deliveryId', (c) => {
   const deliveryId = c.req.param('deliveryId');
   c.executionCtx.waitUntil(
-    DeliveryService.markOpened(deliveryId).catch((error: unknown) => {
-      reportError(error, { source: 'tracking', deliveryId });
-      logger('tracking').error('open mark failed', error, { deliveryId });
-    }),
+    DeliveryService.markOpened(deliveryId)
+      .then((opened) => (opened ? publishAdminEvents(['deliveries', 'metrics']) : undefined))
+      .catch((error: unknown) => {
+        reportError(error, { source: 'tracking', deliveryId });
+        logger('tracking').error('open mark failed', error, { deliveryId });
+      }),
   );
   return c.body(TRANSPARENT_GIF.slice().buffer, 200, {
     'content-type': 'image/gif',

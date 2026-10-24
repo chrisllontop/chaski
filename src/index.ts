@@ -1,3 +1,4 @@
+export type { AdminEventTopic, AdminSocketEvent } from './contract/admin-events';
 export type {
   ChaskiApi,
   ChaskiFeedApi,
@@ -47,6 +48,7 @@ export type {
   PushConfig,
   VapidConfig,
 } from './server/config';
+export { ChaskiEvents } from './server/durable/events';
 export { ChaskiFeed } from './server/durable/feed';
 export type { Authorize, RoutesOptions } from './server/routes';
 export type {

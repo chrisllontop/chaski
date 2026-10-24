@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import type { Channel } from '../../contract/contract';
 import { ChaskiError } from '../../contract/errors';
 import { notifications } from '../db/schema';
+import { publishAdminEvents } from '../lib/admin-events';
 import { DeliveryError } from '../lib/errors';
 import { newId } from '../lib/ids';
 import { parseJson } from '../lib/json';
@@ -164,6 +165,7 @@ export class TemplateService extends BaseService {
         skipDuplicates: true,
       });
     }
+    await publishAdminEvents(['templates']);
     return created;
   };
 
@@ -199,12 +201,14 @@ export class TemplateService extends BaseService {
       where: { id: templateId },
       data: input,
     });
+    await publishAdminEvents(['templates']);
     return updated;
   };
 
   static deleteTemplate = async (templateId: string): Promise<void> => {
     await TemplateService.get(templateId);
     await TemplateService.client.templates.delete({ where: { id: templateId } });
+    await publishAdminEvents(['templates']);
   };
 
   // Retention/repair escape hatch. Never use this for an ordinary user delete:
@@ -216,6 +220,7 @@ export class TemplateService extends BaseService {
     });
     if (!deleted) throw new ChaskiError('not_found', `deleted template '${templateId}' not found`);
     await TemplateService.client.templates.delete({ where: { id: templateId }, mode: 'hard' });
+    await publishAdminEvents(['templates']);
   };
 
   static upsertChannel = async (
@@ -243,6 +248,7 @@ export class TemplateService extends BaseService {
             textBody: input.textBody ?? null,
           },
         });
+    await publishAdminEvents(['templates']);
     return row;
   };
 

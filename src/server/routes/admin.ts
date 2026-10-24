@@ -1,7 +1,9 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { channelSchema } from '../../contract/contract';
+import { ChaskiError } from '../../contract/errors';
 import { DELIVERY_STATUS } from '../db/schema';
+import { eventsStub } from '../durable/events';
 import { parseInput } from '../lib/validate';
 import { ChannelService } from '../services/channel.service';
 import { DeliveryAdminService } from '../services/delivery-admin.service';
@@ -102,6 +104,18 @@ admin.post('/templates/:id/test-send', async (c) => {
     await c.req.json(),
   );
   return c.json(await TemplateService.testSend(c.req.param('id'), input));
+});
+
+// The dashboard's realtime socket; the 101 must pass through untouched.
+admin.get('/events', async (c) => {
+  const events = eventsStub();
+  if (!events) {
+    throw new ChaskiError('not_found', 'realtime events are off: bindings.events is missing');
+  }
+  if (c.req.header('upgrade')?.toLowerCase() !== 'websocket') {
+    return c.json({ error: 'upgrade_required', message: 'expected a WebSocket upgrade' }, 426);
+  }
+  return events.fetch(c.req.raw);
 });
 
 admin.get('/channels', (c) => c.json(ChannelService.overview()));

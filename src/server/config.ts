@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { CHANNELS, type Channel } from '../contract/contract';
 import { ChaskiError } from '../contract/errors';
+import type { ChaskiEvents } from './durable/events';
 import type { ChaskiFeed } from './durable/feed';
 import type { ApnsCredentials } from './lib/apns';
 import { decodeBase64Url, encodeBase64Url } from './lib/base64';
@@ -13,6 +14,8 @@ export type ChaskiBindings = {
   queue: Queue<DeliveryMessage>;
   /** The host's `send_email` binding; required when the email channel is configured. */
   email?: SendEmailBinding;
+  /** The ChaskiEvents Durable Object namespace; without it the dashboard gets no realtime updates. */
+  events?: DurableObjectNamespace<ChaskiEvents>;
   /** The ChaskiScheduler Workflow; required by chaski.schedule(). */
   scheduler?: Workflow<ScheduleParams>;
   /** The ChaskiFeed Durable Object namespace; required when the in_app channel is configured. */
@@ -60,7 +63,7 @@ export type ResolvedPush = {
   apns?: ApnsCredentials;
 };
 
-export type ErrorSource = 'http' | 'queue' | 'workflow' | 'tracking' | 'feed';
+export type ErrorSource = 'http' | 'queue' | 'workflow' | 'tracking' | 'feed' | 'events';
 
 export type ErrorContext = {
   source: ErrorSource;

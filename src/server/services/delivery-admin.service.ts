@@ -2,6 +2,7 @@ import { and, desc, eq, inArray, isNotNull, isNull, type SQL, sql } from 'drizzl
 import type { Channel } from '../../contract/contract';
 import { ChaskiError } from '../../contract/errors';
 import { type DeliveryStatus, deliveries, notifications } from '../db/schema';
+import { publishAdminEvents } from '../lib/admin-events';
 import { parseJson } from '../lib/json';
 import type { DeliveryMessage } from '../types';
 import { BaseService } from './base.service';
@@ -201,6 +202,7 @@ export class DeliveryAdminService extends BaseService {
       );
     }
     DeliveryAdminService.log.info('deliveries replayed', { count: rows.length });
+    await publishAdminEvents(['deliveries', 'metrics']);
     return rows.length;
   };
 }

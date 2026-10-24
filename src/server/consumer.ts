@@ -1,4 +1,5 @@
 import { resolveConfig } from './config';
+import { publishAdminEvents } from './lib/admin-events';
 import { logger } from './lib/log';
 import { reportError } from './lib/report-error';
 import { DeliveryService } from './services/delivery.service';
@@ -23,6 +24,7 @@ export const handleQueueBatch = async (batch: MessageBatch<DeliveryMessage>): Pr
   for (const message of batch.messages) {
     await processDelivery(message);
   }
+  await publishAdminEvents(['deliveries', 'metrics']);
 };
 
 const processDelivery = async (message: Message<DeliveryMessage>): Promise<void> => {

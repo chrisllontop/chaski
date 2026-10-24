@@ -28,9 +28,12 @@
     ]
   },
   "durable_objects": {
-    "bindings": [{ "name": "CHASKI_FEED", "class_name": "ChaskiFeed" }]
+    "bindings": [
+      { "name": "CHASKI_FEED", "class_name": "ChaskiFeed" },
+      { "name": "CHASKI_EVENTS", "class_name": "ChaskiEvents" }
+    ]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ChaskiFeed"] }],
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ChaskiFeed", "ChaskiEvents"] }],
   "workflows": [
     { "name": "chaski-scheduler", "binding": "CHASKI_SCHEDULER", "class_name": "ChaskiScheduler" }
   ],

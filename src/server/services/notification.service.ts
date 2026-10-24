@@ -8,6 +8,7 @@ import type {
 import { sendRequestSchema } from '../../contract/contract';
 import { ChaskiError } from '../../contract/errors';
 import { deliveries, notifications } from '../db/schema';
+import { publishAdminEvents } from '../lib/admin-events';
 import { newId } from '../lib/ids';
 import { resolveChannels } from '../lib/resolve-channels';
 import { parseInput } from '../lib/validate';
@@ -189,6 +190,7 @@ export class NotificationService extends BaseService {
     // Every send delivers through the queue; `transactional` only decides whether
     // recipient preferences apply (see resolveChannels).
     await NotificationService.enqueue(pendingMessages);
+    await publishAdminEvents(['deliveries', 'metrics']);
 
     const results: DeliveryResult[] = deliveryRows.map((row) => ({
       id: row.id,
