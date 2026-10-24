@@ -1,4 +1,4 @@
-// `kind` lets a host that runs several queues tell chaski's batches apart.
+// `kind` lets a host that runs several queues tell Chaski's batches apart.
 export interface DeliveryMessage {
   kind: 'chaski.delivery';
   deliveryId: string;

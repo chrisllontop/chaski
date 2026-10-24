@@ -16,7 +16,7 @@ export type Chaski = ChaskiApi & {
   routes<E extends Env = Env>(options: RoutesOptions<E>): Hono<E>;
   /** Feed, devices and preferences of the signed-in user, for the host's frontend; mount it with app.route(). */
   userRoutes<E extends Env = Env>(options: UserRoutesOptions<E>): Hono<E>;
-  /** Handles a batch from chaski's queue and returns true; leaves any other batch untouched. */
+  /** Handles a batch from Chaski's queue and returns true; leaves any other batch untouched. */
   queue(batch: MessageBatch<unknown>, env?: unknown, ctx?: ExecutionContext): Promise<boolean>;
 };
 

@@ -76,7 +76,7 @@ export const queuedMessages = (): DeliveryMessage[] =>
     .mocked(env.CHASKI_QUEUE.sendBatch)
     .mock.calls.flatMap(([messages]) => [...messages].map((message) => message.body));
 
-// Registers chaski again with the fixture's config plus the overrides; the
+// Registers Chaski again with the fixture's config plus the overrides; the
 // fixture Worker shares this isolate, so its routes and queue see it too.
 export const useConfig = (overrides: Partial<ChaskiConfig> = {}) =>
   createChaski(() => ({ ...fixtureConfig(env), ...overrides }));

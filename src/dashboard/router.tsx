@@ -2,7 +2,7 @@ import { createRootRoute, createRoute, createRouter, Link, Outlet } from '@tanst
 
 const Home = () => (
   <main className="grid min-h-dvh place-items-center">
-    <h1 className="text-2xl font-semibold">chaski</h1>
+    <h1 className="text-2xl font-semibold">Chaski</h1>
   </main>
 );
 

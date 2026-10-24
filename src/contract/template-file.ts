@@ -4,7 +4,7 @@ import { channelSchema, typeNameSchema } from './contract';
 // The file the dashboard downloads and uploads to carry templates between
 // environments, staging to production say. Templates are keyed by type, so
 // uploading the same file twice changes nothing; format and version let a
-// later chaski read an older file and refuse one it does not know.
+// later Chaski read an older file and refuse one it does not know.
 export const TEMPLATE_FILE_FORMAT = 'chaski.templates';
 export const TEMPLATE_FILE_VERSION = 1;
 

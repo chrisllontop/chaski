@@ -138,7 +138,7 @@ export const cloudflareAccess = (options: {
   ).origin;
   const audiences = [options.audience].flat().filter(Boolean);
   if (audiences.length === 0) {
-    throw new ChaskiError('config', 'chaski config: cloudflareAccess needs an audience');
+    throw new ChaskiError('config', 'Chaski config: cloudflareAccess needs an audience');
   }
   return async (c) => {
     const token = c.req.header('cf-access-jwt-assertion');
@@ -186,9 +186,9 @@ export const basicAuth = (options: {
   realm?: string;
 }): Authorize => {
   if (!options.username || !options.password) {
-    throw new ChaskiError('config', 'chaski config: basicAuth needs a username and a password');
+    throw new ChaskiError('config', 'Chaski config: basicAuth needs a username and a password');
   }
-  const challenge = `Basic realm="${options.realm ?? 'chaski'}", charset="UTF-8"`;
+  const challenge = `Basic realm="${options.realm ?? 'Chaski'}", charset="UTF-8"`;
   return async (c) => {
     const [username, password] = decodeCredentials(c.req.header('authorization')) ?? ['', ''];
     // Both comparisons always run, so the answer time doesn't tell which failed.

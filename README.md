@@ -1,7 +1,7 @@
 <h1>
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="brand/logo-white.svg">
-    <img alt="chaski" src="brand/logo-black.svg" height="40">
+    <img alt="Chaski" src="brand/logo-black.svg" height="40">
   </picture>
 </h1>
 
@@ -12,11 +12,11 @@ Embeddable notification infrastructure for Cloudflare Workers, dashboard include
 ![Status: pre-release](https://img.shields.io/badge/status-pre--release-404040?style=flat-square)
 
 **Status: pre-release.** The engine and the browser clients are in place. The dashboard screens and
-a setup guide come next, so chaski isn’t ready to install yet.
+a setup guide come next, so Chaski isn’t ready to install yet.
 
 ## What it will be
 
-chaski lives inside your Worker. You mount it on a route, the way you’d mount Swagger UI or Bull
+Chaski lives inside your Worker. You mount it on a route, the way you’d mount Swagger UI or Bull
 Board, and it runs on your own Cloudflare resources. It deploys with your Worker, and your data stays
 in your account.
 

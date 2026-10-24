@@ -6,7 +6,7 @@ import { resolveConfig } from '../config';
 // One instance per recipient, named by the recipient id.
 export const feedStub = (recipientId: string) => {
   const namespace = resolveConfig().bindings.feed;
-  if (!namespace) throw new ChaskiError('config', 'chaski config: bindings.feed is missing');
+  if (!namespace) throw new ChaskiError('config', 'Chaski config: bindings.feed is missing');
   return namespace.get(namespace.idFromName(recipientId));
 };
 

@@ -178,7 +178,7 @@ describe('basicAuth', () => {
     const response = await app.request('/chaski/api/channels');
 
     expect(response.status).toBe(401);
-    expect(response.headers.get('www-authenticate')).toBe('Basic realm="chaski", charset="UTF-8"');
+    expect(response.headers.get('www-authenticate')).toBe('Basic realm="Chaski", charset="UTF-8"');
   });
 
   it('lets in the right credentials and nothing else', async () => {
@@ -189,7 +189,7 @@ describe('basicAuth', () => {
 
   it('needs a username and a password', () => {
     expect(() => basicAuth({ username: 'ops', password: '' })).toThrowError(
-      'chaski config: basicAuth needs a username and a password',
+      'Chaski config: basicAuth needs a username and a password',
     );
   });
 });

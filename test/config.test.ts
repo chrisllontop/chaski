@@ -11,7 +11,7 @@ describe('config', () => {
     ).toThrowError(
       expect.objectContaining({
         code: 'config',
-        message: `chaski config: bindings.${name} is missing`,
+        message: `Chaski config: bindings.${name} is missing`,
       }),
     );
   });
@@ -35,7 +35,7 @@ describe('config', () => {
       validateConfig({ ...config, bindings: { ...config.bindings, email: undefined } }),
     ).toThrowError(
       expect.objectContaining({
-        message: 'chaski config: channels.email is configured but bindings.email is missing',
+        message: 'Chaski config: channels.email is configured but bindings.email is missing',
       }),
     );
   });
@@ -58,7 +58,7 @@ describe('config', () => {
       validateConfig({ ...config, bindings: { ...config.bindings, feed: undefined } }),
     ).toThrowError(
       expect.objectContaining({
-        message: 'chaski config: channels.in_app is configured but bindings.feed is missing',
+        message: 'Chaski config: channels.in_app is configured but bindings.feed is missing',
       }),
     );
   });

@@ -1,12 +1,12 @@
-# chaski
+# Chaski
 
 Embeddable notification infrastructure for Cloudflare Workers, dashboard included. A project mounts
-chaski on a route of its own Worker, the way it would mount Swagger UI or Bull Board, and chaski runs
+Chaski on a route of its own Worker, the way it would mount Swagger UI or Bull Board, and Chaski runs
 on that project's Cloudflare resources: email, web push and in-app notifications, with templates,
 scheduling, retries and a dashboard. Open source (MIT), published on npm as `chaski`.
 
 **Current stage: the engine and the browser clients, without dashboard screens.** `createChaski()` takes
-the host's config; chaski sends email, web push, APNs and in-app notifications through the host's
+the host's config; Chaski sends email, web push, APNs and in-app notifications through the host's
 queue, with templates, preferences, scheduled sends, retries and realtime events. `chaski.routes()`
 mounts the dashboard shell and the admin API, and `chaski.userRoutes()` the endpoints the host's
 frontend calls for the signed-in user, which `chaski/client`, `chaski/sw` and `chaski/react` wrap
@@ -74,7 +74,7 @@ for the page, the service worker and React. The dashboard screens come next.
 - `brand/` holds the logo: the mark and the full logo (mark and wordmark, outlined), each in black
   (`#0A0A0A`) and white (`#FAFAFA`) ink. The README and the dashboard favicon use it; it doesn't
   ship in the package.
-- `test/fixture` is a host Worker that mounts chaski and declares every binding it uses (D1, queue
+- `test/fixture` is a host Worker that mounts Chaski and declares every binding it uses (D1, queue
   and dead-letter queue, both Durable Objects, the Workflow, R2 and `send_email`); the tests and
   `pnpm dev` both run it.
 
@@ -90,7 +90,7 @@ with the code they govern.
 - Biome: 2 spaces, single quotes, semicolons, 100 columns. Run `pnpm lint`.
 - Arrow functions, not function declarations. Inferred types over annotations; no `any`.
 - Comments say **why** (a constraint, an invariant, a quirk), never what the next line does.
-- chaski runs inside the host's Worker and only on the bindings the host declares. Do not assume
+- Chaski runs inside the host's Worker and only on the bindings the host declares. Do not assume
   binding names or reach for resources the host did not hand over.
 - Each runtime has its own types: `tsconfig.json` (the Worker side of `src`, Workers types),
   `tsconfig.browser.json` (the browser entries and the contract, DOM types),

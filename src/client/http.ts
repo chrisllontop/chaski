@@ -1,6 +1,6 @@
 import { CHASKI_ERROR_CODES, ChaskiError, type ChaskiErrorCode } from '../contract/errors';
 
-/** An error answer from chaski's user routes, with its HTTP status. */
+/** An error answer from Chaski's user routes, with its HTTP status. */
 export class ChaskiRequestError extends ChaskiError {
   readonly status: number;
 

@@ -7,7 +7,7 @@ import type { DeliveryMessage } from './types';
 
 const log = logger('consumer');
 
-// A batch is chaski's only when every message carries the delivery kind; a
+// A batch is Chaski's only when every message carries the delivery kind; a
 // shared queue is a host misconfiguration, so a mixed batch is left alone.
 export const isChaskiBatch = (
   batch: MessageBatch<unknown>,

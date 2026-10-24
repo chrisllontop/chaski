@@ -11,7 +11,7 @@ export const CHASKI_QUERY_KEY = ['chaski'] as const;
 
 /**
  * `{ queryKey, queryFn }` pairs for apps that already run a query cache
- * (TanStack Query, SWR and the like), so chaski's data lives in that cache
+ * (TanStack Query, SWR and the like), so Chaski's data lives in that cache
  * instead of a second copy. Invalidate CHASKI_QUERY_KEY when the feed signals.
  */
 export const chaskiQueries = (client: ChaskiClient) => ({

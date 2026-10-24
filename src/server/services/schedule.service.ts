@@ -32,7 +32,7 @@ export class ScheduleService extends BaseService {
     if (!scheduler) {
       throw new ChaskiError(
         'config',
-        'chaski config: bindings.scheduler is missing; chaski.schedule() needs the ChaskiScheduler Workflow',
+        'Chaski config: bindings.scheduler is missing; chaski.schedule() needs the ChaskiScheduler Workflow',
       );
     }
     return scheduler;
