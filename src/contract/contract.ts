@@ -186,6 +186,15 @@ export const feedSocketEventSchema = z.object({
 });
 export type FeedSocketEvent = z.infer<typeof feedSocketEventSchema>;
 
+/** What a web push carries; chaski's service worker shows it as a notification. */
+export type PushPayload = {
+  title: string;
+  body: string;
+  href?: string;
+  /** The notification id, so a repeated push shows once instead of twice. */
+  tag?: string;
+};
+
 export type FeedItem = {
   id: string;
   type: string;

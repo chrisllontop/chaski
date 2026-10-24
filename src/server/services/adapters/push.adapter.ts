@@ -1,3 +1,4 @@
+import type { PushPayload } from '../../../contract/contract';
 import type { ResolvedPush } from '../../config';
 import {
   type ApnsCredentials,
@@ -15,14 +16,6 @@ import type { ApnsPushDevice, WebPushDevice } from '../push-subscription.service
 import { PushSubscriptionService } from '../push-subscription.service';
 import { TemplateService } from '../template.service';
 import type { AdapterContext, AdapterResult } from './types';
-
-/** What a web push carries; chaski's service worker shows it as a notification. */
-export type PushPayload = {
-  title: string;
-  body: string;
-  href?: string;
-  tag?: string;
-};
 
 type PushOutcome = 'delivered' | 'expired';
 
