@@ -32,6 +32,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./client": {
+      "types": "./dist/client/index.d.ts",
+      "import": "./dist/client.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [
@@ -55,9 +59,9 @@
   "scripts": {
     "dev": "pnpm build:dashboard && wrangler dev -c test/fixture/wrangler.jsonc --var CHASKI_DRY_RUN:true",
     "build:dashboard": "vite build",
-    "build:types": "tsc -p tsconfig.json --noEmit false --declaration --emitDeclarationOnly --outDir dist --rootDir src && node scripts/fix-declaration-imports.ts dist",
+    "build:types": "tsc -p tsconfig.json --noEmit false --declaration --emitDeclarationOnly --outDir dist --rootDir src && tsc -p tsconfig.browser.json --noEmit false --declaration --emitDeclarationOnly --outDir dist --rootDir src && node scripts/fix-declaration-imports.ts dist",
     "build": "pnpm build:dashboard && tsdown && pnpm build:types",
-    "typecheck": "tsc -p tsconfig.json && tsc -p src/dashboard/tsconfig.json && tsc -p test/tsconfig.json && tsc -p tsconfig.node.json",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.browser.json && tsc -p src/dashboard/tsconfig.json && tsc -p test/tsconfig.json && tsc -p test/browser/tsconfig.json && tsc -p tsconfig.node.json",
     "lint": "biome check .",
     "format": "biome check --write .",
     "test": "vitest run",
@@ -69,11 +73,14 @@
     "@cloudflare/workers-types": "^5.20261023.1",
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/react-router": "^1.170.46",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
     "@types/node": "^24.19.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
     "drizzle-kit": "^0.31.11",
+    "happy-dom": "^21.0.4",
     "hono": "^4.13.13",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",

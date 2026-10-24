@@ -1,8 +1,11 @@
 import { defineConfig } from 'tsdown';
 
 export default defineConfig({
+  // Each entry runs in a runtime of its own, so none may pull another's code
+  // into its bundle.
   entry: {
     index: 'src/index.ts',
+    client: 'src/client/index.ts',
   },
   format: ['esm'],
   platform: 'neutral',
