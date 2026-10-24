@@ -152,6 +152,66 @@ describe('template editing', () => {
   });
 });
 
+describe('email preview document', () => {
+  it('renders unsaved email HTML under its own sandboxed CSP', async () => {
+    await seedTemplate('payment_received', 'email');
+    const template = await getClient().templates.findFirst({
+      where: { type: 'payment_received' },
+    });
+    const form = new URLSearchParams({
+      subject: 'Paid',
+      body: '<p style="color:red">{{ amount }} paid</p>',
+      data: JSON.stringify({ amount: 42 }),
+    });
+
+    const response = await api(`/templates/${template?.id}/preview/document`, {
+      method: 'POST',
+      body: form,
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toContain('text/html');
+    const csp = response.headers.get('content-security-policy') ?? '';
+    expect(csp).toContain("default-src 'none'");
+    expect(csp).toContain("style-src 'unsafe-inline'");
+    expect(csp).toContain('sandbox');
+    expect(csp).toContain("frame-ancestors 'self'");
+    expect(csp).not.toContain('script-src');
+    expect(await response.text()).toBe('<p style="color:red">42 paid</p>');
+  });
+
+  it('refuses sample data that is not a JSON object', async () => {
+    await seedTemplate('payment_received', 'email');
+    const template = await getClient().templates.findFirst({
+      where: { type: 'payment_received' },
+    });
+
+    const response = await api(`/templates/${template?.id}/preview/document`, {
+      method: 'POST',
+      body: new URLSearchParams({ body: '<p>x</p>', data: '[1, 2]' }),
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    });
+
+    expect(response.status).toBe(400);
+  });
+
+  it('keeps previews out of the admin action log', async () => {
+    await seedTemplate('payment_received', 'email');
+    const template = await getClient().templates.findFirst({
+      where: { type: 'payment_received' },
+    });
+    const info = vi.spyOn(console, 'info');
+
+    await api(`/templates/${template?.id}/preview`, {
+      method: 'POST',
+      body: JSON.stringify({ channel: 'email', data: { amount: 1 } }),
+    });
+
+    expect(info).not.toHaveBeenCalledWith('[chaski:admin]', 'admin action', expect.anything());
+  });
+});
+
 describe('deliveries by time', () => {
   it('lists the latest change first and filters by when it happened', async () => {
     await seedTemplate('payment_received', 'email');

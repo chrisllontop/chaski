@@ -93,9 +93,13 @@ const log = logger('admin');
 
 // Every change made through the dashboard is logged under the actor that
 // authorize let in.
+// Previews change nothing, and the editor asks for one on every edit.
+const READ_ONLY_POSTS = /\/preview(\/document)?$/;
+
 admin.use(async (c, next) => {
   await next();
   if (c.req.method === 'GET' || c.req.method === 'HEAD') return;
+  if (READ_ONLY_POSTS.test(c.req.path) || c.req.query('preview') === 'true') return;
   log.info('admin action', {
     actor: actorOf(c)?.id,
     method: c.req.method,
@@ -161,6 +165,51 @@ admin.put('/templates/:id/channels/:channel', async (c) => {
   const input = parseInput(channelContentSchema, await c.req.json());
   const row = await TemplateService.upsertChannel(c.req.param('id'), channel, input);
   return c.json({ channel: row });
+});
+
+// The dashboard renders the email inside an iframe it posts this form into,
+// so the email's own inline styles and remote images apply there without
+// loosening the dashboard's CSP. The sandbox lets no script run.
+const PREVIEW_DOCUMENT_CSP = [
+  "default-src 'none'",
+  "style-src 'unsafe-inline'",
+  'img-src https: http: data:',
+  'font-src https: data:',
+  "frame-ancestors 'self'",
+  'sandbox',
+].join('; ');
+
+const previewDocumentSchema = z.object({
+  subject: z.string().max(512).optional(),
+  body: z.string(),
+  data: z
+    .string()
+    .optional()
+    .transform((text, ctx) => {
+      if (!text) return {};
+      try {
+        const value = JSON.parse(text) as unknown;
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+          return value as Record<string, unknown>;
+        }
+      } catch {
+        // Reported below.
+      }
+      ctx.addIssue({ code: 'custom', message: 'data must be a JSON object' });
+      return z.NEVER;
+    }),
+});
+
+admin.post('/templates/:id/preview/document', async (c) => {
+  const form = parseInput(previewDocumentSchema, await c.req.parseBody());
+  const rendered = await TemplateService.preview(c.req.param('id'), 'email', form.data, {
+    subject: form.subject ?? null,
+    body: form.body,
+  });
+  return c.html(rendered.html, 200, {
+    'Content-Security-Policy': PREVIEW_DOCUMENT_CSP,
+    'X-Content-Type-Options': 'nosniff',
+  });
 });
 
 admin.post('/templates/:id/preview', async (c) => {
