@@ -2,6 +2,11 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { channelSchema } from '../../contract/contract';
 import { ChaskiError } from '../../contract/errors';
+import {
+  TEMPLATE_FILE_FORMAT,
+  TEMPLATE_FILE_VERSION,
+  templateFileSchema,
+} from '../../contract/template-file';
 import { actorOf } from '../auth';
 import { DELIVERY_STATUS } from '../db/schema';
 import { eventsStub } from '../durable/events';
@@ -50,6 +55,8 @@ const deliveryListSchema = deliveryFiltersSchema.extend({
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
 
+const importQuerySchema = z.object({ preview: z.stringbool().default(false) });
+
 const metricsQuerySchema = z.object({ period: z.enum(METRIC_PERIODS).default('30d') });
 
 export const admin = new Hono();
@@ -70,6 +77,21 @@ admin.use(async (c, next) => {
 });
 
 admin.get('/templates', async (c) => c.json({ templates: await TemplateService.list() }));
+
+admin.get('/templates/export', async (c) => {
+  c.header('content-disposition', 'attachment; filename="chaski-templates.json"');
+  return c.json({
+    format: TEMPLATE_FILE_FORMAT,
+    version: TEMPLATE_FILE_VERSION,
+    templates: await TemplateService.exportTemplates(),
+  });
+});
+
+admin.post('/templates/import', async (c) => {
+  const { preview } = parseInput(importQuerySchema, c.req.query());
+  const file = parseInput(templateFileSchema, await c.req.json());
+  return c.json(await TemplateService.importTemplates(file.templates, { preview }));
+});
 
 admin.get('/templates/deleted', async (c) =>
   c.json({ templates: await TemplateService.listDeleted() }),

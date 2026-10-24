@@ -1,6 +1,11 @@
 import { sql } from 'drizzle-orm';
 import type { Channel } from '../../contract/contract';
 import { ChaskiError } from '../../contract/errors';
+import type {
+  TemplateChange,
+  TemplateImportResult,
+  TemplateRecord,
+} from '../../contract/template-file';
 import { notifications } from '../db/schema';
 import { publishAdminEvents } from '../lib/admin-events';
 import { DeliveryError } from '../lib/errors';
@@ -39,7 +44,37 @@ const isLive = (row: {
   body: string;
 } => row.enabled && Boolean(row.body?.trim());
 
+const TEMPLATE_FIELDS = ['description', 'topic', 'sampleData'] as const;
+const CHANNEL_FIELDS = ['enabled', 'subject', 'body', 'textBody'] as const;
+
+// Compares the way the import writes: an absent field stores null, and a
+// channel the file leaves out keeps whatever it has.
+const diffTemplate = (
+  existing: TemplateRecord | undefined,
+  incoming: TemplateRecord,
+): TemplateChange => {
+  if (!existing) return { type: incoming.type, change: 'create', fields: [] };
+  const fields: string[] = TEMPLATE_FIELDS.filter(
+    (field) => (existing[field] ?? null) !== (incoming[field] ?? null),
+  );
+  for (const content of incoming.channels ?? []) {
+    const stored = existing.channels?.find((c) => c.channel === content.channel);
+    if (!stored) {
+      fields.push(`channels.${content.channel}`);
+      continue;
+    }
+    for (const field of CHANNEL_FIELDS) {
+      if ((stored[field] ?? null) !== (content[field] ?? null)) {
+        fields.push(`channels.${content.channel}.${field}`);
+      }
+    }
+  }
+  return { type: incoming.type, change: fields.length > 0 ? 'update' : 'unchanged', fields };
+};
+
 export class TemplateService extends BaseService {
+  protected static override name = 'templates';
+
   static hasType = async (type: string): Promise<boolean> => {
     const row = await TemplateService.client.templates.findFirst({ where: { type } });
     return Boolean(row);
@@ -167,6 +202,83 @@ export class TemplateService extends BaseService {
     }
     await publishAdminEvents(['templates']);
     return created;
+  };
+
+  /** Every live template with its channel content, as the template file holds them. */
+  static exportTemplates = async (): Promise<TemplateRecord[]> => {
+    const client = TemplateService.client;
+    const [rows, channels] = await Promise.all([
+      client.templates.findMany({ orderBy: [{ type: 'asc' }] }),
+      client.templateChannels.findMany({ orderBy: [{ channel: 'asc' }] }),
+    ]);
+    return rows.map((row) => ({
+      type: row.type,
+      description: row.description,
+      topic: row.topic,
+      sampleData: row.sampleData,
+      channels: channels
+        .filter((channel) => channel.templateId === row.id)
+        .map((channel) => ({
+          channel: channel.channel as Channel,
+          enabled: channel.enabled,
+          subject: channel.subject,
+          body: channel.body,
+          textBody: channel.textBody,
+        })),
+    }));
+  };
+
+  /**
+   * Creates or overwrites templates by type and leaves identical ones alone,
+   * so importing the same file twice changes nothing. With `preview` it only
+   * reports what it would do.
+   */
+  static importTemplates = async (
+    records: TemplateRecord[],
+    options: { preview: boolean },
+  ): Promise<TemplateImportResult> => {
+    const current = new Map((await TemplateService.exportTemplates()).map((r) => [r.type, r]));
+    const changes = records.map((record) => diffTemplate(current.get(record.type), record));
+    if (options.preview) return { applied: false, changes };
+
+    const client = TemplateService.client;
+    const changed = records.filter((_, index) => changes[index]?.change !== 'unchanged');
+    for (const record of changed) {
+      const fields = {
+        description: record.description ?? null,
+        topic: record.topic ?? null,
+        sampleData: record.sampleData ?? null,
+      };
+      const existing = await client.templates.findFirst({ where: { type: record.type } });
+      const template = existing
+        ? await client.templates.update({ where: { id: existing.id }, data: fields })
+        : await client.templates.create({
+            data: { id: newId('tpl'), type: record.type, ...fields },
+          });
+      if (!template) throw new ChaskiError('internal', `template '${record.type}' was not stored`);
+      for (const content of record.channels ?? []) {
+        await client.templateChannels.upsertMany({
+          data: [
+            {
+              id: newId('tc'),
+              templateId: template.id,
+              channel: content.channel,
+              enabled: content.enabled,
+              subject: content.subject ?? null,
+              body: content.body ?? null,
+              textBody: content.textBody ?? null,
+            },
+          ],
+          target: ['templateId', 'channel'],
+          update: ['enabled', 'subject', 'body', 'textBody', 'updatedAt'],
+        });
+      }
+    }
+    if (changed.length > 0) {
+      await publishAdminEvents(['templates']);
+      TemplateService.log.info('templates imported', { changed: changed.length });
+    }
+    return { applied: true, changes };
   };
 
   static get = async (templateId: string) => {

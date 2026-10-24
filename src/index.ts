@@ -36,6 +36,12 @@ export {
   isChaskiError,
   isRetryableChaskiError,
 } from './contract/errors';
+export type {
+  TemplateChange,
+  TemplateFile,
+  TemplateImportResult,
+  TemplateRecord,
+} from './contract/template-file';
 export { type Actor, type Authorize, basicAuth, cloudflareAccess } from './server/auth';
 export { type Chaski, createChaski } from './server/chaski';
 export type {
