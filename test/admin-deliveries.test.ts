@@ -157,6 +157,44 @@ describe('replay', () => {
 });
 
 describe('metrics', () => {
+  it('lists only the error codes of deliveries that ended', async () => {
+    const { deliveries } = await send('user_1');
+    const [email, inApp] = deliveries;
+    await getClient().deliveries.update({
+      where: { id: email?.id ?? '' },
+      data: { status: 'dead', errorCode: 'internal_server_error' },
+    });
+    // Still retrying: it has an error code but has not failed yet.
+    await getClient().deliveries.update({
+      where: { id: inApp?.id ?? '' },
+      data: { status: 'pending', errorCode: 'provider_error' },
+    });
+
+    const { body } = await json('/metrics/overview?period=7d');
+
+    expect(body).toMatchObject({
+      topErrorCodes: [{ errorCode: 'internal_server_error', count: 1 }],
+    });
+  });
+
+  it('counts opens by when they happened, in the totals and by type', async () => {
+    const { deliveries } = await send('user_1');
+    const email = deliveries.find((d) => d.channel === 'email');
+    // Opened long before this period, though the delivery changed inside it.
+    await getClient().deliveries.update({
+      where: { id: email?.id ?? '' },
+      data: { openedAt: new Date('2025-01-01T00:00:00Z') },
+    });
+
+    const overview = await json('/metrics/overview?period=7d');
+    const byType = await json('/metrics/types?period=7d');
+
+    expect(overview.body).toMatchObject({ opened: 0 });
+    expect(byType.body.types).toContainEqual(
+      expect.objectContaining({ channel: 'email', sent: 1, opened: 0 }),
+    );
+  });
+
   it('summarizes the period', async () => {
     const { deliveries } = await send('user_1');
     await send('user_2');

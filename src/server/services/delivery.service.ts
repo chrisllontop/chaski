@@ -61,12 +61,16 @@ export class DeliveryService extends BaseService {
       return { status: 'failed' };
     }
 
+    // Every call to the channel is an attempt, whatever it ends in; the
+    // failures above never reached one.
+    const attempts = delivery.attempts + 1;
     try {
       const result = await definition.deliver({ delivery, notification });
       await DeliveryService.client.deliveries.update({
         where: { id: delivery.id },
         data: {
           status: 'sent',
+          attempts,
           providerMessageId: result.providerMessageId ?? null,
           sentAt: new Date(),
           lastError: null,
@@ -77,10 +81,14 @@ export class DeliveryService extends BaseService {
     } catch (error) {
       const classified = DeliveryService.classify(error);
       if (classified.permanent) {
-        await DeliveryService.markFailed(delivery.id, classified.code, classified.message);
+        await DeliveryService.markFailed(
+          delivery.id,
+          classified.code,
+          classified.message,
+          attempts,
+        );
         return { status: 'failed' };
       }
-      const attempts = delivery.attempts + 1;
       await DeliveryService.client.deliveries.update({
         where: { id: delivery.id },
         data: {
@@ -95,14 +103,14 @@ export class DeliveryService extends BaseService {
 
   // Fired by the public tracking pixel. Unknown ids are a silent no-op (the
   // pixel must always render). An open is a read receipt, not a delivery state:
-  // it freezes openedAt on the first open and leaves status untouched.
+  // it freezes openedAt on the first open and leaves status and updatedAt
+  // alone, so metrics windowed on updatedAt never move an old delivery into
+  // the period it was opened in.
   static markOpened = async (deliveryId: string): Promise<boolean> => {
-    const now = new Date();
     const result = await DeliveryService.db
       .update(deliveries)
       .set({
-        openedAt: sql`COALESCE(${deliveries.openedAt}, ${sql.param(now, deliveries.openedAt)})`,
-        updatedAt: now,
+        openedAt: sql`COALESCE(${deliveries.openedAt}, ${sql.param(new Date(), deliveries.openedAt)})`,
       })
       .where(and(eq(deliveries.id, deliveryId), eq(deliveries.channel, 'email')));
     return result.meta.changes > 0;
@@ -119,10 +127,11 @@ export class DeliveryService extends BaseService {
     deliveryId: string,
     errorCode: string,
     message: string,
+    attempts?: number,
   ): Promise<void> => {
     await DeliveryService.client.deliveries.update({
       where: { id: deliveryId },
-      data: { status: 'failed', errorCode, lastError: message },
+      data: { status: 'failed', errorCode, lastError: message, ...(attempts ? { attempts } : {}) },
     });
   };
 

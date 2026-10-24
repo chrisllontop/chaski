@@ -1,4 +1,4 @@
-import { exports } from 'cloudflare:workers';
+import { env, exports } from 'cloudflare:workers';
 import { describe, expect, it, vi } from 'vitest';
 import { getClient } from '../src/server/db';
 import { injectOpenPixel, openPixelUrl } from '../src/server/lib/email-open';
@@ -25,14 +25,20 @@ const openedAt = async (deliveryId: string) =>
   (await getClient().deliveries.findFirst({ where: { id: deliveryId } }))?.openedAt;
 
 describe('DeliveryService.markOpened', () => {
-  it('stamps openedAt without changing status', async () => {
+  it('stamps openedAt without changing status or updatedAt', async () => {
     const deliveryId = await createEmailDelivery('sent');
+    const updatedAt = new Date('2026-01-01T00:00:00Z');
+    // Straight SQL: the client's timestamps plugin would stamp updatedAt with now.
+    await env.CHASKI_DB.prepare('UPDATE deliveries SET updated_at = ? WHERE id = ?')
+      .bind(updatedAt.getTime(), deliveryId)
+      .run();
 
     await DeliveryService.markOpened(deliveryId);
 
     const row = await getClient().deliveries.findFirst({ where: { id: deliveryId } });
     expect(row?.openedAt).toBeTruthy();
     expect(row?.status).toBe('sent');
+    expect(row?.updatedAt.toISOString()).toBe(updatedAt.toISOString());
   });
 
   it('keeps the first openedAt on re-opens', async () => {

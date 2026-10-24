@@ -202,7 +202,7 @@ describe('web push', () => {
     expect(delivery).toMatchObject({
       status: 'failed',
       errorCode: 'no_device_tokens',
-      attempts: 0,
+      attempts: 1,
     });
     expect(await devices()).toEqual([]);
   });

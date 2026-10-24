@@ -126,7 +126,8 @@ export class MetricsService extends BaseService {
         failed: count(['failed', 'dead']),
         pending: count(['pending']),
         skipped: count(['skipped']),
-        opened: sql<number>`sum(case when ${deliveries.openedAt} is not null then 1 else 0 end)`,
+        // Opens count by when they happened, the same window the overview uses.
+        opened: sql<number>`sum(case when ${deliveries.openedAt} >= ${sql.param(from, deliveries.openedAt)} and ${deliveries.openedAt} < ${sql.param(to, deliveries.openedAt)} then 1 else 0 end)`,
       })
       .from(deliveries)
       .innerJoin(notifications, eq(notifications.id, deliveries.notificationId))
@@ -214,12 +215,22 @@ export class MetricsService extends BaseService {
     };
   };
 
+  // A pending delivery that is retrying carries an error code too; only the
+  // ones that ended count, so the list adds up to failed plus dead.
   private static topBy = async (field: 'errorCode' | 'skipReason', from: Date, to: Date) => {
     const column = deliveries[field];
+    const ended = field === 'errorCode' ? (['failed', 'dead'] as const) : (['skipped'] as const);
     const rows = await MetricsService.db
       .select({ key: column, count: sql<number>`count(*)` })
       .from(deliveries)
-      .where(and(gte(deliveries.updatedAt, from), lt(deliveries.updatedAt, to), isNotNull(column)))
+      .where(
+        and(
+          gte(deliveries.updatedAt, from),
+          lt(deliveries.updatedAt, to),
+          isNotNull(column),
+          inArray(deliveries.status, [...ended]),
+        ),
+      )
       .groupBy(column)
       .orderBy(sql`count(*) desc`)
       .limit(5)

@@ -143,7 +143,7 @@ describe('chaski.queue', () => {
     expect(await deliveryRow()).toMatchObject({
       status: 'failed',
       errorCode: 'recipient_rejected',
-      attempts: 0,
+      attempts: 1,
     });
   });
 

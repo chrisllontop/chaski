@@ -43,6 +43,7 @@ describe('email channel', () => {
     expect(await findEmailDelivery(result.notificationId)).toMatchObject({
       status: 'sent',
       providerMessageId: 'msg_1',
+      attempts: 1,
     });
   });
 
@@ -120,7 +121,7 @@ describe('email channel', () => {
     expect(await findEmailDelivery(result.notificationId)).toMatchObject({
       status: 'failed',
       errorCode: 'validation_error',
-      attempts: 0,
+      attempts: 1,
     });
   });
 
