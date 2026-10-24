@@ -99,4 +99,9 @@ describe('resolveChannels', () => {
     const result = resolveChannels(base({ requestedChannels: ['email'], templatesByChannel: {} }));
     expect(result).toEqual([{ channel: 'email', skipReason: 'no_template' }]);
   });
+
+  it('skips email when the contact has none', () => {
+    const result = resolveChannels(base({ contact: {} }));
+    expect(result).toEqual([{ channel: 'email', skipReason: 'missing_email' }]);
+  });
 });

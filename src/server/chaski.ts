@@ -7,7 +7,7 @@ import { mountRoutes, type RoutesOptions } from './routes';
 import { NotificationService } from './services/notification.service';
 
 export type Chaski = ChaskiApi & {
-  /** The dashboard and its admin API under /api; mount it with app.route(). */
+  /** The dashboard, its admin API under /api and the open-tracking pixel; mount it with app.route(). */
   routes<E extends Env = Env>(options: RoutesOptions<E>): Hono<E>;
   /** Handles a batch from chaski's queue and returns true; leaves any other batch untouched. */
   queue(batch: MessageBatch<unknown>, env?: unknown, ctx?: ExecutionContext): Promise<boolean>;

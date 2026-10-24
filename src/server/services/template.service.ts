@@ -2,10 +2,12 @@ import { sql } from 'drizzle-orm';
 import type { Channel } from '../../contract/contract';
 import { ChaskiError } from '../../contract/errors';
 import { notifications } from '../db/schema';
+import { DeliveryError } from '../lib/errors';
 import { newId } from '../lib/ids';
 import { parseJson } from '../lib/json';
 import { renderTemplate } from '../lib/render';
 import { BaseService } from './base.service';
+import { EmailSenderService } from './email-sender.service';
 
 export type ChannelContentInput = {
   enabled?: boolean;
@@ -274,5 +276,29 @@ export class TemplateService extends BaseService {
       input.textBody ? renderTemplate(input.textBody, data) : Promise.resolve(undefined),
     ]);
     return { subject, html, text };
+  };
+
+  static testSend = async (
+    templateId: string,
+    input: { to: string; data?: Record<string, unknown> },
+  ): Promise<{ messageId?: string }> => {
+    const email = TemplateService.config.channels.email;
+    if (!email) throw new ChaskiError('validation', 'the email channel is not configured');
+
+    const rendered = await TemplateService.preview(templateId, 'email', input.data);
+    try {
+      return await EmailSenderService.send({
+        to: input.to,
+        from: email.fromName ? `${email.fromName} <${email.from}>` : email.from,
+        replyTo: email.replyTo,
+        subject: `[test] ${rendered.subject}`,
+        html: rendered.html,
+        text: rendered.text,
+      });
+    } catch (error) {
+      if (error instanceof DeliveryError)
+        throw new ChaskiError(error.permanent ? 'validation' : 'internal', error.message);
+      throw error;
+    }
   };
 }

@@ -53,7 +53,7 @@
     }
   },
   "scripts": {
-    "dev": "pnpm build:dashboard && wrangler dev -c test/fixture/wrangler.jsonc",
+    "dev": "pnpm build:dashboard && wrangler dev -c test/fixture/wrangler.jsonc --var CHASKI_DRY_RUN:true",
     "build:dashboard": "vite build",
     "build:types": "tsc -p tsconfig.json --noEmit false --declaration --emitDeclarationOnly --outDir dist --rootDir src",
     "build": "pnpm build:dashboard && tsdown && pnpm build:types",

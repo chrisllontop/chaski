@@ -1,6 +1,7 @@
 import type { Channel } from '../../../contract/contract';
 import type { SkipReason } from '../../db/schema';
 import type { ContactSnapshot } from '../contact.service';
+import { EmailAdapter } from './email.adapter';
 import type { AdapterContext, AdapterResult } from './types';
 
 // A channel's recipient prerequisite, declared as data so resolveChannels
@@ -19,7 +20,12 @@ export type ChannelDefinition = {
 
 // Each channel registers its definition here. A delivery for a channel without
 // one has nothing to send it with and fails as channel_not_available.
-export const CHANNEL_DEFS: Partial<Record<Channel, ChannelDefinition>> = {};
+export const CHANNEL_DEFS: Partial<Record<Channel, ChannelDefinition>> = {
+  email: {
+    gate: { kind: 'contact', field: 'email', skipReason: 'missing_email' },
+    deliver: EmailAdapter.deliver,
+  },
+};
 
 export const passesGate = (
   channel: Channel,

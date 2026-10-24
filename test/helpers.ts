@@ -1,9 +1,15 @@
 import { env, exports } from 'cloudflare:workers';
 import { vi } from 'vitest';
-import type { DeliveryMessage } from '../src';
+import {
+  type ChaskiConfig,
+  createChaski,
+  type DeliveryMessage,
+  type SendEmailBinding,
+} from '../src';
 import type { Channel } from '../src/contract/contract';
 import { getClient } from '../src/server/db';
 import { DeliveryService } from '../src/server/services/delivery.service';
+import { fixtureConfig } from './fixture/worker';
 
 // A bare template row (no channel content): enough for a type to pass ingest
 // validation while every channel still skips with no_template.
@@ -68,3 +74,23 @@ export const queuedMessages = (): DeliveryMessage[] =>
   vi
     .mocked(env.CHASKI_QUEUE.sendBatch)
     .mock.calls.flatMap(([messages]) => [...messages].map((message) => message.body));
+
+// Registers chaski again with the fixture's config plus the overrides; the
+// fixture Worker shares this isolate, so its routes and queue see it too.
+export const useConfig = (overrides: Partial<ChaskiConfig> = {}) =>
+  createChaski(() => ({ ...fixtureConfig(env), ...overrides }));
+
+export type SentEmail = Parameters<SendEmailBinding['send']>[0];
+
+export const stubEmail = (
+  send: (message: SentEmail) => Promise<{ messageId: string }> = async () => ({
+    messageId: 'msg_1',
+  }),
+) => {
+  const sent: SentEmail[] = [];
+  vi.spyOn(env.CHASKI_EMAIL, 'send').mockImplementation(async (message) => {
+    sent.push(message);
+    return send(message);
+  });
+  return sent;
+};

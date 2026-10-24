@@ -28,4 +28,27 @@ describe('config', () => {
       maxRetries: 5,
     });
   });
+
+  it('requires the email binding once the email channel is configured', () => {
+    const config = fixtureConfig(env);
+    expect(() =>
+      validateConfig({ ...config, bindings: { ...config.bindings, email: undefined } }),
+    ).toThrowError(
+      expect.objectContaining({
+        message: 'chaski config: channels.email is configured but bindings.email is missing',
+      }),
+    );
+  });
+
+  it('requires an absolute publicUrl', () => {
+    expect(() => validateConfig({ ...fixtureConfig(env), publicUrl: '/chaski' })).toThrowError(
+      expect.objectContaining({ code: 'config', message: expect.stringContaining('publicUrl') }),
+    );
+  });
+
+  it('lists only the channels that have config', () => {
+    const config = fixtureConfig(env);
+    expect(validateConfig(config).enabledChannels).toEqual(['email']);
+    expect(validateConfig({ ...config, channels: {} }).enabledChannels).toEqual([]);
+  });
 });

@@ -1,13 +1,32 @@
 import { Hono } from 'hono';
-import { type ChaskiConfig, createChaski, type DeliveryMessage } from '../../src';
+import {
+  type ChaskiConfig,
+  createChaski,
+  type DeliveryMessage,
+  type SendEmailBinding,
+} from '../../src';
 
 export type FixtureEnv = {
+  CHASKI_PUBLIC_URL: string;
+  CHASKI_DRY_RUN: string;
   CHASKI_DB: D1Database;
   CHASKI_QUEUE: Queue<DeliveryMessage>;
+  CHASKI_EMAIL: SendEmailBinding;
+  CHASKI_ATTACHMENTS: R2Bucket;
 };
 
 export const fixtureConfig = (env: FixtureEnv): ChaskiConfig => ({
-  bindings: { db: env.CHASKI_DB, queue: env.CHASKI_QUEUE },
+  publicUrl: env.CHASKI_PUBLIC_URL,
+  bindings: {
+    db: env.CHASKI_DB,
+    queue: env.CHASKI_QUEUE,
+    email: env.CHASKI_EMAIL,
+    attachments: env.CHASKI_ATTACHMENTS,
+  },
+  channels: {
+    email: { from: 'notifications@host.test', fromName: 'Fixture host' },
+  },
+  dryRun: env.CHASKI_DRY_RUN === 'true',
 });
 
 export const chaski = createChaski(fixtureConfig);

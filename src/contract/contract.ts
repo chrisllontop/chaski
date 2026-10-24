@@ -14,6 +14,26 @@ export const recipientSchema = z.object({
 });
 export type Recipient = z.infer<typeof recipientSchema>;
 
+export const attachmentInputSchema = z
+  .object({
+    filename: z.string().min(1).max(256),
+    contentType: z.string().min(1).max(128),
+    content: z.string().optional(),
+    url: z.string().url().optional(),
+    disposition: z.enum(['attachment', 'inline']).optional(),
+    contentId: z.string().max(128).optional(),
+  })
+  .refine((a) => Boolean(a.content) !== Boolean(a.url), {
+    message: 'attachment requires exactly one of content or url',
+  });
+export type AttachmentInput = z.infer<typeof attachmentInputSchema>;
+
+export const emailOptionsSchema = z.object({
+  fromName: z.string().max(256).optional(),
+  replyTo: z.string().email().optional(),
+  attachments: z.array(attachmentInputSchema).max(10).optional(),
+});
+
 export const typeNameSchema = z
   .string()
   .min(1)
@@ -26,6 +46,7 @@ export const sendRequestSchema = z.object({
   payload: z.record(z.string(), z.unknown()).default({}),
   channels: z.array(channelSchema).min(1).optional(),
   transactional: z.boolean().default(false),
+  email: emailOptionsSchema.optional(),
   idempotencyKey: z.string().min(1).max(512).optional(),
 });
 export type SendRequest = z.input<typeof sendRequestSchema>;

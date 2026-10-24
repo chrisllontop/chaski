@@ -1,16 +1,27 @@
 import { env } from 'cloudflare:workers';
-import type { Channel } from '../contract/contract';
+import { CHANNELS, type Channel } from '../contract/contract';
 import { ChaskiError } from '../contract/errors';
-import type { DeliveryMessage } from './types';
+import type { DeliveryMessage, SendEmailBinding } from './types';
 
 export type ChaskiBindings = {
   /** The D1 database chaski keeps its data in. */
   db: D1Database;
   /** The delivery queue; the host's consumer passes its batches to chaski.queue(). */
   queue: Queue<DeliveryMessage>;
+  /** The host's `send_email` binding; required when the email channel is configured. */
+  email?: SendEmailBinding;
+  /** An R2 bucket; required by sends that carry email attachments. */
+  attachments?: R2Bucket;
 };
 
-export type ErrorSource = 'http' | 'queue';
+export type EmailConfig = {
+  /** The sender address; it must be allowed by the host's send_email binding. */
+  from: string;
+  fromName?: string;
+  replyTo?: string;
+};
+
+export type ErrorSource = 'http' | 'queue' | 'tracking';
 
 export type ErrorContext = {
   source: ErrorSource;
@@ -20,7 +31,15 @@ export type ErrorContext = {
 };
 
 export type ChaskiConfig = {
+  /** Absolute URL where the host mounts chaski, e.g. `https://app.example.com/chaski`. */
+  publicUrl: string;
   bindings: ChaskiBindings;
+  /** A channel is active when it has a config entry. */
+  channels?: {
+    email?: EmailConfig;
+  };
+  /** Render and record email deliveries without calling the provider. */
+  dryRun?: boolean;
   /** Must match `max_retries` on the host's queue consumer; defaults to 5. */
   maxRetries?: number;
   /** Must match `migrations_table` on the host's D1 binding; defaults to `d1_migrations`. */
@@ -30,8 +49,13 @@ export type ChaskiConfig = {
 };
 
 export type ResolvedConfig = {
+  publicUrl: string;
   bindings: ChaskiBindings;
+  channels: {
+    email?: EmailConfig;
+  };
   enabledChannels: Channel[];
+  dryRun: boolean;
   maxRetries: number;
   migrationsTable: string;
   onError?: (error: unknown, context: ErrorContext) => void;
@@ -42,9 +66,27 @@ const fail = (message: string): never => {
 };
 
 export const validateConfig = (config: ChaskiConfig): ResolvedConfig => {
+  let publicUrl: URL | null = null;
+  try {
+    publicUrl = new URL(config.publicUrl);
+  } catch {
+    // Reported below with the rest of the publicUrl rule.
+  }
+  if (!publicUrl || !/^https?:$/.test(publicUrl.protocol)) {
+    fail('publicUrl must be the absolute http(s) URL where chaski is mounted');
+  }
+
   const bindings = config.bindings ?? fail('bindings is required');
   for (const name of ['db', 'queue'] as const) {
     if (!bindings[name]) fail(`bindings.${name} is missing`);
+  }
+
+  const channels = config.channels ?? {};
+  const resolved: ResolvedConfig['channels'] = {};
+  if (channels.email) {
+    if (!bindings.email) fail('channels.email is configured but bindings.email is missing');
+    if (!channels.email.from?.includes('@')) fail('channels.email.from must be an email address');
+    resolved.email = channels.email;
   }
 
   const maxRetries = config.maxRetries ?? 5;
@@ -58,8 +100,11 @@ export const validateConfig = (config: ChaskiConfig): ResolvedConfig => {
   }
 
   return {
+    publicUrl: (publicUrl as URL).href.replace(/\/+$/, ''),
     bindings,
-    enabledChannels: [],
+    channels: resolved,
+    enabledChannels: CHANNELS.filter((channel) => resolved[channel as keyof typeof resolved]),
+    dryRun: config.dryRun ?? false,
     maxRetries,
     migrationsTable,
     onError: config.onError,

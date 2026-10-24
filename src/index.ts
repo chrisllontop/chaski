@@ -1,5 +1,6 @@
 export type { ChaskiApi } from './contract/api';
 export type {
+  AttachmentInput,
   Channel,
   DeliveryResult,
   Recipient,
@@ -17,8 +18,9 @@ export { type Chaski, createChaski } from './server/chaski';
 export type {
   ChaskiBindings,
   ChaskiConfig,
+  EmailConfig,
   ErrorContext,
   ErrorSource,
 } from './server/config';
 export type { Authorize, RoutesOptions } from './server/routes';
-export type { DeliveryMessage } from './server/types';
+export type { DeliveryMessage, EmailAttachment, SendEmailBinding } from './server/types';

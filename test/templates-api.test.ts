@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { api } from './helpers';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { api, stubEmail } from './helpers';
 
 const createWelcome = async () => {
   const response = await api('/templates', {
@@ -8,6 +8,10 @@ const createWelcome = async () => {
   });
   return ((await response.json()) as { template: { id: string } }).template;
 };
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('templates API', () => {
   it('creates a template and lists it with its channels', async () => {
@@ -83,5 +87,28 @@ describe('templates API', () => {
 
     expect(response.status).toBe(404);
     expect(await response.json()).toMatchObject({ error: 'not_found' });
+  });
+
+  it('sends a test email with the rendered content', async () => {
+    const template = await createWelcome();
+    await api(`/templates/${template.id}/channels/email`, {
+      method: 'PUT',
+      body: JSON.stringify({ enabled: true, subject: 'Hi {{ name }}', body: '<p>{{ name }}</p>' }),
+    });
+    const sent = stubEmail();
+
+    const response = await api(`/templates/${template.id}/test-send`, {
+      method: 'POST',
+      body: JSON.stringify({ to: 'ops@host.test', data: { name: 'Ana' } }),
+    });
+
+    expect(await response.json()).toEqual({ messageId: 'msg_1' });
+    expect(sent).toEqual([
+      expect.objectContaining({
+        to: 'ops@host.test',
+        subject: '[test] Hi Ana',
+        html: '<p>Ana</p>',
+      }),
+    ]);
   });
 });

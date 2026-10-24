@@ -6,6 +6,7 @@ import { reportError } from '../lib/report-error';
 import { ready } from '../migrations';
 import { admin } from './admin';
 import { isApi, serveAsset, serveShell } from './dashboard';
+import { tracking } from './tracking';
 
 export type Authorize<E extends Env = Env> = (
   c: Context<E>,
@@ -59,9 +60,10 @@ export const mountRoutes = <E extends Env = Env>({ dashboard }: RoutesOptions<E>
     log.error('unhandled error', error);
     return c.json({ error: 'internal', message: 'internal error' }, 500);
   });
-  // Registered before the guard on purpose: Hono runs handlers in registration order, and the
-  // assets are public anyway because they ship in the npm package.
+  // Registered before the guard on purpose: Hono runs handlers in registration order. The assets
+  // ship in the npm package, and email clients load the open pixel without credentials.
   app.get('/assets/*', serveAsset);
+  app.route('/t', tracking);
   app.use(guard(dashboard.authorize));
   app.use('/api/*', async (_c, next) => {
     await ready();

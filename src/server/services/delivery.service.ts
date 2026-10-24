@@ -1,3 +1,5 @@
+import { and, eq, sql } from 'drizzle-orm';
+import { deliveries } from '../db/schema';
 import { DeliveryError } from '../lib/errors';
 import type { DeliveryMessage } from '../types';
 import { CHANNEL_DEFS } from './adapters/registry';
@@ -89,6 +91,21 @@ export class DeliveryService extends BaseService {
       });
       return { status: 'retry', delaySeconds: backoffSeconds(attempts) };
     }
+  };
+
+  // Fired by the public tracking pixel. Unknown ids are a silent no-op (the
+  // pixel must always render). An open is a read receipt, not a delivery state:
+  // it freezes openedAt on the first open and leaves status untouched.
+  static markOpened = async (deliveryId: string): Promise<boolean> => {
+    const now = new Date();
+    const result = await DeliveryService.db
+      .update(deliveries)
+      .set({
+        openedAt: sql`COALESCE(${deliveries.openedAt}, ${sql.param(now, deliveries.openedAt)})`,
+        updatedAt: now,
+      })
+      .where(and(eq(deliveries.id, deliveryId), eq(deliveries.channel, 'email')));
+    return result.meta.changes > 0;
   };
 
   static markDead = async (deliveryId: string): Promise<void> => {

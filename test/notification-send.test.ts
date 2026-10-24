@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ChaskiError } from '../src';
 import { getClient } from '../src/server/db';
 import { NotificationService } from '../src/server/services/notification.service';
-import { recipient, seedTemplateType } from './helpers';
+import { queuedMessages, recipient, seedTemplate, seedTemplateType } from './helpers';
 
 describe('NotificationService.send', () => {
   it('rejects invalid requests with a validation error', async () => {
@@ -21,7 +21,7 @@ describe('NotificationService.send', () => {
       }),
     ).rejects.toMatchObject({
       code: 'validation',
-      message: 'channels not configured: email, push',
+      message: 'channels not configured: push',
     });
   });
 
@@ -34,8 +34,8 @@ describe('NotificationService.send', () => {
     });
   });
 
-  it('records the notification and the contact even with nothing to deliver', async () => {
-    await seedTemplateType('payment_received');
+  it('records the notification, its deliveries and the contact', async () => {
+    await seedTemplate('payment_received', 'email');
 
     const result = await NotificationService.send({
       type: 'payment_received',
@@ -43,7 +43,13 @@ describe('NotificationService.send', () => {
       payload: { amount: 1500 },
     });
 
-    expect(result).toMatchObject({ replayed: false, outcome: 'undeliverable', deliveries: [] });
+    expect(result).toMatchObject({ replayed: false, outcome: 'delivered' });
+    expect(result.deliveries).toEqual([
+      expect.objectContaining({ channel: 'email', status: 'pending' }),
+    ]);
+    expect(queuedMessages()).toEqual([
+      expect.objectContaining({ kind: 'chaski.delivery', channel: 'email' }),
+    ]);
     const stored = await getClient().notifications.findFirst({
       where: { id: result.notificationId },
     });
@@ -90,5 +96,20 @@ describe('NotificationService.send', () => {
     const contact = await getClient().contacts.findFirst({ where: { recipientId: 'user_9' } });
     expect(contact?.email).toBe('new@y.com');
     expect(contact?.phoneE164).toBe('+525511111111');
+  });
+
+  it('records a skip with its reason when the template has no channel content', async () => {
+    await seedTemplateType('type_without_content');
+
+    const result = await NotificationService.send({
+      type: 'type_without_content',
+      recipient: recipient(),
+    });
+
+    expect(result.outcome).toBe('undeliverable');
+    expect(result.deliveries).toEqual([
+      expect.objectContaining({ channel: 'email', status: 'skipped', reason: 'no_template' }),
+    ]);
+    expect(queuedMessages()).toEqual([]);
   });
 });

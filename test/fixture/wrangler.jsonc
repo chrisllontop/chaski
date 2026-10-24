@@ -3,6 +3,10 @@
   "name": "chaski-fixture-host",
   "main": "worker.ts",
   "compatibility_date": "2026-10-15",
+  "vars": {
+    "CHASKI_PUBLIC_URL": "http://localhost:8787/chaski",
+    "CHASKI_DRY_RUN": "false"
+  },
   "d1_databases": [
     {
       "binding": "CHASKI_DB",
@@ -22,5 +26,7 @@
         "dead_letter_queue": "chaski-deliveries-dlq"
       }
     ]
-  }
+  },
+  "r2_buckets": [{ "binding": "CHASKI_ATTACHMENTS", "bucket_name": "chaski-attachments" }],
+  "send_email": [{ "name": "CHASKI_EMAIL" }]
 }

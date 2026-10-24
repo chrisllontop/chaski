@@ -1,4 +1,10 @@
-import type { Channel, DeliveryResult, SendOutcome, SendResult } from '../../contract/contract';
+import type {
+  AttachmentInput,
+  Channel,
+  DeliveryResult,
+  SendOutcome,
+  SendResult,
+} from '../../contract/contract';
 import { sendRequestSchema } from '../../contract/contract';
 import { ChaskiError } from '../../contract/errors';
 import { deliveries, notifications } from '../db/schema';
@@ -6,6 +12,8 @@ import { newId } from '../lib/ids';
 import { resolveChannels } from '../lib/resolve-channels';
 import type { DeliveryMessage } from '../types';
 import { loadCapabilities } from './adapters/registry';
+import type { StoredAttachment } from './attachment.service';
+import { AttachmentService } from './attachment.service';
 import { BaseService } from './base.service';
 import type { ContactSnapshot } from './contact.service';
 import { ContactService } from './contact.service';
@@ -45,6 +53,19 @@ const assertKnownType = async (type: string): Promise<void> => {
   }
 };
 
+const splitEmailOptions = (
+  email: { fromName?: string; replyTo?: string; attachments?: AttachmentInput[] } | undefined,
+): {
+  attachments: AttachmentInput[];
+  overrides: { fromName?: string; replyTo?: string } | null;
+} => {
+  const { attachments = [], ...overrides } = email ?? {};
+  return {
+    attachments,
+    overrides: Object.values(overrides).some((value) => value !== undefined) ? overrides : null,
+  };
+};
+
 export type DispatchInput = {
   type: string;
   recipientId: string;
@@ -52,6 +73,8 @@ export type DispatchInput = {
   payload: Record<string, unknown>;
   channels?: Channel[];
   transactional: boolean;
+  emailOverrides: { fromName?: string; replyTo?: string } | null;
+  storedAttachments: StoredAttachment[];
   idempotencyKey: string | null;
 };
 
@@ -73,6 +96,8 @@ export class NotificationService extends BaseService {
     }
 
     const snapshot = await ContactService.upsertFromRecipient(request.recipient);
+    const { attachments, overrides } = splitEmailOptions(request.email);
+    const storedAttachments = await AttachmentService.store(newId('att'), attachments);
 
     return NotificationService.dispatch({
       type: request.type,
@@ -81,6 +106,8 @@ export class NotificationService extends BaseService {
       payload: request.payload,
       channels: request.channels,
       transactional: request.transactional,
+      emailOverrides: overrides,
+      storedAttachments,
       idempotencyKey: request.idempotencyKey ?? null,
     });
   };
@@ -124,6 +151,9 @@ export class NotificationService extends BaseService {
           type: input.type,
           payload: JSON.stringify(input.payload),
           contactSnapshot: JSON.stringify(input.snapshot),
+          attachments:
+            input.storedAttachments.length > 0 ? JSON.stringify(input.storedAttachments) : null,
+          emailOverrides: input.emailOverrides ? JSON.stringify(input.emailOverrides) : null,
           transactional: input.transactional,
           idempotencyKey: input.idempotencyKey,
           createdAt: now,

@@ -81,3 +81,14 @@ admin.post('/templates/:id/preview', async (c) => {
   );
   return c.json(await TemplateService.preview(c.req.param('id'), input.channel, input.data));
 });
+
+admin.post('/templates/:id/test-send', async (c) => {
+  const input = parseBody(
+    z.object({
+      to: z.string().email(),
+      data: z.record(z.string(), z.unknown()).optional(),
+    }),
+    await c.req.json(),
+  );
+  return c.json(await TemplateService.testSend(c.req.param('id'), input));
+});
