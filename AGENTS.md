@@ -11,7 +11,7 @@ what is still open; read it before writing engine code.
 
 ## Run it
 
-- `pnpm i` installs the dependencies (Node 24 and pnpm 11). `devEngines` holds contributors to
+- `pnpm i` installs the dependencies (Node 24 and pnpm 12). `devEngines` holds contributors to
   Node 24 without putting that constraint on the people who install `chaski`.
 - `pnpm typecheck` (tsc), `pnpm lint` (Biome), `pnpm format` (Biome with fixes), `pnpm test`
   (Vitest), `pnpm build` (tsdown).
@@ -43,13 +43,15 @@ punctuation for user-facing text). Read them before committing, writing code or 
 for the API, services, database, errors and UI arrive with the code they govern.
 
 - Biome: 2 spaces, single quotes, semicolons, 100 columns. Run `pnpm lint`.
-- Arrow functions, not function declarations. Inferred types over annotations; no `any`.
+- Arrow functions, not function declarations. Inferred types over annotations, except on exports
+  (see `isolatedDeclarations` below); no `any`.
 - Comments say **why** (a constraint, an invariant, a quirk), never what the next line does.
 - chaski runs inside the host's Worker and only on the bindings the host declares. Do not assume
   binding names or reach for resources the host did not hand over.
-- TypeScript stays on 6.0: TypeScript 7 does not ship the compiler API that tsdown uses to emit
-  declarations. Moving to 7 needs `isolatedDeclarations` (declarations through Oxc) or tsgo
-  support in tsdown.
+- TypeScript 7 has no classic compiler API, so tsdown emits declarations with Oxc, which needs
+  `isolatedDeclarations`: an export whose type can't be read from its own syntax needs an explicit
+  annotation. `pnpm build` fails with TS9013 when one is missing; `tsc --noEmit` does not report it.
+  tsdown's tsgo generator would lift that rule; it needs TypeScript 7.1, in beta as of October 2026.
 
 ## Tests
 

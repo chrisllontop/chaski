@@ -14,6 +14,8 @@
     "resolveJsonModule": true,
     "allowImportingTsExtensions": true,
     "skipLibCheck": true,
+    "declaration": true,
+    "isolatedDeclarations": true,
     "noEmit": true,
     "types": []
   },
