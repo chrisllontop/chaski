@@ -36,7 +36,10 @@ const outcomeOf = (deliveries: DeliveryResult[]): SendOutcome => {
 
 // Ingest-only guard; dispatch keeps the channel_not_configured skip so
 // scheduled sends survive the host dropping a channel before they fire.
-const assertChannelsConfigured = (enabledChannels: Channel[], channels?: Channel[]): void => {
+export const assertChannelsConfigured = (
+  enabledChannels: Channel[],
+  channels?: Channel[],
+): void => {
   const missing = channels?.filter((c) => !enabledChannels.includes(c)) ?? [];
   if (missing.length > 0) {
     throw new ChaskiError('validation', `channels not configured: ${missing.join(', ')}`);
@@ -46,7 +49,7 @@ const assertChannelsConfigured = (enabledChannels: Channel[], channels?: Channel
 // Ingest-only as well: an unknown type is a caller bug and rejected outright,
 // while dispatch keeps the per-channel no_template skip so scheduled sends
 // survive channel-content edits between ingest and dispatch.
-const assertKnownType = async (type: string): Promise<void> => {
+export const assertKnownType = async (type: string): Promise<void> => {
   if (!(await TemplateService.hasType(type))) {
     throw new ChaskiError(
       'validation',
@@ -55,7 +58,7 @@ const assertKnownType = async (type: string): Promise<void> => {
   }
 };
 
-const splitEmailOptions = (
+export const splitEmailOptions = (
   email: { fromName?: string; replyTo?: string; attachments?: AttachmentInput[] } | undefined,
 ): {
   attachments: AttachmentInput[];

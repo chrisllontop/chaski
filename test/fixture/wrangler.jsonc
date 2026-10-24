@@ -31,6 +31,9 @@
     "bindings": [{ "name": "CHASKI_FEED", "class_name": "ChaskiFeed" }]
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ChaskiFeed"] }],
+  "workflows": [
+    { "name": "chaski-scheduler", "binding": "CHASKI_SCHEDULER", "class_name": "ChaskiScheduler" }
+  ],
   "r2_buckets": [{ "binding": "CHASKI_ATTACHMENTS", "bucket_name": "chaski-attachments" }],
   "send_email": [{ "name": "CHASKI_EMAIL" }]
 }

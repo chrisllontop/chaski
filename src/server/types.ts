@@ -28,3 +28,7 @@ export interface SendEmailBinding {
     attachments?: EmailAttachment[];
   }): Promise<{ messageId: string }>;
 }
+
+export type ScheduleParams = {
+  scheduledId: string;
+};

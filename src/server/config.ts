@@ -4,7 +4,7 @@ import { ChaskiError } from '../contract/errors';
 import type { ChaskiFeed } from './durable/feed';
 import type { ApnsCredentials } from './lib/apns';
 import { decodeBase64Url, encodeBase64Url } from './lib/base64';
-import type { DeliveryMessage, SendEmailBinding } from './types';
+import type { DeliveryMessage, ScheduleParams, SendEmailBinding } from './types';
 
 export type ChaskiBindings = {
   /** The D1 database chaski keeps its data in. */
@@ -13,6 +13,8 @@ export type ChaskiBindings = {
   queue: Queue<DeliveryMessage>;
   /** The host's `send_email` binding; required when the email channel is configured. */
   email?: SendEmailBinding;
+  /** The ChaskiScheduler Workflow; required by chaski.schedule(). */
+  scheduler?: Workflow<ScheduleParams>;
   /** The ChaskiFeed Durable Object namespace; required when the in_app channel is configured. */
   feed?: DurableObjectNamespace<ChaskiFeed>;
   /** An R2 bucket; required by sends that carry email attachments. */
@@ -58,12 +60,13 @@ export type ResolvedPush = {
   apns?: ApnsCredentials;
 };
 
-export type ErrorSource = 'http' | 'queue' | 'tracking' | 'feed';
+export type ErrorSource = 'http' | 'queue' | 'workflow' | 'tracking' | 'feed';
 
 export type ErrorContext = {
   source: ErrorSource;
   deliveryId?: string;
   notificationId?: string;
+  scheduledId?: string;
   channel?: string;
 };
 

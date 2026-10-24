@@ -56,6 +56,47 @@ export const sendRequestSchema = z.object({
 });
 export type SendRequest = z.input<typeof sendRequestSchema>;
 
+// A schedule with an idempotencyKey is upserted by it: declaring it again with
+// another scheduledAt moves the pending schedule instead of adding one, so the
+// key must not be derived from the time.
+export const scheduleRequestSchema = sendRequestSchema.extend({
+  scheduledAt: z.string().regex(OFFSET_TIMESTAMP_REGEX, {
+    message: 'scheduledAt must be ISO 8601 with an explicit offset (Z or ±hh:mm)',
+  }),
+  groupKey: z.string().min(1).max(512).optional(),
+});
+export type ScheduleRequest = z.input<typeof scheduleRequestSchema>;
+
+export const cancelScheduledSchema = z
+  .object({
+    id: z.string().min(1).optional(),
+    idempotencyKey: z.string().min(1).optional(),
+    groupKey: z.string().min(1).optional(),
+  })
+  .refine((q) => q.id || q.idempotencyKey || q.groupKey, {
+    message: 'one of id, idempotencyKey or groupKey is required',
+  });
+export type CancelScheduledQuery = z.infer<typeof cancelScheduledSchema>;
+
+export type ScheduledItem = {
+  id: string;
+  recipientId: string;
+  type: string;
+  scheduledAt: string;
+  groupKey?: string;
+  idempotencyKey?: string;
+};
+
+// 'completed': the key already fired. 'cancelled': the new time is already
+// past, so the pending schedule is retired instead of firing late.
+export type ScheduleOp = 'created' | 'updated' | 'completed' | 'cancelled';
+
+export type ScheduleResult = {
+  scheduledId: string;
+  scheduledAt: string;
+  op: ScheduleOp;
+};
+
 export const webPushSubscriptionSchema = z.object({
   endpoint: z.string().url().max(2048),
   keys: z.object({

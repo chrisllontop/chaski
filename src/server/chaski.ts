@@ -8,6 +8,7 @@ import { FeedService } from './services/feed.service';
 import { NotificationService } from './services/notification.service';
 import { PreferenceService } from './services/preference.service';
 import { PushSubscriptionService } from './services/push-subscription.service';
+import { ScheduleService } from './services/schedule.service';
 
 export type Chaski = ChaskiApi & {
   /** The dashboard, its admin API under /api and the open-tracking pixel; mount it with app.route(). */
@@ -35,6 +36,11 @@ export const createChaski = <E>(configure: (env: E) => ChaskiConfig): Chaski => 
       return true;
     },
     send: run((request) => NotificationService.send(request)),
+    schedule: run((request) => ScheduleService.schedule(request)),
+    schedules: {
+      list: run((query = {}) => ScheduleService.listPending(query.recipientId)),
+      cancel: run((query) => ScheduleService.cancel(query)),
+    },
     push: {
       register: run((request) => PushSubscriptionService.register(request)),
       unregister: run((query) => PushSubscriptionService.unregister(query)),

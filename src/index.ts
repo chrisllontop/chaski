@@ -3,9 +3,11 @@ export type {
   ChaskiFeedApi,
   ChaskiPreferencesApi,
   ChaskiPushApi,
+  ChaskiSchedulesApi,
 } from './contract/api';
 export type {
   AttachmentInput,
+  CancelScheduledQuery,
   Channel,
   ChaskiPreferences,
   DeliveryResult,
@@ -17,6 +19,10 @@ export type {
   PreferencesUpdate,
   Recipient,
   RegisterPushSubscriptionRequest,
+  ScheduledItem,
+  ScheduleOp,
+  ScheduleRequest,
+  ScheduleResult,
   SendOutcome,
   SendRequest,
   SendResult,
@@ -43,4 +49,10 @@ export type {
 } from './server/config';
 export { ChaskiFeed } from './server/durable/feed';
 export type { Authorize, RoutesOptions } from './server/routes';
-export type { DeliveryMessage, EmailAttachment, SendEmailBinding } from './server/types';
+export type {
+  DeliveryMessage,
+  EmailAttachment,
+  ScheduleParams,
+  SendEmailBinding,
+} from './server/types';
+export { ChaskiScheduler } from './server/workflows/scheduler';

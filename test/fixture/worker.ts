@@ -4,6 +4,7 @@ import {
   type ChaskiFeed,
   createChaski,
   type DeliveryMessage,
+  type ScheduleParams,
   type SendEmailBinding,
 } from '../../src';
 
@@ -15,6 +16,7 @@ export type FixtureEnv = {
   CHASKI_EMAIL: SendEmailBinding;
   CHASKI_ATTACHMENTS: R2Bucket;
   CHASKI_FEED: DurableObjectNamespace<ChaskiFeed>;
+  CHASKI_SCHEDULER: Workflow<ScheduleParams>;
 };
 
 export const fixtureConfig = (env: FixtureEnv): ChaskiConfig => ({
@@ -25,6 +27,7 @@ export const fixtureConfig = (env: FixtureEnv): ChaskiConfig => ({
     email: env.CHASKI_EMAIL,
     attachments: env.CHASKI_ATTACHMENTS,
     feed: env.CHASKI_FEED,
+    scheduler: env.CHASKI_SCHEDULER,
   },
   channels: {
     email: { from: 'notifications@host.test', fromName: 'Fixture host' },
@@ -34,7 +37,7 @@ export const fixtureConfig = (env: FixtureEnv): ChaskiConfig => ({
 });
 
 // The host's main module re-exports chaski's classes so its bindings can find them.
-export { ChaskiFeed } from '../../src';
+export { ChaskiFeed, ChaskiScheduler } from '../../src';
 
 export const chaski = createChaski(fixtureConfig);
 
