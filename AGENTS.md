@@ -71,6 +71,9 @@ for the page, the service worker and React. The dashboard screens come next.
   `node_modules/chaski/migrations`.
 - `src/dashboard` is the dashboard (Vite root). `vite.config.ts` embeds its build into
   `src/generated/dashboard.ts`.
+- `brand/` holds the logo: the mark and the full logo (mark and wordmark, outlined), each in black
+  (`#0A0A0A`) and white (`#FAFAFA`) ink. The README and the dashboard favicon use it; it doesn't
+  ship in the package.
 - `test/fixture` is a host Worker that mounts chaski and declares every binding it uses (D1, queue
   and dead-letter queue, both Durable Objects, the Workflow, R2 and `send_email`); the tests and
   `pnpm dev` both run it.
