@@ -31,7 +31,7 @@ export type ServiceWorkerScopeLike = {
     matchAll(options?: {
       type?: string;
       includeUncontrolled?: boolean;
-    }): Promise<WindowClientLike[]>;
+    }): Promise<readonly WindowClientLike[]>;
     openWindow(url: string): Promise<unknown>;
   };
 };

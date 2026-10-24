@@ -4,5 +4,5 @@
     "types": ["@cloudflare/workers-types", "@cloudflare/vitest-plugin/types"]
   },
   "include": ["."],
-  "exclude": ["browser"]
+  "exclude": ["browser", "sw"]
 }

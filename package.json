@@ -75,7 +75,7 @@
     "build:dashboard": "vite build",
     "build:types": "tsc -p tsconfig.json --noEmit false --declaration --emitDeclarationOnly --outDir dist --rootDir src && tsc -p tsconfig.browser.json --noEmit false --declaration --emitDeclarationOnly --outDir dist --rootDir src && node scripts/fix-declaration-imports.ts dist",
     "build": "pnpm build:dashboard && tsdown && pnpm build:types",
-    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.browser.json && tsc -p src/dashboard/tsconfig.json && tsc -p test/tsconfig.json && tsc -p test/browser/tsconfig.json && tsc -p tsconfig.node.json",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.browser.json && tsc -p src/dashboard/tsconfig.json && tsc -p test/tsconfig.json && tsc -p test/browser/tsconfig.json && tsc -p test/sw/tsconfig.json && tsc -p tsconfig.node.json",
     "lint": "biome check .",
     "format": "biome check --write .",
     "test": "vitest run",
