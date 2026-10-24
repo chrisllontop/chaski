@@ -7,6 +7,7 @@ export default defineConfig({
     index: 'src/index.ts',
     client: 'src/client/index.ts',
     sw: 'src/sw/index.ts',
+    react: 'src/react/index.ts',
   },
   format: ['esm'],
   platform: 'neutral',

@@ -4,6 +4,6 @@
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "types": []
   },
-  "include": ["src/client", "src/sw", "src/contract"],
+  "include": ["src/client", "src/sw", "src/react", "src/contract"],
   "exclude": []
 }
