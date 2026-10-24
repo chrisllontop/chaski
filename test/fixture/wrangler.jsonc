@@ -10,5 +10,17 @@
       "database_id": "00000000-0000-0000-0000-000000000000",
       "migrations_dir": "../../migrations"
     }
-  ]
+  ],
+  "queues": {
+    "producers": [{ "binding": "CHASKI_QUEUE", "queue": "chaski-deliveries" }],
+    "consumers": [
+      {
+        "queue": "chaski-deliveries",
+        "max_batch_size": 10,
+        "max_batch_timeout": 1,
+        "max_retries": 5,
+        "dead_letter_queue": "chaski-deliveries-dlq"
+      }
+    ]
+  }
 }

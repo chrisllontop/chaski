@@ -4,6 +4,7 @@ declare namespace Cloudflare {
   }
   interface Env {
     CHASKI_DB: D1Database;
+    CHASKI_QUEUE: Queue<import('../src').DeliveryMessage>;
     TEST_MIGRATIONS: import('cloudflare:test').D1Migration[];
   }
 }

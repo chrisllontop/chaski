@@ -1,6 +1,9 @@
-import { exports } from 'cloudflare:workers';
+import { env, exports } from 'cloudflare:workers';
+import { vi } from 'vitest';
+import type { DeliveryMessage } from '../src';
 import type { Channel } from '../src/contract/contract';
 import { getClient } from '../src/server/db';
+import { DeliveryService } from '../src/server/services/delivery.service';
 
 // A bare template row (no channel content): enough for a type to pass ingest
 // validation while every channel still skips with no_template.
@@ -39,3 +42,29 @@ export const api = (path: string, init: RequestInit = {}) =>
       ...init.headers,
     },
   });
+
+// Sends always enqueue; tests that assert on delivery outcomes drain the
+// pending deliveries through the same code path the queue consumer runs.
+export const processDeliveries = async (notificationId: string): Promise<void> => {
+  const client = getClient();
+  const notification = await client.notifications.findFirst({ where: { id: notificationId } });
+  if (!notification) return;
+  const deliveries = await client.deliveries.findMany({ where: { notificationId } });
+  for (const delivery of deliveries) {
+    if (delivery.status !== 'pending') continue;
+    await DeliveryService.process({
+      kind: 'chaski.delivery',
+      deliveryId: delivery.id,
+      notificationId,
+      channel: delivery.channel,
+      type: notification.type,
+      recipientId: notification.recipientId,
+    });
+  }
+};
+
+// The messages the stubbed producer received (see setup.ts).
+export const queuedMessages = (): DeliveryMessage[] =>
+  vi
+    .mocked(env.CHASKI_QUEUE.sendBatch)
+    .mock.calls.flatMap(([messages]) => [...messages].map((message) => message.body));

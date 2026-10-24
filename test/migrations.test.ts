@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { describe, expect, it } from 'vitest';
 import { createChaski } from '../src';
 import { ensureMigrations, MIGRATIONS } from '../src/server/migrations';
+import { fixtureConfig } from './fixture/worker';
 
 describe('migrations', () => {
   it('lists every file the package ships in migrations/', () => {
@@ -24,7 +25,7 @@ describe('migrations', () => {
 
   it('answers the API with the config error before touching storage', async () => {
     const chaski = createChaski(() => ({
-      bindings: { db: env.CHASKI_DB },
+      ...fixtureConfig(env),
       migrationsTable: 'missing_migrations',
     }));
     const app = new Hono().route(
