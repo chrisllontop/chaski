@@ -49,17 +49,28 @@
     }
   },
   "scripts": {
-    "build": "tsdown",
-    "typecheck": "tsc -p tsconfig.json",
+    "build:dashboard": "vite build",
+    "build": "pnpm build:dashboard && tsdown",
+    "typecheck": "tsc -p tsconfig.json && tsc -p src/dashboard/tsconfig.json && tsc -p tsconfig.node.json",
     "lint": "biome check .",
     "format": "biome check --write .",
     "test": "vitest run --passWithNoTests",
-    "check": "pnpm typecheck && pnpm lint && pnpm test"
+    "check": "pnpm build:dashboard && pnpm typecheck && pnpm lint && pnpm test"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.2",
+    "@tailwindcss/vite": "^4.3.3",
+    "@tanstack/react-router": "^1.170.46",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "tailwindcss": "^4.3.3",
     "tsdown": "^0.23.2",
     "typescript": "^7.0.2",
+    "vite": "^8.3.5",
     "vitest": "^5.0.5"
   }
 }
