@@ -6,8 +6,7 @@ on that project's Cloudflare resources: email, web push and in-app notifications
 scheduling, retries and a dashboard. Open source (MIT), published on npm as `chaski`.
 
 **Current stage: repository base, no engine code yet.** Tooling, conventions, CI and docs are in
-place, and the package builds an empty entry point. `docs/architecture.md` lists what is decided and
-what is still open; read it before writing engine code.
+place, and the package builds an empty entry point.
 
 ## Run it
 
@@ -33,7 +32,6 @@ what is still open; read it before writing engine code.
   tsdown builds `src/index.ts` into `dist` (ESM plus declarations); only `dist` ships, along with
   `README.md` and `LICENSE`.
 - The dashboard is expected at `src/dashboard`, where `copy.mdc` already points.
-- `docs/architecture.md` holds the decisions taken and the questions still open.
 
 ## Code conventions
 
