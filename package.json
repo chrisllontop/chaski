@@ -55,7 +55,7 @@
   "scripts": {
     "dev": "pnpm build:dashboard && wrangler dev -c test/fixture/wrangler.jsonc --var CHASKI_DRY_RUN:true",
     "build:dashboard": "vite build",
-    "build:types": "tsc -p tsconfig.json --noEmit false --declaration --emitDeclarationOnly --outDir dist --rootDir src",
+    "build:types": "tsc -p tsconfig.json --noEmit false --declaration --emitDeclarationOnly --outDir dist --rootDir src && node scripts/fix-declaration-imports.ts dist",
     "build": "pnpm build:dashboard && tsdown && pnpm build:types",
     "typecheck": "tsc -p tsconfig.json && tsc -p src/dashboard/tsconfig.json && tsc -p test/tsconfig.json && tsc -p tsconfig.node.json",
     "lint": "biome check .",

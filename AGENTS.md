@@ -89,6 +89,8 @@ with the code they govern.
   plugin) and `tsconfig.node.json` (the config files).
 - tsdown bundles the JavaScript and TypeScript 7's compiler emits the declarations
   (`pnpm build:types`), so exported Drizzle tables and zod schemas keep their inferred types.
+  `scripts/fix-declaration-imports.ts` then gives their relative imports the file extensions that
+  Node16 and NodeNext resolution require.
 
 ## Tests
 
