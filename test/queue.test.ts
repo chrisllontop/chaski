@@ -34,6 +34,8 @@ const seedDelivery = async (channel = 'email') => {
 
 const deliveryRow = () => getClient().deliveries.findFirst({ where: { id: 'd_queue' } });
 
+const REAL_EMAIL = CHANNEL_DEFS.email;
+
 // Stands in for a channel so the consumer's retry rules are tested on their own.
 const useChannel = (deliver: ChannelDefinition['deliver']) => {
   CHANNEL_DEFS.email = { gate: null, deliver };
@@ -52,7 +54,7 @@ const consume = async (messages: { attempts: number; body: unknown }[]) => {
 };
 
 afterEach(() => {
-  delete CHANNEL_DEFS.email;
+  CHANNEL_DEFS.email = REAL_EMAIL;
   vi.restoreAllMocks();
 });
 
@@ -146,9 +148,9 @@ describe('chaski.queue', () => {
   });
 
   it('fails a delivery for a channel nothing can send', async () => {
-    await seedDelivery('push');
+    await seedDelivery('sms');
 
-    await consume([{ attempts: 1, body: { ...MESSAGE, channel: 'push' } }]);
+    await consume([{ attempts: 1, body: { ...MESSAGE, channel: 'sms' } }]);
 
     expect(await deliveryRow()).toMatchObject({
       status: 'failed',

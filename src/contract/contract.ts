@@ -56,6 +56,50 @@ export const sendRequestSchema = z.object({
 });
 export type SendRequest = z.input<typeof sendRequestSchema>;
 
+export const webPushSubscriptionSchema = z.object({
+  endpoint: z.string().url().max(2048),
+  keys: z.object({
+    p256dh: z.string().min(1).max(512),
+    auth: z.string().min(1).max(256),
+  }),
+});
+export type WebPushSubscription = z.infer<typeof webPushSubscriptionSchema>;
+
+// APNs device tokens are opaque hex (64 characters today; Apple may grow them).
+export const apnsDeviceTokenSchema = z
+  .string()
+  .min(32)
+  .max(512)
+  .regex(/^[0-9a-fA-F]+$/, { message: 'deviceToken must be a hex string' });
+
+// The iOS shape comes first so its `platform` literal drives the error a
+// malformed iOS registration gets.
+export const registerPushSubscriptionSchema = z.union([
+  z.object({
+    recipient: recipientSchema,
+    platform: z.literal('ios'),
+    deviceToken: apnsDeviceTokenSchema,
+    userAgent: z.string().max(512).optional(),
+  }),
+  z.object({
+    recipient: recipientSchema,
+    subscription: webPushSubscriptionSchema,
+    userAgent: z.string().max(512).optional(),
+  }),
+]);
+export type RegisterPushSubscriptionRequest = z.input<typeof registerPushSubscriptionSchema>;
+
+export const unregisterPushSubscriptionSchema = z
+  .object({
+    recipientId: z.string().min(1).max(256).optional(),
+    endpoint: z.string().url().max(2048).optional(),
+    deviceToken: apnsDeviceTokenSchema.optional(),
+  })
+  .refine((q) => q.recipientId || q.endpoint || q.deviceToken, {
+    message: 'one of recipientId, endpoint or deviceToken is required',
+  });
+export type UnregisterPushSubscriptionQuery = z.infer<typeof unregisterPushSubscriptionSchema>;
+
 export const listFeedQuerySchema = z.object({
   recipientId: z.string().min(1).max(256),
   cursor: z.string().max(512).optional(),

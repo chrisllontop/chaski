@@ -2,6 +2,8 @@ import { env } from 'cloudflare:workers';
 import { CHANNELS, type Channel } from '../contract/contract';
 import { ChaskiError } from '../contract/errors';
 import type { ChaskiFeed } from './durable/feed';
+import type { ApnsCredentials } from './lib/apns';
+import { decodeBase64Url, encodeBase64Url } from './lib/base64';
 import type { DeliveryMessage, SendEmailBinding } from './types';
 
 export type ChaskiBindings = {
@@ -27,6 +29,35 @@ export type EmailConfig = {
 /** The in_app channel has no options yet; `{}` turns it on. */
 export type InAppConfig = Record<string, never>;
 
+export type VapidConfig = {
+  /** A `mailto:` or `https:` contact the push services can reach you at. */
+  subject: string;
+  /** The base64url uncompressed P-256 public key (65 bytes), as web-push tools print it. */
+  publicKey: string;
+  /** The base64url P-256 private key (32 bytes), or the whole private JWK as JSON. */
+  privateKey: string;
+};
+
+export type ApnsConfig = {
+  teamId: string;
+  keyId: string;
+  bundleId: string;
+  environment: 'sandbox' | 'production';
+  /** The contents of the .p8 file (PKCS#8 PEM). */
+  privateKey: string;
+};
+
+/** Web push needs `vapid`, iOS needs `apns`; configure either or both. */
+export type PushConfig = {
+  vapid?: VapidConfig;
+  apns?: ApnsConfig;
+};
+
+export type ResolvedPush = {
+  vapid?: { subject: string; publicKey: string; privateJwk: string };
+  apns?: ApnsCredentials;
+};
+
 export type ErrorSource = 'http' | 'queue' | 'tracking' | 'feed';
 
 export type ErrorContext = {
@@ -44,8 +75,9 @@ export type ChaskiConfig = {
   channels?: {
     email?: EmailConfig;
     in_app?: InAppConfig;
+    push?: PushConfig;
   };
-  /** Render and record email deliveries without calling the provider. */
+  /** Render and record email and push deliveries without calling the providers. */
   dryRun?: boolean;
   /** Must match `max_retries` on the host's queue consumer; defaults to 5. */
   maxRetries?: number;
@@ -61,6 +93,7 @@ export type ResolvedConfig = {
   channels: {
     email?: EmailConfig;
     in_app?: InAppConfig;
+    push?: ResolvedPush;
   };
   enabledChannels: Channel[];
   dryRun: boolean;
@@ -71,6 +104,53 @@ export type ResolvedConfig = {
 
 const fail = (message: string): never => {
   throw new ChaskiError('config', `chaski config: ${message}`);
+};
+
+// Subscriptions are bound to the public key they were made with, so hosts bring
+// their own pair, in the raw base64url form web-push tools print.
+const resolveVapid = (vapid: VapidConfig): NonNullable<ResolvedPush['vapid']> => {
+  if (!/^(mailto:|https:)/.test(vapid.subject ?? '')) {
+    fail('channels.push.vapid.subject must be a mailto: or https: URL');
+  }
+  const point = decodeBase64Url(vapid.publicKey ?? '');
+  if (point?.length !== 65 || point[0] !== 4) {
+    fail('channels.push.vapid.publicKey must be a base64url uncompressed P-256 key (65 bytes)');
+  }
+  const privateKey = (vapid.privateKey ?? '').trim();
+  if (privateKey.startsWith('{')) {
+    return { subject: vapid.subject, publicKey: vapid.publicKey, privateJwk: privateKey };
+  }
+  if (decodeBase64Url(privateKey)?.length !== 32) {
+    fail('channels.push.vapid.privateKey must be a base64url P-256 private key (32 bytes)');
+  }
+  const xy = point as Uint8Array;
+  const privateJwk = JSON.stringify({
+    kty: 'EC',
+    crv: 'P-256',
+    x: encodeBase64Url(xy.slice(1, 33)),
+    y: encodeBase64Url(xy.slice(33, 65)),
+    d: privateKey,
+  });
+  return { subject: vapid.subject, publicKey: vapid.publicKey, privateJwk };
+};
+
+const resolveApns = (apns: ApnsConfig): ApnsCredentials => {
+  for (const field of ['teamId', 'keyId', 'bundleId'] as const) {
+    if (!apns[field]) fail(`channels.push.apns.${field} is required`);
+  }
+  if (apns.environment !== 'sandbox' && apns.environment !== 'production') {
+    fail("channels.push.apns.environment must be 'sandbox' or 'production'");
+  }
+  if (!apns.privateKey?.includes('PRIVATE KEY')) {
+    fail('channels.push.apns.privateKey must be the contents of the .p8 file');
+  }
+  return {
+    teamId: apns.teamId,
+    keyId: apns.keyId,
+    bundleId: apns.bundleId,
+    environment: apns.environment,
+    privateKeyPem: apns.privateKey,
+  };
 };
 
 export const validateConfig = (config: ChaskiConfig): ResolvedConfig => {
@@ -100,6 +180,15 @@ export const validateConfig = (config: ChaskiConfig): ResolvedConfig => {
     if (!bindings.feed) fail('channels.in_app is configured but bindings.feed is missing');
     resolved.in_app = {};
   }
+  if (channels.push) {
+    if (!channels.push.vapid && !channels.push.apns) {
+      fail('channels.push needs vapid (web push), apns (iOS) or both');
+    }
+    resolved.push = {
+      vapid: channels.push.vapid ? resolveVapid(channels.push.vapid) : undefined,
+      apns: channels.push.apns ? resolveApns(channels.push.apns) : undefined,
+    };
+  }
 
   const maxRetries = config.maxRetries ?? 5;
   if (!Number.isInteger(maxRetries) || maxRetries < 0) {
@@ -115,7 +204,7 @@ export const validateConfig = (config: ChaskiConfig): ResolvedConfig => {
     publicUrl: (publicUrl as URL).href.replace(/\/+$/, ''),
     bindings,
     channels: resolved,
-    enabledChannels: CHANNELS.filter((channel) => resolved[channel as keyof typeof resolved]),
+    enabledChannels: CHANNELS.filter((channel) => resolved[channel]),
     dryRun: config.dryRun ?? false,
     maxRetries,
     migrationsTable,

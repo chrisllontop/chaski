@@ -1,8 +1,10 @@
 import type { Channel } from '../../../contract/contract';
 import type { SkipReason } from '../../db/schema';
 import type { ContactSnapshot } from '../contact.service';
+import { PushSubscriptionService } from '../push-subscription.service';
 import { EmailAdapter } from './email.adapter';
 import { InAppAdapter } from './inapp.adapter';
+import { PushAdapter } from './push.adapter';
 import type { AdapterContext, AdapterResult } from './types';
 
 // A channel's recipient prerequisite, declared as data so resolveChannels
@@ -19,14 +21,17 @@ export type ChannelDefinition = {
   deliver: (ctx: AdapterContext) => Promise<AdapterResult>;
 };
 
-// Each channel registers its definition here. A delivery for a channel without
-// one has nothing to send it with and fails as channel_not_available.
-export const CHANNEL_DEFS: Partial<Record<Channel, ChannelDefinition>> = {
+export const CHANNEL_DEFS: Record<Channel, ChannelDefinition> = {
   email: {
     gate: { kind: 'contact', field: 'email', skipReason: 'missing_email' },
     deliver: EmailAdapter.deliver,
   },
   in_app: { gate: null, deliver: InAppAdapter.deliver },
+  push: {
+    gate: { kind: 'capability', skipReason: 'no_device_tokens' },
+    loadCapability: PushSubscriptionService.hasReachableDevice,
+    deliver: PushAdapter.deliver,
+  },
 };
 
 export const passesGate = (

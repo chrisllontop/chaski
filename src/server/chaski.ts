@@ -1,11 +1,12 @@
 import type { Env, Hono } from 'hono';
 import type { ChaskiApi } from '../contract/api';
-import { type ChaskiConfig, setConfigure } from './config';
+import { type ChaskiConfig, resolveConfig, setConfigure } from './config';
 import { handleQueueBatch, isChaskiBatch } from './consumer';
 import { ready } from './migrations';
 import { mountRoutes, type RoutesOptions } from './routes';
 import { FeedService } from './services/feed.service';
 import { NotificationService } from './services/notification.service';
+import { PushSubscriptionService } from './services/push-subscription.service';
 
 export type Chaski = ChaskiApi & {
   /** The dashboard, its admin API under /api and the open-tracking pixel; mount it with app.route(). */
@@ -33,6 +34,13 @@ export const createChaski = <E>(configure: (env: E) => ChaskiConfig): Chaski => 
       return true;
     },
     send: run((request) => NotificationService.send(request)),
+    push: {
+      register: run((request) => PushSubscriptionService.register(request)),
+      unregister: run((query) => PushSubscriptionService.unregister(query)),
+      vapidPublicKey: async () => ({
+        publicKey: resolveConfig().channels.push?.vapid?.publicKey ?? null,
+      }),
+    },
     feed: {
       list: run((query) => FeedService.list(query)),
       unreadCount: run((recipientId) => FeedService.unreadCount(recipientId)),

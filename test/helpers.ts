@@ -30,7 +30,8 @@ export const seedTemplate = async (type: string, channel: Channel) => {
       enabled: true,
       subject: 'Hello {{recipient.name}}',
       body: channel === 'email' ? '<p>Amount: {{amount}}</p>' : 'Amount: {{amount}}',
-      textBody: channel === 'in_app' ? '/payments/{{amount}}' : 'Amount: {{amount}}',
+      // Email keeps its plain-text body here; in_app and push keep the link they open.
+      textBody: channel === 'email' ? 'Amount: {{amount}}' : '/payments/{{amount}}',
     },
   });
 };
