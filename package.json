@@ -52,16 +52,18 @@
     }
   },
   "scripts": {
+    "dev": "pnpm build:dashboard && wrangler dev -c test/fixture/wrangler.jsonc",
     "build:dashboard": "vite build",
     "build": "pnpm build:dashboard && tsdown",
-    "typecheck": "tsc -p tsconfig.json && tsc -p src/dashboard/tsconfig.json && tsc -p tsconfig.node.json",
+    "typecheck": "tsc -p tsconfig.json && tsc -p src/dashboard/tsconfig.json && tsc -p test/tsconfig.json && tsc -p tsconfig.node.json",
     "lint": "biome check .",
     "format": "biome check --write .",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
     "check": "pnpm build:dashboard && pnpm typecheck && pnpm lint && pnpm test"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.2",
+    "@cloudflare/vitest-plugin": "^1.4.7",
     "@cloudflare/workers-types": "^5.20261023.1",
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/react-router": "^1.170.46",
@@ -76,6 +78,7 @@
     "tsdown": "^0.23.2",
     "typescript": "^7.0.2",
     "vite": "^8.3.5",
-    "vitest": "^5.0.5"
+    "vitest": "^5.0.5",
+    "wrangler": "^4.152.0"
   }
 }

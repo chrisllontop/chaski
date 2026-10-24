@@ -1,5 +1,6 @@
 allowBuilds:
   esbuild: true
+  workerd: true
 
 minimumReleaseAgeExclude:
   - tsdown@0.23.2
