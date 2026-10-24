@@ -4,6 +4,7 @@ import { type ChaskiErrorCode, isChaskiError } from '../../contract/errors';
 import { logger } from '../lib/log';
 import { reportError } from '../lib/report-error';
 import { ready } from '../migrations';
+import { admin } from './admin';
 import { isApi, serveAsset, serveShell } from './dashboard';
 
 export type Authorize<E extends Env = Env> = (
@@ -66,6 +67,7 @@ export const mountRoutes = <E extends Env = Env>({ dashboard }: RoutesOptions<E>
     await ready();
     await next();
   });
+  app.route('/api', admin);
   app.all('/api/*', (c) => c.json({ error: 'not_found', message: 'no such endpoint' }, 404));
   app.get('*', serveShell);
   return app;
