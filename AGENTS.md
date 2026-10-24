@@ -50,8 +50,9 @@ for the API, services, database, errors and UI arrive with the code they govern.
   binding names or reach for resources the host did not hand over.
 - TypeScript 7 has no classic compiler API, so tsdown emits declarations with Oxc, which needs
   `isolatedDeclarations`: an export whose type can't be read from its own syntax needs an explicit
-  annotation. `pnpm build` fails with TS9013 when one is missing; `tsc --noEmit` does not report it.
-  tsdown's tsgo generator would lift that rule; it needs TypeScript 7.1, in beta as of October 2026.
+  annotation. `pnpm typecheck` reports a missing one (TS9007, TS9010, TS9013), and so does
+  `pnpm build`. tsdown's tsgo generator would lift that rule; it needs TypeScript 7.1, in beta as of
+  October 2026.
 
 ## Tests
 
