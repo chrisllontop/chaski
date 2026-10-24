@@ -4,6 +4,7 @@ import { type ChaskiConfig, setConfigure } from './config';
 import { handleQueueBatch, isChaskiBatch } from './consumer';
 import { ready } from './migrations';
 import { mountRoutes, type RoutesOptions } from './routes';
+import { FeedService } from './services/feed.service';
 import { NotificationService } from './services/notification.service';
 
 export type Chaski = ChaskiApi & {
@@ -32,5 +33,10 @@ export const createChaski = <E>(configure: (env: E) => ChaskiConfig): Chaski => 
       return true;
     },
     send: run((request) => NotificationService.send(request)),
+    feed: {
+      list: run((query) => FeedService.list(query)),
+      unreadCount: run((recipientId) => FeedService.unreadCount(recipientId)),
+      markRead: run((input) => FeedService.markRead(input)),
+    },
   };
 };

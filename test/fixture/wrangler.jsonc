@@ -27,6 +27,10 @@
       }
     ]
   },
+  "durable_objects": {
+    "bindings": [{ "name": "CHASKI_FEED", "class_name": "ChaskiFeed" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ChaskiFeed"] }],
   "r2_buckets": [{ "binding": "CHASKI_ATTACHMENTS", "bucket_name": "chaski-attachments" }],
   "send_email": [{ "name": "CHASKI_EMAIL" }]
 }

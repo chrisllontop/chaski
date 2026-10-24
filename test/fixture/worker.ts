@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import {
   type ChaskiConfig,
+  type ChaskiFeed,
   createChaski,
   type DeliveryMessage,
   type SendEmailBinding,
@@ -13,6 +14,7 @@ export type FixtureEnv = {
   CHASKI_QUEUE: Queue<DeliveryMessage>;
   CHASKI_EMAIL: SendEmailBinding;
   CHASKI_ATTACHMENTS: R2Bucket;
+  CHASKI_FEED: DurableObjectNamespace<ChaskiFeed>;
 };
 
 export const fixtureConfig = (env: FixtureEnv): ChaskiConfig => ({
@@ -22,12 +24,17 @@ export const fixtureConfig = (env: FixtureEnv): ChaskiConfig => ({
     queue: env.CHASKI_QUEUE,
     email: env.CHASKI_EMAIL,
     attachments: env.CHASKI_ATTACHMENTS,
+    feed: env.CHASKI_FEED,
   },
   channels: {
     email: { from: 'notifications@host.test', fromName: 'Fixture host' },
+    in_app: {},
   },
   dryRun: env.CHASKI_DRY_RUN === 'true',
 });
+
+// The host's main module re-exports chaski's classes so its bindings can find them.
+export { ChaskiFeed } from '../../src';
 
 export const chaski = createChaski(fixtureConfig);
 

@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { CHANNELS, type Channel } from '../contract/contract';
 import { ChaskiError } from '../contract/errors';
+import type { ChaskiFeed } from './durable/feed';
 import type { DeliveryMessage, SendEmailBinding } from './types';
 
 export type ChaskiBindings = {
@@ -10,6 +11,8 @@ export type ChaskiBindings = {
   queue: Queue<DeliveryMessage>;
   /** The host's `send_email` binding; required when the email channel is configured. */
   email?: SendEmailBinding;
+  /** The ChaskiFeed Durable Object namespace; required when the in_app channel is configured. */
+  feed?: DurableObjectNamespace<ChaskiFeed>;
   /** An R2 bucket; required by sends that carry email attachments. */
   attachments?: R2Bucket;
 };
@@ -21,7 +24,10 @@ export type EmailConfig = {
   replyTo?: string;
 };
 
-export type ErrorSource = 'http' | 'queue' | 'tracking';
+/** The in_app channel has no options yet; `{}` turns it on. */
+export type InAppConfig = Record<string, never>;
+
+export type ErrorSource = 'http' | 'queue' | 'tracking' | 'feed';
 
 export type ErrorContext = {
   source: ErrorSource;
@@ -37,6 +43,7 @@ export type ChaskiConfig = {
   /** A channel is active when it has a config entry. */
   channels?: {
     email?: EmailConfig;
+    in_app?: InAppConfig;
   };
   /** Render and record email deliveries without calling the provider. */
   dryRun?: boolean;
@@ -53,6 +60,7 @@ export type ResolvedConfig = {
   bindings: ChaskiBindings;
   channels: {
     email?: EmailConfig;
+    in_app?: InAppConfig;
   };
   enabledChannels: Channel[];
   dryRun: boolean;
@@ -87,6 +95,10 @@ export const validateConfig = (config: ChaskiConfig): ResolvedConfig => {
     if (!bindings.email) fail('channels.email is configured but bindings.email is missing');
     if (!channels.email.from?.includes('@')) fail('channels.email.from must be an email address');
     resolved.email = channels.email;
+  }
+  if (channels.in_app) {
+    if (!bindings.feed) fail('channels.in_app is configured but bindings.feed is missing');
+    resolved.in_app = {};
   }
 
   const maxRetries = config.maxRetries ?? 5;

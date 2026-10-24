@@ -34,6 +34,11 @@ export const emailOptionsSchema = z.object({
   attachments: z.array(attachmentInputSchema).max(10).optional(),
 });
 
+// A wall-clock time without an explicit UTC offset names a different instant
+// in every timezone, so it is rejected instead of guessed.
+export const OFFSET_TIMESTAMP_REGEX =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
+
 export const typeNameSchema = z
   .string()
   .min(1)
@@ -50,6 +55,51 @@ export const sendRequestSchema = z.object({
   idempotencyKey: z.string().min(1).max(512).optional(),
 });
 export type SendRequest = z.input<typeof sendRequestSchema>;
+
+export const listFeedQuerySchema = z.object({
+  recipientId: z.string().min(1).max(256),
+  cursor: z.string().max(512).optional(),
+  limit: z.number().int().min(1).max(100).optional(),
+  unreadOnly: z.boolean().optional(),
+});
+export type ListFeedQuery = z.input<typeof listFeedQuerySchema>;
+
+// ids marks those items; before marks everything up to that instant
+// (inclusive); neither marks the recipient's whole unread feed.
+export const markFeedReadSchema = z.object({
+  recipientId: z.string().min(1).max(256),
+  ids: z.array(z.string().min(1)).max(100).optional(),
+  before: z
+    .string()
+    .regex(OFFSET_TIMESTAMP_REGEX, { message: 'before must be ISO 8601 with an explicit offset' })
+    .optional(),
+});
+export type MarkFeedReadInput = z.input<typeof markFeedReadSchema>;
+
+// Socket events carry no title or body: they tell clients to refetch, and the
+// feed API stays the source of truth. Clients ignore types they don't know, so
+// the protocol can grow without breaking older bundles.
+export const feedSocketEventSchema = z.object({
+  type: z.literal('feed_item.created'),
+  feedItemId: z.string().min(1),
+  createdAt: z.string(),
+});
+export type FeedSocketEvent = z.infer<typeof feedSocketEventSchema>;
+
+export type FeedItem = {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  href?: string;
+  readAt: string | null;
+  createdAt: string;
+};
+
+export type FeedPage = {
+  items: FeedItem[];
+  nextCursor: string | null;
+};
 
 export type DeliveryResult = {
   id?: string;

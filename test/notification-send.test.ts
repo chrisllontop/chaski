@@ -46,6 +46,7 @@ describe('NotificationService.send', () => {
     expect(result).toMatchObject({ replayed: false, outcome: 'delivered' });
     expect(result.deliveries).toEqual([
       expect.objectContaining({ channel: 'email', status: 'pending' }),
+      expect.objectContaining({ channel: 'in_app', status: 'skipped', reason: 'no_template' }),
     ]);
     expect(queuedMessages()).toEqual([
       expect.objectContaining({ kind: 'chaski.delivery', channel: 'email' }),
@@ -109,6 +110,7 @@ describe('NotificationService.send', () => {
     expect(result.outcome).toBe('undeliverable');
     expect(result.deliveries).toEqual([
       expect.objectContaining({ channel: 'email', status: 'skipped', reason: 'no_template' }),
+      expect.objectContaining({ channel: 'in_app', status: 'skipped', reason: 'no_template' }),
     ]);
     expect(queuedMessages()).toEqual([]);
   });

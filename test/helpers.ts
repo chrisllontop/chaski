@@ -30,7 +30,7 @@ export const seedTemplate = async (type: string, channel: Channel) => {
       enabled: true,
       subject: 'Hello {{recipient.name}}',
       body: channel === 'email' ? '<p>Amount: {{amount}}</p>' : 'Amount: {{amount}}',
-      textBody: 'Amount: {{amount}}',
+      textBody: channel === 'in_app' ? '/payments/{{amount}}' : 'Amount: {{amount}}',
     },
   });
 };

@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { channelSchema } from '../../contract/contract';
-import { ChaskiError } from '../../contract/errors';
+import { parseInput } from '../lib/validate';
 import { TemplateService } from '../services/template.service';
 
 const templateInputSchema = z.object({
@@ -29,14 +29,6 @@ const channelContentSchema = z.object({
   textBody: z.string().nullable().optional(),
 });
 
-export const parseBody = <T>(schema: z.ZodType<T>, body: unknown): T => {
-  const parsed = schema.safeParse(body);
-  if (!parsed.success) {
-    throw new ChaskiError('validation', parsed.error.issues.map((i) => i.message).join('; '));
-  }
-  return parsed.data;
-};
-
 export const admin = new Hono();
 
 admin.get('/templates', async (c) => c.json({ templates: await TemplateService.list() }));
@@ -46,7 +38,7 @@ admin.get('/templates/deleted', async (c) =>
 );
 
 admin.post('/templates', async (c) => {
-  const input = parseBody(templateInputSchema, await c.req.json());
+  const input = parseInput(templateInputSchema, await c.req.json());
   const template = await TemplateService.createTemplate(input);
   return c.json({ template }, 201);
 });
@@ -54,7 +46,7 @@ admin.post('/templates', async (c) => {
 admin.get('/templates/:id', async (c) => c.json(await TemplateService.get(c.req.param('id'))));
 
 admin.patch('/templates/:id', async (c) => {
-  const input = parseBody(templatePatchSchema, await c.req.json());
+  const input = parseInput(templatePatchSchema, await c.req.json());
   return c.json({ template: await TemplateService.updateTemplate(c.req.param('id'), input) });
 });
 
@@ -65,14 +57,14 @@ admin.delete('/templates/:id', async (c) => {
 });
 
 admin.put('/templates/:id/channels/:channel', async (c) => {
-  const channel = parseBody(channelSchema, c.req.param('channel'));
-  const input = parseBody(channelContentSchema, await c.req.json());
+  const channel = parseInput(channelSchema, c.req.param('channel'));
+  const input = parseInput(channelContentSchema, await c.req.json());
   const row = await TemplateService.upsertChannel(c.req.param('id'), channel, input);
   return c.json({ channel: row });
 });
 
 admin.post('/templates/:id/preview', async (c) => {
-  const input = parseBody(
+  const input = parseInput(
     z.object({
       channel: channelSchema,
       data: z.record(z.string(), z.unknown()).optional(),
@@ -83,7 +75,7 @@ admin.post('/templates/:id/preview', async (c) => {
 });
 
 admin.post('/templates/:id/test-send', async (c) => {
-  const input = parseBody(
+  const input = parseInput(
     z.object({
       to: z.string().email(),
       data: z.record(z.string(), z.unknown()).optional(),

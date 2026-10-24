@@ -10,6 +10,7 @@ import { ChaskiError } from '../../contract/errors';
 import { deliveries, notifications } from '../db/schema';
 import { newId } from '../lib/ids';
 import { resolveChannels } from '../lib/resolve-channels';
+import { parseInput } from '../lib/validate';
 import type { DeliveryMessage } from '../types';
 import { loadCapabilities } from './adapters/registry';
 import type { StoredAttachment } from './attachment.service';
@@ -82,11 +83,7 @@ export class NotificationService extends BaseService {
   protected static override name = 'notification';
 
   static send = async (rawRequest: unknown): Promise<SendResult> => {
-    const parsed = sendRequestSchema.safeParse(rawRequest);
-    if (!parsed.success) {
-      throw new ChaskiError('validation', parsed.error.issues.map((i) => i.message).join('; '));
-    }
-    const request = parsed.data;
+    const request = parseInput(sendRequestSchema, rawRequest);
     assertChannelsConfigured(NotificationService.config.enabledChannels, request.channels);
     await assertKnownType(request.type);
 

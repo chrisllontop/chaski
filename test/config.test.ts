@@ -48,7 +48,18 @@ describe('config', () => {
 
   it('lists only the channels that have config', () => {
     const config = fixtureConfig(env);
-    expect(validateConfig(config).enabledChannels).toEqual(['email']);
+    expect(validateConfig(config).enabledChannels).toEqual(['email', 'in_app']);
     expect(validateConfig({ ...config, channels: {} }).enabledChannels).toEqual([]);
+  });
+
+  it('requires the feed binding once the in_app channel is configured', () => {
+    const config = fixtureConfig(env);
+    expect(() =>
+      validateConfig({ ...config, bindings: { ...config.bindings, feed: undefined } }),
+    ).toThrowError(
+      expect.objectContaining({
+        message: 'chaski config: channels.in_app is configured but bindings.feed is missing',
+      }),
+    );
   });
 });

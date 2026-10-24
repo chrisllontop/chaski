@@ -2,6 +2,7 @@ import type { Channel } from '../../../contract/contract';
 import type { SkipReason } from '../../db/schema';
 import type { ContactSnapshot } from '../contact.service';
 import { EmailAdapter } from './email.adapter';
+import { InAppAdapter } from './inapp.adapter';
 import type { AdapterContext, AdapterResult } from './types';
 
 // A channel's recipient prerequisite, declared as data so resolveChannels
@@ -25,6 +26,7 @@ export const CHANNEL_DEFS: Partial<Record<Channel, ChannelDefinition>> = {
     gate: { kind: 'contact', field: 'email', skipReason: 'missing_email' },
     deliver: EmailAdapter.deliver,
   },
+  in_app: { gate: null, deliver: InAppAdapter.deliver },
 };
 
 export const passesGate = (

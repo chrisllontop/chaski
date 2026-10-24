@@ -29,9 +29,9 @@ describe('email channel', () => {
 
     const result = await sendPayment();
 
-    expect(result.deliveries).toEqual([
+    expect(result.deliveries).toContainEqual(
       expect.objectContaining({ channel: 'email', status: 'pending' }),
-    ]);
+    );
     expect(sent).toEqual([
       expect.objectContaining({
         to: 'ana@example.com',
@@ -82,6 +82,7 @@ describe('email channel', () => {
     expect(result.outcome).toBe('undeliverable');
     expect(result.deliveries).toEqual([
       expect.objectContaining({ channel: 'email', status: 'skipped', reason: 'missing_email' }),
+      expect.objectContaining({ channel: 'in_app', status: 'skipped', reason: 'no_template' }),
     ]);
   });
 

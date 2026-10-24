@@ -1,8 +1,13 @@
-export type { ChaskiApi } from './contract/api';
+export type { ChaskiApi, ChaskiFeedApi } from './contract/api';
 export type {
   AttachmentInput,
   Channel,
   DeliveryResult,
+  FeedItem,
+  FeedPage,
+  FeedSocketEvent,
+  ListFeedQuery,
+  MarkFeedReadInput,
   Recipient,
   SendOutcome,
   SendRequest,
@@ -21,6 +26,8 @@ export type {
   EmailConfig,
   ErrorContext,
   ErrorSource,
+  InAppConfig,
 } from './server/config';
+export { ChaskiFeed } from './server/durable/feed';
 export type { Authorize, RoutesOptions } from './server/routes';
 export type { DeliveryMessage, EmailAttachment, SendEmailBinding } from './server/types';
