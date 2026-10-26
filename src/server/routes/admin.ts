@@ -282,3 +282,7 @@ admin.get('/metrics/timeseries', async (c) =>
 admin.get('/metrics/types', async (c) =>
   c.json(await MetricsService.byType(parseInput(metricsQuerySchema, c.req.query()).period)),
 );
+
+admin.get('/metrics/latency', async (c) =>
+  c.json(await MetricsService.latency(parseInput(metricsQuerySchema, c.req.query()).period)),
+);

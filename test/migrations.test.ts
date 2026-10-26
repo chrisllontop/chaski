@@ -18,7 +18,7 @@ describe('migrations', () => {
     await expect(ensureMigrations(env.CHASKI_DB, 'missing_migrations')).rejects.toMatchObject({
       code: 'config',
       message: expect.stringContaining(
-        'missing migrations 0000_init.sql. Apply them with `wrangler d1 migrations apply',
+        'missing migrations 0000_init.sql, 0001_delivery_latency.sql. Apply them with `wrangler d1',
       ),
     });
   });

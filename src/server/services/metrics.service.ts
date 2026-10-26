@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, isNotNull, lt, sql } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNotNull, lt, type SQL, sql } from 'drizzle-orm';
 import type { Channel } from '../../contract/contract';
 import { deliveries, notifications, scheduledNotifications } from '../db/schema';
 import { BaseService } from './base.service';
@@ -39,6 +39,25 @@ const utcDays = (from: Date, to: Date): string[] => {
   }
   return days;
 };
+
+type LatencyRow = {
+  key: string;
+  count: number;
+  deliverP50: number | null;
+  deliverP95: number | null;
+  providerP50: number | null;
+  providerP95: number | null;
+};
+
+// Nearest-rank percentile: the value at rank ceil(n × p / 100), in integer
+// arithmetic because D1 may lack SQLite's math functions.
+const rankOf = (n: string, p: number) => sql.raw(`(${n} * ${p} + 99) / 100`);
+
+const latencyStats = (row: LatencyRow) => ({
+  count: Number(row.count),
+  toDeliver: { p50: row.deliverP50, p95: row.deliverP95 },
+  provider: { p50: row.providerP50, p95: row.providerP95 },
+});
 
 export class MetricsService extends BaseService {
   protected static override name = 'metrics';
@@ -154,6 +173,73 @@ export class MetricsService extends BaseService {
         };
       }),
     };
+  };
+
+  /**
+   * Percentiles of time to deliver (notification created to delivery sent, retries
+   * included) and of the provider's time on the sending attempt, over sent deliveries.
+   */
+  static latency = async (period: MetricPeriod) => {
+    const { from, to } = windowFor(period);
+    const [overall, channels, days] = await Promise.all([
+      MetricsService.latencyBy(sql`'all'`, from, to),
+      MetricsService.latencyBy(sql`d.channel`, from, to),
+      MetricsService.latencyBy(sql`date(d.sent_at / 1000, 'unixepoch')`, from, to),
+    ]);
+    const byDay = new Map(days.map((row) => [row.key, row]));
+    return {
+      period,
+      from: from.toISOString(),
+      overall: latencyStats(
+        overall[0] ?? {
+          key: 'all',
+          count: 0,
+          deliverP50: null,
+          deliverP95: null,
+          providerP50: null,
+          providerP95: null,
+        },
+      ),
+      channels: channels.map((row) => ({ channel: row.key as Channel, ...latencyStats(row) })),
+      series: utcDays(from, to).map((date) => {
+        const row = byDay.get(date);
+        return {
+          date,
+          count: Number(row?.count ?? 0),
+          p50: row?.deliverP50 ?? null,
+          p95: row?.deliverP95 ?? null,
+        };
+      }),
+    };
+  };
+
+  private static latencyBy = async (key: SQL, from: Date, to: Date) => {
+    // Provider times sort nulls last, so the ranks below the non-null count
+    // only ever land on measured attempts.
+    return MetricsService.db.all<LatencyRow>(sql`
+      WITH samples AS (
+        SELECT ${key} AS key, d.sent_at - n.created_at AS deliver, d.provider_ms AS provider
+        FROM deliveries d JOIN notifications n ON n.id = d.notification_id
+        WHERE d.status = 'sent'
+          AND d.sent_at >= ${from.getTime()} AND d.sent_at < ${to.getTime()}
+      ),
+      ranked AS (
+        SELECT key, deliver, provider,
+          row_number() OVER (PARTITION BY key ORDER BY deliver) AS deliver_rank,
+          row_number() OVER (PARTITION BY key ORDER BY provider IS NULL, provider) AS provider_rank,
+          count(*) OVER (PARTITION BY key) AS n,
+          count(provider) OVER (PARTITION BY key) AS measured
+        FROM samples
+      )
+      SELECT key, max(n) AS count,
+        max(CASE WHEN deliver_rank = ${rankOf('n', 50)} THEN deliver END) AS deliverP50,
+        max(CASE WHEN deliver_rank = ${rankOf('n', 95)} THEN deliver END) AS deliverP95,
+        max(CASE WHEN provider_rank = ${rankOf('measured', 50)} THEN provider END) AS providerP50,
+        max(CASE WHEN provider_rank = ${rankOf('measured', 95)} THEN provider END) AS providerP95
+      FROM ranked
+      GROUP BY key
+      ORDER BY count DESC
+    `);
   };
 
   private static totals = async (from: Date, to: Date) => {

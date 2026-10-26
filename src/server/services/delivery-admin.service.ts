@@ -69,6 +69,7 @@ export class DeliveryAdminService extends BaseService {
         errorCode: deliveries.errorCode,
         providerMessageId: deliveries.providerMessageId,
         sentAt: deliveries.sentAt,
+        providerMs: deliveries.providerMs,
         openedAt: deliveries.openedAt,
         updatedAt: deliveries.updatedAt,
         createdAt: notifications.createdAt,

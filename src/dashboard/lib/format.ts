@@ -15,6 +15,20 @@ export const formatChange = (value: number | null, unit: '%' | 'pts' = '%') => {
   return unit === '%' ? `${sign}${magnitude}%` : `${sign}${magnitude.toFixed(1)} pts`;
 };
 
+const oneDecimal = (value: number) => {
+  const rounded = Math.round(value * 10) / 10;
+  return rounded >= 10 ? String(Math.round(rounded)) : String(rounded);
+};
+
+/** Milliseconds in the largest unit that keeps them readable: 840 ms, 1.4 s, 12 min, 2.5 h. */
+export const formatDuration = (ms: number | null) => {
+  if (ms === null) return '–';
+  if (ms < 1000) return `${Math.round(ms)} ms`;
+  if (ms < 60_000) return `${oneDecimal(ms / 1000)} s`;
+  if (ms < 3_600_000) return `${oneDecimal(ms / 60_000)} min`;
+  return `${oneDecimal(ms / 3_600_000)} h`;
+};
+
 const dateTime = new Intl.DateTimeFormat('en-US', {
   month: 'short',
   day: 'numeric',
