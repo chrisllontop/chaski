@@ -1,12 +1,23 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { MoreVertical, RotateCcw, Search } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useSearch } from '@tanstack/react-router';
+import { MoreHorizontal, RotateCcw, Search } from 'lucide-react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { ConfirmDialog } from '~/components/app/confirm-dialog';
+import {
+  DataBody,
+  DataCell,
+  DataEmpty,
+  DataHead,
+  DataHeader,
+  DataRow,
+  DataTable,
+  rowActionClass,
+} from '~/components/app/data-table';
 import { ChannelLabel, STATUS_LABELS, StatusBadge } from '~/components/app/delivery-bits';
 import { ErrorAlert, PageHeader } from '~/components/app/page';
 import { Pager } from '~/components/app/pager';
+import { Pill } from '~/components/app/pill';
 import { SiteHeader } from '~/components/app/site-header';
-import { Badge } from '~/components/ui/badge';
 import { Button } from '~/components/ui/button';
 import {
   DropdownMenu,
@@ -30,17 +41,17 @@ import {
   SheetHeader,
   SheetTitle,
 } from '~/components/ui/sheet';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '~/components/ui/table';
+import { Skeleton } from '~/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs';
 import { api, query } from '~/lib/api';
-import { CHANNEL_LABELS, formatDateTime, formatDuration, formatNumber } from '~/lib/format';
+import { useDebounced } from '~/lib/debounce';
+import {
+  CHANNEL_LABELS,
+  formatDateTime,
+  formatDuration,
+  formatNumber,
+  formatRelative,
+} from '~/lib/format';
 import type { Channel, Delivery, DeliveryPage, DeliveryStatus, TemplateSummary } from '~/lib/types';
 
 const STATUSES: DeliveryStatus[] = ['pending', 'sent', 'failed', 'dead', 'skipped'];
@@ -62,22 +73,98 @@ const since = (range: Range) => {
   return hours === null ? undefined : new Date(Date.now() - hours * 3_600_000).toISOString();
 };
 
-const useDebounced = (value: string, delayMs = 300) => {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), delayMs);
-    return () => clearTimeout(timer);
-  }, [value, delayMs]);
-  return debounced;
-};
+/** The filters a link can open the list with, such as the overview's failures. */
+export type DeliverySearch = { status?: DeliveryStatus; type?: string; channel?: Channel };
 
 // ─── Detail sheet ───
 
-const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
-  <div className="grid grid-cols-3 gap-2 py-2 text-sm">
+const Field = ({ label, children }: { label: string; children: ReactNode }) => (
+  <div className="grid grid-cols-[8rem_1fr] gap-3 py-2 text-[13px]">
     <dt className="text-muted-foreground">{label}</dt>
-    <dd className="col-span-2 break-words">{children}</dd>
+    <dd className="min-w-0 break-words">{children}</dd>
   </div>
+);
+
+type Step = {
+  label: string;
+  at: string | null;
+  detail?: string | null;
+  tone: 'done' | 'bad' | 'wait';
+};
+
+// What happened to a delivery, in order; durations count from the send.
+const stepsOf = (delivery: Delivery): Step[] => {
+  const after = (at: string) =>
+    `${formatDuration(new Date(at).getTime() - new Date(delivery.createdAt).getTime())} after the send`;
+  const steps: Step[] = [{ label: 'Sent to the queue', at: delivery.createdAt, tone: 'done' }];
+  if (delivery.status === 'skipped') {
+    steps.push({
+      label: 'Skipped',
+      at: delivery.updatedAt,
+      detail: delivery.skipReason,
+      tone: 'wait',
+    });
+    return steps;
+  }
+  if (delivery.status === 'sent' && delivery.sentAt) {
+    steps.push({
+      label: `Accepted by ${CHANNEL_LABELS[delivery.channel].toLowerCase()}`,
+      at: delivery.sentAt,
+      detail: after(delivery.sentAt),
+      tone: 'done',
+    });
+  } else if (delivery.status === 'pending') {
+    steps.push({
+      label:
+        delivery.attempts > 0
+          ? `Retrying after attempt ${delivery.attempts}`
+          : 'Waiting in the queue',
+      at: null,
+      detail: delivery.lastError,
+      tone: 'wait',
+    });
+  } else {
+    steps.push({
+      label: delivery.status === 'dead' ? 'Out of attempts' : 'Failed',
+      at: delivery.updatedAt,
+      detail: delivery.lastError,
+      tone: 'bad',
+    });
+  }
+  if (delivery.openedAt) {
+    steps.push({
+      label: 'Opened',
+      at: delivery.openedAt,
+      detail: after(delivery.openedAt),
+      tone: 'done',
+    });
+  }
+  return steps;
+};
+
+const DOT = { done: 'bg-success', bad: 'bg-destructive', wait: 'bg-muted-foreground/50' };
+
+const Timeline = ({ steps }: { steps: Step[] }) => (
+  <ol className="relative ml-1 space-y-4 border-l pl-5">
+    {steps.map((step) => (
+      <li key={step.label} className="relative">
+        <span
+          className={`-left-[24.5px] absolute top-1.5 size-2 rounded-full ring-4 ring-background ${DOT[step.tone]}`}
+        />
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-[13px]">
+          <span className="font-medium">{step.label}</span>
+          {step.at ? (
+            <time className="text-muted-foreground text-xs tabular-nums" dateTime={step.at}>
+              {formatDateTime(step.at)}
+            </time>
+          ) : null}
+        </div>
+        {step.detail ? (
+          <p className="mt-0.5 break-words text-muted-foreground text-xs">{step.detail}</p>
+        ) : null}
+      </li>
+    ))}
+  </ol>
 );
 
 const DeliverySheet = ({
@@ -97,76 +184,80 @@ const DeliverySheet = ({
   const delivery = data?.delivery;
   return (
     <Sheet open={deliveryId !== null} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
-        <SheetHeader>
-          <SheetTitle>Delivery</SheetTitle>
+      <SheetContent className="w-full gap-0 overflow-y-auto sm:max-w-lg">
+        <SheetHeader className="gap-2 border-b">
+          {delivery ? (
+            <div className="flex items-center gap-3">
+              <StatusBadge status={delivery.status} />
+              <span className="text-muted-foreground text-xs">
+                <ChannelLabel channel={delivery.channel} />
+              </span>
+            </div>
+          ) : null}
+          <SheetTitle className="font-mono text-base">{delivery?.type ?? 'Delivery'}</SheetTitle>
           <SheetDescription className="font-mono text-xs">{deliveryId}</SheetDescription>
         </SheetHeader>
-        <div className="px-4">
+        <div className="space-y-6 p-4">
           {error ? <ErrorAlert error={error} /> : null}
           {delivery ? (
-            <dl className="divide-y">
-              <Field label="Status">
-                <StatusBadge status={delivery.status} />
-              </Field>
-              <Field label="Contact">
-                <div>{delivery.recipientId}</div>
-                {delivery.address ? (
-                  <div className="text-muted-foreground">{delivery.address}</div>
-                ) : null}
-              </Field>
-              <Field label="Type">{delivery.type}</Field>
-              <Field label="Channel">
-                <ChannelLabel channel={delivery.channel} />
-              </Field>
-              <Field label="Attempts">{delivery.attempts}</Field>
-              {delivery.skipReason ? (
-                <Field label="Skip reason">
-                  <code className="font-mono text-xs">{delivery.skipReason}</code>
-                </Field>
-              ) : null}
-              {delivery.errorCode ? (
-                <Field label="Error code">
-                  <code className="font-mono text-xs">{delivery.errorCode}</code>
-                </Field>
-              ) : null}
-              {delivery.lastError ? (
-                <Field label="Last error">
-                  <code className="font-mono text-xs">{delivery.lastError}</code>
-                </Field>
-              ) : null}
-              {delivery.providerMessageId ? (
-                <Field label="Provider id">
-                  <code className="font-mono text-xs">{delivery.providerMessageId}</code>
-                </Field>
-              ) : null}
-              <Field label="Created">{formatDateTime(delivery.createdAt)}</Field>
-              <Field label="Sent">{formatDateTime(delivery.sentAt)}</Field>
-              {delivery.sentAt ? (
-                <Field label="Time to deliver">
-                  {formatDuration(
-                    new Date(delivery.sentAt).getTime() - new Date(delivery.createdAt).getTime(),
-                  )}
-                </Field>
-              ) : null}
-              {delivery.providerMs !== null ? (
-                <Field label="Provider time">{formatDuration(delivery.providerMs)}</Field>
-              ) : null}
-              {delivery.channel === 'email' ? (
-                <Field label="Opened">{formatDateTime(delivery.openedAt)}</Field>
-              ) : null}
-              <Field label="Updated">{formatDateTime(delivery.updatedAt)}</Field>
-              <div className="space-y-2 py-3">
-                <div className="text-muted-foreground text-sm">Payload</div>
-                <pre className="overflow-x-auto rounded-md bg-muted p-3 font-mono text-xs">
+            <>
+              <section className="space-y-3">
+                <h3 className="font-medium text-muted-foreground text-xs">Timeline</h3>
+                <Timeline steps={stepsOf(delivery)} />
+              </section>
+              <section>
+                <h3 className="mb-1 font-medium text-muted-foreground text-xs">Details</h3>
+                <dl className="divide-y">
+                  <Field label="Contact">
+                    <div>{delivery.recipientId}</div>
+                    {delivery.address ? (
+                      <div className="text-muted-foreground">{delivery.address}</div>
+                    ) : null}
+                  </Field>
+                  <Field label="Attempts">
+                    <span className="tabular-nums">{delivery.attempts}</span>
+                  </Field>
+                  {delivery.sentAt ? (
+                    <Field label="Provider time">
+                      <span className="tabular-nums">{formatDuration(delivery.providerMs)}</span>
+                    </Field>
+                  ) : null}
+                  {delivery.errorCode ? (
+                    <Field label="Error code">
+                      <code className="font-mono text-xs">{delivery.errorCode}</code>
+                    </Field>
+                  ) : null}
+                  {delivery.skipReason ? (
+                    <Field label="Skip reason">
+                      <code className="font-mono text-xs">{delivery.skipReason}</code>
+                    </Field>
+                  ) : null}
+                  {delivery.providerMessageId ? (
+                    <Field label="Provider id">
+                      <code className="font-mono text-xs">{delivery.providerMessageId}</code>
+                    </Field>
+                  ) : null}
+                  <Field label="Notification">
+                    <code className="font-mono text-xs">{delivery.notificationId}</code>
+                  </Field>
+                </dl>
+              </section>
+              <section className="space-y-2">
+                <h3 className="font-medium text-muted-foreground text-xs">Payload</h3>
+                <pre className="overflow-x-auto rounded-md border bg-muted/40 p-3 font-mono text-xs leading-relaxed">
                   {JSON.stringify(delivery.payload, null, 2)}
                 </pre>
-              </div>
-            </dl>
-          ) : null}
+              </section>
+            </>
+          ) : error ? null : (
+            <div className="space-y-3">
+              <Skeleton className="h-24" />
+              <Skeleton className="h-40" />
+            </div>
+          )}
         </div>
         {delivery && REPLAYABLE.includes(delivery.status) ? (
-          <SheetFooter>
+          <SheetFooter className="border-t">
             <Button onClick={() => onReplay(delivery)}>
               <RotateCcw /> Replay delivery
             </Button>
@@ -181,10 +272,11 @@ const DeliverySheet = ({
 
 export const DeliveriesPage = () => {
   const client = useQueryClient();
-  const [status, setStatus] = useState<DeliveryStatus | 'all'>('all');
+  const search = useSearch({ strict: false }) as DeliverySearch;
+  const [status, setStatus] = useState<DeliveryStatus | 'all'>(search.status ?? 'all');
   const [contact, setContact] = useState('');
-  const [channel, setChannel] = useState<Channel | typeof ANY>(ANY);
-  const [type, setType] = useState<string>(ANY);
+  const [channel, setChannel] = useState<Channel | typeof ANY>(search.channel ?? ANY);
+  const [type, setType] = useState<string>(search.type ?? ANY);
   const [opened, setOpened] = useState<'opened' | 'unopened' | typeof ANY>(ANY);
   const [range, setRange] = useState<Range>('30d');
   const [from, setFrom] = useState(() => since('30d'));
@@ -193,7 +285,7 @@ export const DeliveriesPage = () => {
   const [selected, setSelected] = useState<string | null>(null);
   const [replaying, setReplaying] = useState<Delivery | null>(null);
   const [replayingDead, setReplayingDead] = useState(false);
-  const recipientId = useDebounced(contact.trim());
+  const recipientId = useDebounced(contact.trim(), 300);
 
   const filters = {
     from,
@@ -252,13 +344,13 @@ export const DeliveriesPage = () => {
   return (
     <>
       <SiteHeader />
-      <div className="flex flex-1 flex-col gap-6 p-6">
+      <div className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col gap-5 px-6 pt-6 pb-10">
         <PageHeader
           title="Deliveries"
-          description="One row per notification and channel"
+          description="One row per notification and channel, latest change first"
           actions={
             dead > 0 ? (
-              <Button variant="outline" onClick={() => setReplayingDead(true)}>
+              <Button variant="outline" size="sm" onClick={() => setReplayingDead(true)}>
                 <RotateCcw /> Replay {formatNumber(dead)} dead{' '}
                 {dead === 1 ? 'delivery' : 'deliveries'}
               </Button>
@@ -267,34 +359,33 @@ export const DeliveriesPage = () => {
         />
 
         <Tabs value={status} onValueChange={(value) => setStatus(value as DeliveryStatus | 'all')}>
-          <TabsList>
-            <TabsTrigger value="all">
-              All <Badge variant="secondary">{formatNumber(all)}</Badge>
-            </TabsTrigger>
-            {STATUSES.map((key) => (
-              <TabsTrigger key={key} value={key}>
-                {STATUS_LABELS[key]}{' '}
-                <Badge variant="secondary">{formatNumber(byStatus[key] ?? 0)}</Badge>
+          <TabsList variant="line" className="w-full justify-start border-b">
+            {(['all', ...STATUSES] as const).map((key) => (
+              <TabsTrigger key={key} value={key} className="flex-none px-3">
+                {key === 'all' ? 'All' : STATUS_LABELS[key]}
+                <span className="text-muted-foreground text-xs tabular-nums">
+                  {formatNumber(key === 'all' ? all : (byStatus[key] ?? 0))}
+                </span>
               </TabsTrigger>
             ))}
           </TabsList>
         </Tabs>
 
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative w-64">
-            <Search className="-translate-y-1/2 absolute top-1/2 left-2.5 size-4 text-muted-foreground" />
+          <div className="relative w-60">
+            <Search className="-translate-y-1/2 absolute top-1/2 left-2.5 size-3.5 text-muted-foreground" />
             <Input
               value={contact}
               onChange={(event) => setContact(event.target.value)}
               placeholder="Filter by contact ID…"
-              className="pl-8"
+              className="h-8 pl-8 text-[13px]"
             />
           </div>
           <Select
             value={channel}
             onValueChange={(value) => setChannel(value as Channel | typeof ANY)}
           >
-            <SelectTrigger className="w-36 border-dashed">
+            <SelectTrigger size="sm" className="w-36 text-[13px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -307,7 +398,7 @@ export const DeliveriesPage = () => {
             </SelectContent>
           </Select>
           <Select value={type} onValueChange={setType}>
-            <SelectTrigger className="w-44 border-dashed">
+            <SelectTrigger size="sm" className="w-48 text-[13px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -320,7 +411,7 @@ export const DeliveriesPage = () => {
             </SelectContent>
           </Select>
           <Select value={opened} onValueChange={(value) => setOpened(value as typeof opened)}>
-            <SelectTrigger className="w-36 border-dashed">
+            <SelectTrigger size="sm" className="w-36 text-[13px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -336,10 +427,10 @@ export const DeliveriesPage = () => {
               setFrom(since(value as Range));
             }}
           >
-            <SelectTrigger className="w-40">
+            <SelectTrigger size="sm" className="ml-auto w-36 text-[13px]">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent align="end">
               {(Object.keys(RANGES) as Range[]).map((key) => (
                 <SelectItem key={key} value={key}>
                   {RANGES[key].label}
@@ -351,82 +442,92 @@ export const DeliveriesPage = () => {
 
         {list.error ? <ErrorAlert error={list.error} /> : null}
 
-        <div className="overflow-hidden rounded-lg border">
-          <Table>
-            <TableHeader className="bg-muted">
-              <TableRow>
-                <TableHead>Contact</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Channel</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Attempts</TableHead>
-                <TableHead>Opened</TableHead>
-                <TableHead>Updated</TableHead>
-                <TableHead className="w-10" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {list.data?.deliveries.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
-                    No deliveries match these filters.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                list.data?.deliveries.map((delivery) => (
-                  <TableRow
-                    key={delivery.id}
-                    className="cursor-pointer"
-                    onClick={() => setSelected(delivery.id)}
-                  >
-                    <TableCell>
-                      <div className="font-medium">{delivery.recipientId}</div>
-                      {delivery.address ? (
-                        <div className="text-muted-foreground text-xs">{delivery.address}</div>
-                      ) : null}
-                    </TableCell>
-                    <TableCell>{delivery.type}</TableCell>
-                    <TableCell>
-                      <ChannelLabel channel={delivery.channel} />
-                    </TableCell>
-                    <TableCell>
+        <DataTable>
+          <DataHeader>
+            <DataRow>
+              <DataHead>Contact</DataHead>
+              <DataHead>Type</DataHead>
+              <DataHead>Channel</DataHead>
+              <DataHead>Status</DataHead>
+              <DataHead numeric>Attempts</DataHead>
+              <DataHead numeric>Updated</DataHead>
+              <DataHead className="w-10" />
+            </DataRow>
+          </DataHeader>
+          <DataBody>
+            {!list.data ? (
+              Array.from({ length: 8 }, (_, row) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: placeholder rows have no identity
+                <DataRow key={row}>
+                  <DataCell colSpan={7}>
+                    <Skeleton className="h-4 w-full" />
+                  </DataCell>
+                </DataRow>
+              ))
+            ) : list.data.deliveries.length === 0 ? (
+              <DataEmpty colSpan={7}>No deliveries match these filters.</DataEmpty>
+            ) : (
+              list.data.deliveries.map((delivery) => (
+                <DataRow
+                  key={delivery.id}
+                  className="cursor-pointer"
+                  onClick={() => setSelected(delivery.id)}
+                >
+                  <DataCell>
+                    <div className="font-medium">{delivery.recipientId}</div>
+                    {delivery.address ? (
+                      <div className="text-muted-foreground text-xs">{delivery.address}</div>
+                    ) : null}
+                  </DataCell>
+                  <DataCell className="font-mono text-xs">{delivery.type}</DataCell>
+                  <DataCell>
+                    <ChannelLabel channel={delivery.channel} />
+                  </DataCell>
+                  <DataCell>
+                    <div className="flex items-center gap-1.5">
                       <StatusBadge status={delivery.status} />
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">{delivery.attempts}</TableCell>
-                    <TableCell>{formatDateTime(delivery.openedAt)}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {formatDateTime(delivery.updatedAt)}
-                    </TableCell>
-                    <TableCell onClick={(event) => event.stopPropagation()}>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-8 text-muted-foreground"
-                          >
-                            <MoreVertical />
-                            <span className="sr-only">Actions</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => setSelected(delivery.id)}>
-                            View details
+                      {delivery.openedAt ? (
+                        <span title={`Opened ${formatDateTime(delivery.openedAt)}`}>
+                          <Pill tone="info">Opened</Pill>
+                        </span>
+                      ) : null}
+                    </div>
+                  </DataCell>
+                  <DataCell numeric>{delivery.attempts}</DataCell>
+                  <DataCell numeric className="text-muted-foreground">
+                    <time dateTime={delivery.updatedAt} title={formatDateTime(delivery.updatedAt)}>
+                      {formatRelative(delivery.updatedAt)}
+                    </time>
+                  </DataCell>
+                  <DataCell onClick={(event) => event.stopPropagation()}>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={`size-7 text-muted-foreground ${rowActionClass}`}
+                        >
+                          <MoreHorizontal />
+                          <span className="sr-only">Actions</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => setSelected(delivery.id)}>
+                          View details
+                        </DropdownMenuItem>
+                        {REPLAYABLE.includes(delivery.status) ? (
+                          <DropdownMenuItem onClick={() => setReplaying(delivery)}>
+                            Replay delivery
                           </DropdownMenuItem>
-                          {REPLAYABLE.includes(delivery.status) ? (
-                            <DropdownMenuItem onClick={() => setReplaying(delivery)}>
-                              Replay delivery
-                            </DropdownMenuItem>
-                          ) : null}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                        ) : null}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </DataCell>
+                </DataRow>
+              ))
+            )}
+          </DataBody>
+        </DataTable>
 
         {list.data ? (
           <Pager

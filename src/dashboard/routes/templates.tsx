@@ -1,8 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
-import { Download, FileText, MoreVertical, Plus, Upload } from 'lucide-react';
+import { cn } from 'cn';
+import { Download, FileText, MoreHorizontal, Plus, Upload } from 'lucide-react';
 import { type ChangeEvent, useRef, useState } from 'react';
 import { ConfirmDialog } from '~/components/app/confirm-dialog';
+import {
+  DataBody,
+  DataCell,
+  DataEmpty,
+  DataHead,
+  DataHeader,
+  DataRow,
+  DataTable,
+  rowActionClass,
+} from '~/components/app/data-table';
 import { CHANNEL_ICONS, HealthBadge } from '~/components/app/delivery-bits';
 import { ErrorAlert, PageHeader } from '~/components/app/page';
 import { SiteHeader } from '~/components/app/site-header';
@@ -32,17 +43,10 @@ import {
 } from '~/components/ui/empty';
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '~/components/ui/table';
+import { Skeleton } from '~/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs';
 import { ApiError, api } from '~/lib/api';
-import { CHANNEL_LABELS, formatDateTime, formatNumber } from '~/lib/format';
+import { CHANNEL_LABELS, formatDateTime, formatNumber, formatRelative } from '~/lib/format';
 import { healthByType } from '~/lib/health';
 import type {
   Channel,
@@ -56,20 +60,45 @@ import type {
 const CHANNELS: Channel[] = ['email', 'in_app', 'push'];
 
 const ChannelIcons = ({ channels }: { channels: TemplateSummary['channels'] }) => (
-  <div className="flex items-center gap-2">
+  <div className="flex items-center gap-1">
     {CHANNELS.map((channel) => {
       const Icon = CHANNEL_ICONS[channel];
       const enabled = channels.some((c) => c.channel === channel && c.enabled);
       return (
-        <Icon
+        <span
           key={channel}
-          aria-label={`${CHANNEL_LABELS[channel]} ${enabled ? 'on' : 'off'}`}
-          className={enabled ? 'size-4' : 'size-4 text-muted-foreground opacity-50'}
-        />
+          title={`${CHANNEL_LABELS[channel]} ${enabled ? 'on' : 'off'}`}
+          className={cn(
+            'flex size-6 items-center justify-center rounded-md',
+            enabled ? 'bg-muted text-foreground' : 'text-muted-foreground/40',
+          )}
+        >
+          <Icon
+            aria-label={`${CHANNEL_LABELS[channel]} ${enabled ? 'on' : 'off'}`}
+            className="size-3.5"
+          />
+        </span>
       );
     })}
   </div>
 );
+
+const Tag = ({ children }: { children: string }) => (
+  <span className="inline-flex h-5 items-center rounded-md border px-1.5 text-muted-foreground text-xs">
+    {children}
+  </span>
+);
+
+const Dash = () => <span className="text-muted-foreground">–</span>;
+
+const When = ({ at }: { at: string | null }) =>
+  at ? (
+    <time dateTime={at} title={formatDateTime(at)}>
+      {formatRelative(at)}
+    </time>
+  ) : (
+    <Dash />
+  );
 
 // ─── New template ───
 
@@ -318,15 +347,15 @@ export const TemplatesPage = () => {
         className="hidden"
         onChange={readFile}
       />
-      <Button variant="outline" onClick={() => fileInput.current?.click()}>
+      <Button variant="outline" size="sm" onClick={() => fileInput.current?.click()}>
         <Upload /> Import
       </Button>
-      <Button variant="outline" asChild>
+      <Button variant="outline" size="sm" asChild>
         <a href={api.url('templates/export')} download>
           <Download /> Export
         </a>
       </Button>
-      <Button onClick={() => setCreating(true)}>
+      <Button size="sm" onClick={() => setCreating(true)}>
         <Plus /> New template
       </Button>
     </>
@@ -335,7 +364,7 @@ export const TemplatesPage = () => {
   return (
     <>
       <SiteHeader />
-      <div className="flex flex-1 flex-col gap-6 p-6">
+      <div className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col gap-6 px-6 pt-6 pb-10">
         <PageHeader
           title="Templates"
           description="The content of every notification type"
@@ -366,35 +395,44 @@ export const TemplatesPage = () => {
             </EmptyContent>
           </Empty>
         ) : (
-          <Tabs defaultValue="active">
-            <TabsList>
-              <TabsTrigger value="active">
-                Active <Badge variant="secondary">{formatNumber(templates.length)}</Badge>
+          <Tabs defaultValue="active" className="gap-4">
+            <TabsList variant="line" className="w-full justify-start border-b">
+              <TabsTrigger value="active" className="flex-none px-3">
+                Active
+                <span className="text-muted-foreground text-xs tabular-nums">
+                  {formatNumber(templates.length)}
+                </span>
               </TabsTrigger>
-              <TabsTrigger value="deleted">
-                Deleted{' '}
-                <Badge variant="secondary">
+              <TabsTrigger value="deleted" className="flex-none px-3">
+                Deleted
+                <span className="text-muted-foreground text-xs tabular-nums">
                   {formatNumber(deleted.data?.templates.length ?? 0)}
-                </Badge>
+                </span>
               </TabsTrigger>
             </TabsList>
             <TabsContent value="active">
-              <div className="overflow-hidden rounded-lg border">
-                <Table>
-                  <TableHeader className="bg-muted">
-                    <TableRow>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Topic</TableHead>
-                      <TableHead>Channels</TableHead>
-                      <TableHead>Health · 30 days</TableHead>
-                      <TableHead>Updated</TableHead>
-                      <TableHead>Last used</TableHead>
-                      <TableHead className="w-10" />
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {templates.map((template) => (
-                      <TableRow
+              <DataTable>
+                <DataHeader>
+                  <DataRow>
+                    <DataHead>Type</DataHead>
+                    <DataHead>Topic</DataHead>
+                    <DataHead>Channels</DataHead>
+                    <DataHead>Health · 30 days</DataHead>
+                    <DataHead numeric>Updated</DataHead>
+                    <DataHead numeric>Last used</DataHead>
+                    <DataHead className="w-10" />
+                  </DataRow>
+                </DataHeader>
+                <DataBody>
+                  {!live.data ? (
+                    <DataEmpty colSpan={7}>
+                      <Skeleton className="mx-auto h-4 w-48" />
+                    </DataEmpty>
+                  ) : templates.length === 0 ? (
+                    <DataEmpty colSpan={7}>Every template is deleted.</DataEmpty>
+                  ) : (
+                    templates.map((template) => (
+                      <DataRow
                         key={template.id}
                         className="cursor-pointer"
                         onClick={() =>
@@ -404,38 +442,38 @@ export const TemplatesPage = () => {
                           })
                         }
                       >
-                        <TableCell>
-                          <div className="font-medium font-mono">{template.type}</div>
+                        <DataCell>
+                          <div className="font-medium font-mono text-xs">{template.type}</div>
                           {template.description ? (
                             <div className="text-muted-foreground text-xs">
                               {template.description}
                             </div>
                           ) : null}
-                        </TableCell>
-                        <TableCell>
-                          {template.topic ? <Badge variant="outline">{template.topic}</Badge> : '–'}
-                        </TableCell>
-                        <TableCell>
+                        </DataCell>
+                        <DataCell>
+                          {template.topic ? <Tag>{template.topic}</Tag> : <Dash />}
+                        </DataCell>
+                        <DataCell>
                           <ChannelIcons channels={template.channels} />
-                        </TableCell>
-                        <TableCell>
+                        </DataCell>
+                        <DataCell>
                           <TypeHealth health={health.get(template.type)} />
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {formatDateTime(template.contentUpdatedAt)}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {formatDateTime(template.lastUsedAt)}
-                        </TableCell>
-                        <TableCell onClick={(event) => event.stopPropagation()}>
+                        </DataCell>
+                        <DataCell numeric className="text-muted-foreground">
+                          <When at={template.contentUpdatedAt} />
+                        </DataCell>
+                        <DataCell numeric className="text-muted-foreground">
+                          <When at={template.lastUsedAt} />
+                        </DataCell>
+                        <DataCell onClick={(event) => event.stopPropagation()}>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="size-8 text-muted-foreground"
+                                className={`size-7 text-muted-foreground ${rowActionClass}`}
                               >
-                                <MoreVertical />
+                                <MoreHorizontal />
                                 <span className="sr-only">Actions</span>
                               </Button>
                             </DropdownMenuTrigger>
@@ -456,69 +494,61 @@ export const TemplatesPage = () => {
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                        </DataCell>
+                      </DataRow>
+                    ))
+                  )}
+                </DataBody>
+              </DataTable>
             </TabsContent>
-            <TabsContent value="deleted">
-              <div className="overflow-hidden rounded-lg border">
-                <Table>
-                  <TableHeader className="bg-muted">
-                    <TableRow>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Topic</TableHead>
-                      <TableHead>Deleted</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {(deleted.data?.templates ?? []).length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
-                          No deleted templates.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      deleted.data?.templates.map((template) => (
-                        <TableRow key={template.id}>
-                          <TableCell className="font-medium font-mono">{template.type}</TableCell>
-                          <TableCell>
-                            {template.topic ? (
-                              <Badge variant="outline">{template.topic}</Badge>
-                            ) : (
-                              '–'
-                            )}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {formatDateTime(template.deletedAt)}
-                          </TableCell>
-                          <TableCell className="space-x-2 text-right">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={restore.isPending}
-                              onClick={() => restore.mutate(template.id)}
-                            >
-                              Restore
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-destructive"
-                              onClick={() => setPurging(template)}
-                            >
-                              Delete permanently
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
+            <TabsContent value="deleted" className="space-y-4">
+              <DataTable>
+                <DataHeader>
+                  <DataRow>
+                    <DataHead>Type</DataHead>
+                    <DataHead>Topic</DataHead>
+                    <DataHead numeric>Deleted</DataHead>
+                    <DataHead className="w-64" />
+                  </DataRow>
+                </DataHeader>
+                <DataBody>
+                  {(deleted.data?.templates ?? []).length === 0 ? (
+                    <DataEmpty colSpan={4}>No deleted templates.</DataEmpty>
+                  ) : (
+                    deleted.data?.templates.map((template) => (
+                      <DataRow key={template.id}>
+                        <DataCell className="font-medium font-mono text-xs">
+                          {template.type}
+                        </DataCell>
+                        <DataCell>
+                          {template.topic ? <Tag>{template.topic}</Tag> : <Dash />}
+                        </DataCell>
+                        <DataCell numeric className="text-muted-foreground">
+                          <When at={template.deletedAt} />
+                        </DataCell>
+                        <DataCell className="space-x-1 text-right">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={restore.isPending}
+                            onClick={() => restore.mutate(template.id)}
+                          >
+                            Restore
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => setPurging(template)}
+                          >
+                            Delete permanently
+                          </Button>
+                        </DataCell>
+                      </DataRow>
+                    ))
+                  )}
+                </DataBody>
+              </DataTable>
               {restore.error ? <ErrorAlert error={restore.error} /> : null}
             </TabsContent>
           </Tabs>
