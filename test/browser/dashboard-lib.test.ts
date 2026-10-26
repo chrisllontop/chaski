@@ -7,6 +7,7 @@ import {
   formatRelative,
   formatUtcRange,
 } from '../../src/dashboard/lib/format';
+import { healthByType } from '../../src/dashboard/lib/health';
 
 describe('dashboard query strings', () => {
   it('keeps only the filters that have a value', () => {
@@ -50,5 +51,22 @@ describe('dashboard formats', () => {
     expect(formatUtcRange('2026-01-15T00:00:00Z', '2026-02-13T23:59:00Z')).toBe(
       'Jan 15 – Feb 13, 2026 · UTC',
     );
+  });
+});
+
+describe('dashboard health', () => {
+  it('rolls each type up to its worst channel, with paused below any channel that sent', () => {
+    const health = healthByType([
+      { type: 'welcome', health: 'healthy' },
+      { type: 'welcome', health: 'at_risk' },
+      { type: 'invoice_due', health: 'paused' },
+      { type: 'invoice_due', health: 'healthy' },
+      { type: 'digest', health: 'paused' },
+    ]);
+    expect(Object.fromEntries(health)).toEqual({
+      welcome: 'at_risk',
+      invoice_due: 'healthy',
+      digest: 'paused',
+    });
   });
 });

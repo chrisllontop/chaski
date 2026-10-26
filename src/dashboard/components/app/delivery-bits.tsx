@@ -1,7 +1,18 @@
-import { Bell, CircleCheck, CircleMinus, CircleX, Loader, Mail, Smartphone } from 'lucide-react';
+import {
+  Bell,
+  CircleCheck,
+  CircleMinus,
+  CirclePause,
+  CircleX,
+  Loader,
+  Mail,
+  OctagonX,
+  Smartphone,
+  TriangleAlert,
+} from 'lucide-react';
 import { Badge } from '~/components/ui/badge';
 import { CHANNEL_LABELS } from '~/lib/format';
-import type { Channel, DeliveryStatus } from '~/lib/types';
+import type { Channel, DeliveryStatus, Health } from '~/lib/types';
 
 const STATUS: Record<
   DeliveryStatus,
@@ -41,5 +52,22 @@ export const ChannelLabel = ({ channel }: { channel: Channel }) => {
       <Icon className="size-4 text-muted-foreground" />
       {CHANNEL_LABELS[channel]}
     </span>
+  );
+};
+
+const HEALTH: Record<Health, { label: string; icon: typeof CircleCheck; className: string }> = {
+  healthy: { label: 'Healthy', icon: CircleCheck, className: 'text-success' },
+  at_risk: { label: 'At risk', icon: TriangleAlert, className: 'text-warning' },
+  blocked: { label: 'Blocked', icon: OctagonX, className: 'text-destructive' },
+  paused: { label: 'Paused', icon: CirclePause, className: 'text-muted-foreground' },
+};
+
+export const HealthBadge = ({ health }: { health: Health }) => {
+  const { label, icon: Icon, className } = HEALTH[health];
+  return (
+    <Badge variant="outline" className="gap-1 px-1.5 text-muted-foreground">
+      <Icon className={className} />
+      {label}
+    </Badge>
   );
 };

@@ -40,6 +40,25 @@ const utcDays = (from: Date, to: Date): string[] => {
   return days;
 };
 
+export type Health = 'healthy' | 'at_risk' | 'blocked' | 'paused';
+
+/**
+ * How a type is doing on one channel over the period: blocked once failures reach a
+ * quarter of the volume, at risk on any failure or a backlog, paused when all skipped.
+ */
+export const healthOf = (stats: {
+  volume: number;
+  sent: number;
+  failed: number;
+  pending: number;
+  skipped: number;
+}): Health => {
+  if (stats.failed > 0 && stats.failed / stats.volume >= 0.25) return 'blocked';
+  if (stats.failed > 0 || stats.pending > stats.sent) return 'at_risk';
+  if (stats.skipped === stats.volume) return 'paused';
+  return 'healthy';
+};
+
 type LatencyRow = {
   key: string;
   count: number;
@@ -158,18 +177,20 @@ export class MetricsService extends BaseService {
       period,
       from: from.toISOString(),
       types: rows.map((row) => {
-        const sent = Number(row.sent);
-        const failed = Number(row.failed);
+        const stats = {
+          volume: Number(row.volume),
+          sent: Number(row.sent),
+          failed: Number(row.failed),
+          pending: Number(row.pending),
+          skipped: Number(row.skipped),
+        };
         return {
           type: row.type,
           channel: row.channel as Channel,
-          volume: Number(row.volume),
-          sent,
-          failed,
-          pending: Number(row.pending),
-          skipped: Number(row.skipped),
+          ...stats,
           opened: Number(row.opened),
-          successRate: percent(sent, sent + failed),
+          successRate: percent(stats.sent, stats.sent + stats.failed),
+          health: healthOf(stats),
         };
       }),
     };

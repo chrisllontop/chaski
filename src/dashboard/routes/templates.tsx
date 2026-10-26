@@ -3,7 +3,7 @@ import { Link, useNavigate } from '@tanstack/react-router';
 import { Download, FileText, MoreVertical, Plus, Upload } from 'lucide-react';
 import { type ChangeEvent, useRef, useState } from 'react';
 import { ConfirmDialog } from '~/components/app/confirm-dialog';
-import { CHANNEL_ICONS } from '~/components/app/delivery-bits';
+import { CHANNEL_ICONS, HealthBadge } from '~/components/app/delivery-bits';
 import { ErrorAlert, PageHeader } from '~/components/app/page';
 import { SiteHeader } from '~/components/app/site-header';
 import { Badge } from '~/components/ui/badge';
@@ -43,7 +43,15 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs';
 import { ApiError, api } from '~/lib/api';
 import { CHANNEL_LABELS, formatDateTime, formatNumber } from '~/lib/format';
-import type { Channel, DeletedTemplate, TemplateChange, TemplateSummary } from '~/lib/types';
+import { healthByType } from '~/lib/health';
+import type {
+  Channel,
+  DeletedTemplate,
+  Health,
+  TemplateChange,
+  TemplateSummary,
+  TypeOutcome,
+} from '~/lib/types';
 
 const CHANNELS: Channel[] = ['email', 'in_app', 'push'];
 
@@ -243,6 +251,13 @@ const ImportDialog = ({
 
 // ─── Page ───
 
+const TypeHealth = ({ health }: { health: Health | undefined }) =>
+  health ? (
+    <HealthBadge health={health} />
+  ) : (
+    <span className="text-muted-foreground">No sends</span>
+  );
+
 export const TemplatesPage = () => {
   const client = useQueryClient();
   const navigate = useNavigate();
@@ -261,6 +276,12 @@ export const TemplatesPage = () => {
     queryKey: ['templates', 'deleted'],
     queryFn: () => api.get<{ templates: DeletedTemplate[] }>('templates/deleted'),
   });
+  // Same key as the overview's 30-day query, so the two share one fetch.
+  const outcomes = useQuery({
+    queryKey: ['metrics', 'types', '30d'],
+    queryFn: () => api.get<{ types: TypeOutcome[] }>('metrics/types?period=30d'),
+  });
+  const health = healthByType(outcomes.data?.types ?? []);
   const refresh = () => client.invalidateQueries({ queryKey: ['templates'] });
   const deleteTemplate = useMutation({
     mutationFn: (id: string) => api.delete(`templates/${id}`),
@@ -365,6 +386,7 @@ export const TemplatesPage = () => {
                       <TableHead>Type</TableHead>
                       <TableHead>Topic</TableHead>
                       <TableHead>Channels</TableHead>
+                      <TableHead>Health · 30 days</TableHead>
                       <TableHead>Updated</TableHead>
                       <TableHead>Last used</TableHead>
                       <TableHead className="w-10" />
@@ -395,6 +417,9 @@ export const TemplatesPage = () => {
                         </TableCell>
                         <TableCell>
                           <ChannelIcons channels={template.channels} />
+                        </TableCell>
+                        <TableCell>
+                          <TypeHealth health={health.get(template.type)} />
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {formatDateTime(template.contentUpdatedAt)}

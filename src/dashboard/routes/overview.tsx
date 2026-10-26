@@ -3,7 +3,7 @@ import { Link } from '@tanstack/react-router';
 import { ArrowRight, TrendingDown, TrendingUp } from 'lucide-react';
 import { useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts';
-import { ChannelLabel } from '~/components/app/delivery-bits';
+import { ChannelLabel, HealthBadge } from '~/components/app/delivery-bits';
 import { ErrorAlert, PageHeader } from '~/components/app/page';
 import { SiteHeader } from '~/components/app/site-header';
 import { Badge } from '~/components/ui/badge';
@@ -372,6 +372,7 @@ const TypeTable = ({ types }: { types: TypeOutcome[] }) => (
           <TableRow>
             <TableHead className="pl-6">Type</TableHead>
             <TableHead>Channel</TableHead>
+            <TableHead>Health</TableHead>
             <TableHead className="text-right">Volume</TableHead>
             <TableHead className="text-right">Sent</TableHead>
             <TableHead className="text-right">Failed</TableHead>
@@ -383,7 +384,7 @@ const TypeTable = ({ types }: { types: TypeOutcome[] }) => (
         <TableBody>
           {types.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
+              <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
                 No deliveries in this period.
               </TableCell>
             </TableRow>
@@ -393,6 +394,9 @@ const TypeTable = ({ types }: { types: TypeOutcome[] }) => (
                 <TableCell className="pl-6 font-medium">{row.type}</TableCell>
                 <TableCell>
                   <ChannelLabel channel={row.channel} />
+                </TableCell>
+                <TableCell>
+                  <HealthBadge health={row.health} />
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
                   {formatNumber(row.volume)}

@@ -4,6 +4,7 @@
 export type Channel = 'email' | 'in_app' | 'push';
 export type DeliveryStatus = 'pending' | 'sent' | 'failed' | 'dead' | 'skipped';
 export type Period = '7d' | '30d' | '90d';
+export type Health = 'healthy' | 'at_risk' | 'blocked' | 'paused';
 
 export type Actor = { id: string; name?: string };
 
@@ -80,6 +81,7 @@ export type TypeOutcome = {
   skipped: number;
   opened: number;
   successRate: number | null;
+  health: Health;
 };
 
 export type TemplateSummary = {
