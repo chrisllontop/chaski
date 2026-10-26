@@ -139,7 +139,8 @@ const PATTERNS = {
     /api(?:\.sandbox)?\.push\.apple\.com|\bapn\.Provider\b|\bnew apn\.|\bApnsClient\b/,
     /onesignal\.com\/api|\bcreateNotification\(/,
     /exp\.host\/--\/api\/v2\/push|\bsendPushNotificationsAsync\(/,
-    /pushManager\.subscribe\(|addEventListener\(\s*['"]push['"]|\bshowNotification\(/,
+    /pushManager\.subscribe\(|addEventListener\(\s*['"](?:push|notificationclick)['"]/,
+    /\bshowNotification\(/,
   ],
   'notification services': [
     /\bworkflows\.trigger\(|api\.knock\.app/,
@@ -158,7 +159,7 @@ const PATTERNS = {
     /\bPublishCommand\b|\bsns\.publish\(|\bvonage\b|\bplivo\b|\btelnyx\b/i,
   ],
   templates: [
-    /@react-email\/|from ['"]react-email|\brender(?:Async)?\(\s*</,
+    /@react-email\/|from ['"]react-email|\brender(?:Async)?\(\s*(?:<|$)/,
     /\bmjml2html\(|\bHandlebars\.compile\(|\bhandlebars\.compile\(/,
     /\btemplate_?id\b|\bTemplateAlias\b|\bTemplateModel\b|dynamic_?[Tt]emplate_?[Dd]ata/,
   ],
@@ -167,15 +168,19 @@ const PATTERNS = {
     /\basync\s+queue\s*\(|\bqueue\s*:\s*async|queues\.consumers|\[\[queues\.consumers\]\]/,
     /\bcron\.schedule\(|\bnew CronJob\(|\bdelaySeconds\b|\bsetAlarm\(|\bstep\.sleep(?:Until)?\(/,
     /\bsend_?at\b|\bsendAt\b|\bscheduled_?at\b|\bdeliver_?at\b/i,
+    // A "sent" marker is how a flow avoids sending twice.
+    /\w*sent_?at\b|\bis_?sent\b|\bsent_?flag\b/i,
   ],
   'preferences and devices': [
     /(?:notification|notif|email|push|sms)_?(?:pref|setting|opt)\w*/i,
     /unsubscrib\w*|\bopt_?out\w*|\bopted_?out\b|marketing_?(?:emails?|opt\w*)/i,
-    /\b(?:email|push|sms|digest)_?(?:enabled|frequency)\b/i,
+    /(?:email|push|sms|digest)_?(?:enabled|frequency)\b/i,
     /push_?subscriptions?|device_?tokens?|fcm_?tokens?|apns_?tokens?|\bp256dh\b|expo_?push_?token/i,
   ],
   'in-app feed': [
     /\bnotifications?\b.*\b(?:read_?at|is_?read|seen_?at|unread)\b/i,
+    /\b(?:INSERT\s+INTO|FROM|UPDATE)\s+["'`]?\w*notifications?\b/i,
+    /\b(?:add|create|insert|push|save)\w*(?:Inbox|Notification|Feed)\w*\s*\(/,
     /\bunread_?count\b|\bunreadCount\b|\bmark_?as_?read\b|\bmarkAsRead\b/i,
     /@knocklabs\/react|@novu\/react|@magicbell\/react|\bNotificationCenter\b|\bNotificationFeed\b/,
   ],
@@ -276,7 +281,10 @@ const sections = [
   ['template files', templateFiles],
   ...hits.entries(),
 ];
-console.log(`Candidates under ${root}`);
+const distinct = new Set(
+  [...hits.values()].flat().map((line) => line.slice(0, line.indexOf(': '))),
+);
+console.log(`Candidates under ${root} (${distinct.size} distinct lines of code)`);
 for (const [name, lines] of sections) console.log(`  ${name}: ${lines.length}`);
 for (const [name, lines] of sections) {
   if (lines.length === 0) continue;

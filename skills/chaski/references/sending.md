@@ -20,8 +20,8 @@ A template holds, per channel, three fields under the same three names:
 | `push` | Title | Message | Link the notification opens (optional) |
 
 A channel goes out only when the template has it `enabled`. A template can also carry a
-`description`, a `topic` that groups it on the user’s preferences screen, and `sampleData`, the
-JSON the dashboard previews it with.
+`description`, a `topic` that groups it on the user’s preferences screen, and `sampleData`, a
+string of JSON the dashboard previews it with.
 
 Templates live in Chaski’s database, not in the host’s code. They’re written in the dashboard
 under **Templates**, or brought in as a file through **Templates**, **Import**. A file is the way
@@ -70,6 +70,8 @@ Templates are [Liquid](https://liquidjs.com). They see the send’s `payload` at
 - Output isn’t HTML-escaped. In an email `body`, pipe values a user typed through `escape`:
   `{{ recipient.name | escape }}`.
 - Loops and conditions: `{% for item in items %}…{% endfor %}`, `{% if overdue %}…{% endif %}`.
+  Only `nil` and `false` are false: test a list with `{% if items.size > 0 %}` and a string with
+  `{% if name != blank %}`.
 - Liquid that doesn’t parse is rejected when the template is saved, and fails its delivery at once
   instead of retrying.
 
@@ -130,8 +132,9 @@ const pending = await chaski.schedules.list({ recipientId: user.id });
   rejected, with five minutes of grace.
 - Scheduling again with the same `idempotencyKey` moves the pending send instead of adding one, so
   derive the key from what the notification is about, never from the time. The result’s `op` says
-  what happened: `created`, `updated`, `completed` (it already went out) or `cancelled` (the new
-  time had passed).
+  what happened: `created`, `updated`, `completed` (it already went out, and nothing changed) or
+  `cancelled` (the new time had passed). Something that arms again after it fired needs a new key
+  each time.
 - Preferences and the template are read when the send fires, not when it’s scheduled.
 - A schedule is one send at one time. Something that repeats, such as a weekly digest, stays a
   Cron Trigger in the host whose handler calls `chaski.send()`.
@@ -154,7 +157,8 @@ const topics = await chaski.preferences.topics(); // types grouped by their temp
   it to that channel.
 - `mutedTypes` overwrites the stored list on every `set`: send the full list.
 - `defaultMutedTypes` in the config mutes types for every contact until they save preferences of
-  their own, for opt-in types such as a digest.
+  their own, for opt-in types such as a digest. `get()` for a contact who never saved returns
+  those defaults, with every channel on.
 - Every send checks preferences channel by channel, except `transactional: true` sends.
 
 ## Feed and devices on the server
@@ -168,6 +172,9 @@ await chaski.push.register({ recipient: { id: user.id }, platform: 'ios', device
 await chaski.push.register({ recipient: { id: user.id }, subscription }); // a web push subscription
 await chaski.push.unregister({ deviceToken });
 ```
+
+Registering an endpoint or a device token Chaski already knows hands it to this contact, so a
+repeat is safe.
 
 The frontend reaches the same data as the signed-in user through `chaski.userRoutes()`; see
 [browser-clients.md](browser-clients.md).

@@ -135,9 +135,11 @@ Run that bundling step in the frontend’s build, next to its own.
 
 **A service worker already exists:** call `handlePushEvents(self)` inside it, rather than
 registering a second one on the same scope, and pass its path to the client:
-`createChaskiClient({ baseUrl, push: { serviceWorkerPath: '/service-worker.js' } })`. A
-`firebase-messaging-sw.js` lives on a scope of its own and can stay while the project moves off
-FCM.
+`createChaskiClient({ baseUrl, push: { serviceWorkerPath: '/service-worker.js' } })`. Its own
+`push` and `notificationclick` listeners would show every push a second time: keep them only for
+pushes an old path still sends, and have them skip Chaski’s. A worker written as a plain script
+needs the bundling step above once it imports `chaski/sw`. A `firebase-messaging-sw.js` lives on a
+scope of its own and can stay while the project moves off FCM.
 
 Then a toggle. Call `enable()` from a click: some browsers ask for permission only after a user
 gesture.
@@ -161,7 +163,10 @@ Without React: `chaskiClient.push.isSupported()`, `state()`, `enable()` and `dis
 web push reaches only a site the user added to the home screen.
 
 A click on a push focuses an open window and takes it to the push’s link, or opens one; open
-windows also get a message to refresh their feed.
+windows also get a message to refresh their feed. `handlePushEvents` shows every push the worker
+receives, reading `title`, `body` and `href` from its JSON. A push of another shape still shows,
+but its click opens `/`, so while an old path sends pushes of its own the worker has to handle
+both.
 
 **Done when** `state.subscribed` is `true` after enabling, and a send of a `push` type to the
 signed-in user shows a `push` delivery that isn’t skipped with `no_device_tokens`.
@@ -195,6 +200,7 @@ own. The config needs `channels.push.apns`.
 
 ## Content-Security-Policy on the frontend
 
-Same origin, `connect-src 'self'` covers the requests and the socket. From another origin, add
-the host’s `https://` origin and its `wss://` origin to `connect-src`. The service worker’s script
-must pass `worker-src`, which falls back to `script-src`, then `default-src`.
+Same origin, `connect-src 'self'` covers the requests and, in current browsers, the socket. From
+another origin, add the host’s `https://` origin and its `wss://` origin to `connect-src`. The
+service worker’s script must pass `worker-src`, which falls back to `child-src`, then
+`script-src`, then `default-src`.

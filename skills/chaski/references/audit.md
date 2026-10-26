@@ -3,7 +3,8 @@
 The audit reads the project and writes an **inventory**: every flow that sends email, push or
 in-app notifications, what it sends, when, to whom, on which channel and with which template.
 [plan.md](plan.md) then turns the inventory into a plan for moving those flows onto Chaski. The
-audit changes no code; the only files it writes are the inventory and, later, the plan.
+audit changes no code. It writes the finder’s output to a temporary file, then `chaski-plan.md`
+and `chaski-templates.json` in the project.
 
 ## 1. Map the project
 
@@ -11,7 +12,9 @@ List every deployable unit in the repository and its runtime: each Worker (one p
 config), server, frontend, mobile app, background job and script. Note which ones run on
 Cloudflare Workers, and which Worker would host Chaski.
 
-**Done when** every app or package folder in the repository is on the list with its runtime.
+**Done when** every folder holding code that runs somewhere is on the list with its runtime, and
+so is every runtime the code implies but the repository doesn’t hold (a service worker with no
+frontend that serves it, a webhook from another system).
 
 ## 2. Find every send
 
@@ -19,7 +22,7 @@ Run the finder from this skill’s folder (the one holding `SKILL.md`) against t
 keep its output:
 
 ```sh
-node <skill folder>/scripts/find-sends.mjs <project root> > /tmp/chaski-sends.txt
+node <skill folder>/scripts/find-sends.mjs <project root> > "${TMPDIR:-/tmp}/chaski-sends.txt"
 ```
 
 It prints counts, then each hit as `file:line: code`, under these headings: packages,
@@ -28,9 +31,9 @@ templates, jobs and schedules, preferences and devices, in-app feed. From `.env`
 files it reads only the names of the settings, never their values. It matches patterns: it flags
 lines that send nothing, and it misses sends it has no pattern for. So go past it:
 
-- **Wrappers.** For every module that imports a provider SDK or calls a provider’s API, list the
-  functions it exports, then find every call of each. The call sites are the flows; the wrapper
-  is only the provider.
+- **Wrappers.** For every module that imports a provider SDK, calls a provider’s API or writes to
+  an in-app notifications table of the host’s own, list the functions it exports, then find every
+  call of each. The call sites are the flows; the wrapper is only the provider.
 - **Handlers.** Read every `scheduled` and `queue` handler, every Cron Trigger in the Wrangler
   configs and every job runner’s jobs to the end: digests and reminders hide there.
 - **Credentials.** Each name under the finder’s credentials heading (`RESEND_API_KEY`,
@@ -54,7 +57,7 @@ weekly digest. Trace each one from its send back to its trigger, and record:
 | --- | --- |
 | What | What the message tells the reader, in product terms. |
 | Trigger | The event or schedule that sends it: a route, a webhook, a user action, a queue message, a cron expression. |
-| Recipients | Who gets it, and where the address or device comes from. |
+| Recipients | Who gets it, where the address or device comes from, and the user id behind it, or that there’s none. |
 | Channels | Email, web push, iOS push, Android push, in-app, SMS, chat. |
 | Provider | The SDK or service, with the `file:line` of the send. |
 | Template | Where the content lives: a file (React Email, MJML, Handlebars, inline HTML), a provider-hosted template id, or a string in code. |
@@ -80,5 +83,7 @@ Write it to `chaski-plan.md` at the project root, unless the user named another 
 2. One section per flow with every field from step 3.
 3. The stored state.
 4. The questions for the user.
+5. The finder’s evidence: its command and counts, which hits went to which flow or state, which
+   were dismissed and why, and what you found past it.
 
 Then read [plan.md](plan.md) and add the plan to the same file.
