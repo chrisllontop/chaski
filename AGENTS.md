@@ -26,12 +26,15 @@ same in-process API over RPC to the host's other Workers.
   (`test/fixture/seed.ts`), so the dashboard has something to show.
 - `pnpm build:dashboard` (Vite) writes `src/generated/dashboard.ts`, which the server code imports.
   It is generated and gitignored; run it once before typechecking or testing on a fresh clone.
-- `pnpm typecheck` (tsc, seven projects), `pnpm lint` (Biome), `pnpm format` (Biome with fixes),
+- `pnpm typecheck` (tsc, nine projects), `pnpm lint` (Biome), `pnpm format` (Biome with fixes),
   `pnpm test` (Vitest in workerd), `pnpm build` (dashboard, tsdown, then the declarations).
+- `pnpm dev:site` serves chaski.sh, landing and docs, with Vite. `pnpm build:site` prerenders every
+  page to `site/dist/client` and writes their headers; `pnpm --filter chaski-site preview` serves
+  that build as production does. `pnpm deploy:site` publishes it: only the owner runs it.
 - `pnpm drizzle-kit generate --name <name>` writes a migration into `migrations/` after a schema
   change; `.cursor/rules/database.mdc` says what else a migration needs.
-- `pnpm check` builds the dashboard, then runs typecheck, lint and test: the same gate CI runs before
-  the build.
+- `pnpm check` builds the dashboard, then runs typecheck, lint and test, and builds the site: the
+  same gate CI runs before the build.
 
 ## CI
 
@@ -45,7 +48,8 @@ same in-process API over RPC to the host's other Workers.
 
 ## Layout
 
-- One package, no workspace: the repository root is the package published to npm as `chaski`.
+- The repository root is the package published to npm as `chaski`; `site/` is the only other
+  workspace member.
   tsdown bundles `src/index.ts` into `dist` and TypeScript emits the declarations next to it; only
   `dist` and `migrations/*.sql` ship, along with `README.md` and `LICENSE`. Hono is a peer
   dependency; React and the rest of the dashboard stack are dev dependencies, because they ship
@@ -90,6 +94,13 @@ same in-process API over RPC to the host's other Workers.
 - `brand/` holds the logo: the mark and the full logo (mark and wordmark, outlined), each in black
   (`#0A0A0A`) and white (`#FAFAFA`) ink. The README and the dashboard favicon use it; it doesn't
   ship in the package.
+- `site/` is chaski.sh, the workspace package `chaski-site` with dependencies of its own: TanStack
+  Start and Fumadocs, prerendered at build time and served as a Worker's static assets
+  (`site/wrangler.jsonc` declares no Worker). `src/routes` holds the landing and the docs,
+  `content/docs` the MDX pages and their order (`meta.json`), and `src/routeTree.gen.ts` is
+  generated and committed. The pages hydrate from inline scripts, so `scripts/headers.ts` writes
+  each page's Content-Security-Policy, with those scripts by hash, into `_headers` after the build.
+  It doesn't ship in the package either.
 - `test/fixture` is a host Worker that mounts Chaski and declares every binding it uses (D1, queue
   and dead-letter queue, both Durable Objects, the Workflow, R2 and `send_email`); the tests and
   `pnpm dev` both run it.
@@ -112,8 +123,9 @@ with the code they govern.
   `tsconfig.browser.json` (the browser entries and the contract, DOM types),
   `src/dashboard/tsconfig.json` (DOM and JSX), `test/tsconfig.json` (Workers plus the Vitest
   plugin), `test/browser/tsconfig.json` (the browser tests), `test/sw/tsconfig.json` (a real service
-  worker scope against `chaski/sw`, WebWorker types) and `tsconfig.node.json` (the config files
-  and scripts).
+  worker scope against `chaski/sw`, WebWorker types), `site/tsconfig.json` (the site, DOM types),
+  `site/tsconfig.node.json` (its config files and build script) and `tsconfig.node.json` (the config
+  files and scripts).
 - tsdown bundles the JavaScript and TypeScript 7's compiler emits the declarations
   (`pnpm build:types`), so exported Drizzle tables and zod schemas keep their inferred types.
   `scripts/fix-declaration-imports.ts` then gives their relative imports the file extensions that
