@@ -11,7 +11,7 @@ import { publishAdminEvents } from '../lib/admin-events';
 import { DeliveryError } from '../lib/errors';
 import { newId } from '../lib/ids';
 import { parseJson } from '../lib/json';
-import { renderTemplate } from '../lib/render';
+import { assertTemplates, renderTemplate } from '../lib/render';
 import { BaseService } from './base.service';
 import { EmailSenderService } from './email-sender.service';
 
@@ -268,6 +268,16 @@ export class TemplateService extends BaseService {
     records: TemplateRecord[],
     options: { preview: boolean },
   ): Promise<TemplateImportResult> => {
+    for (const record of records) {
+      for (const content of record.channels ?? []) {
+        const at = `${record.type} ${content.channel}`;
+        assertTemplates({
+          [`${at} subject`]: content.subject,
+          [`${at} body`]: content.body,
+          [`${at} textBody`]: content.textBody,
+        });
+      }
+    }
     const current = new Map((await TemplateService.exportTemplates()).map((r) => [r.type, r]));
     const changes = records.map((record) => diffTemplate(current.get(record.type), record));
     if (options.preview) return { applied: false, changes };
@@ -371,6 +381,7 @@ export class TemplateService extends BaseService {
     channel: Channel,
     input: ChannelContentInput,
   ) => {
+    assertTemplates({ subject: input.subject, body: input.body, textBody: input.textBody });
     await TemplateService.get(templateId);
     const existing = await TemplateService.client.templateChannels.findFirst({
       where: { templateId, channel },
@@ -408,6 +419,7 @@ export class TemplateService extends BaseService {
       throw new ChaskiError('not_found', `template has no ${channel} content to preview`);
     }
 
+    assertTemplates({ subject: row.subject, body: row.body, textBody: row.textBody });
     const sample = data ?? parseJson<Record<string, unknown>>(template.sampleData, {});
     const [subject, html, text] = await Promise.all([
       renderTemplate(row.subject ?? '', sample),

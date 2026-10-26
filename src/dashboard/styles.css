@@ -62,6 +62,12 @@
   --destructive: oklch(0.577 0.245 27.325);
   --success: oklch(0.723 0.219 149.579);
   --warning: oklch(0.666 0.179 58.318);
+  --code-tag: oklch(0.5 0.17 262);
+  --code-attribute: oklch(0.52 0.16 305);
+  --code-string: oklch(0.52 0.13 155);
+  --code-keyword: oklch(0.56 0.17 35);
+  --code-variable: oklch(0.52 0.11 205);
+  --code-number: oklch(0.6 0.15 70);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
@@ -98,6 +104,12 @@
   --destructive: oklch(0.704 0.191 22.216);
   --success: oklch(0.792 0.209 151.711);
   --warning: oklch(0.828 0.189 84.429);
+  --code-tag: oklch(0.76 0.12 255);
+  --code-attribute: oklch(0.78 0.11 305);
+  --code-string: oklch(0.8 0.13 150);
+  --code-keyword: oklch(0.78 0.14 45);
+  --code-variable: oklch(0.8 0.1 200);
+  --code-number: oklch(0.83 0.13 80);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
@@ -165,4 +177,77 @@
   body {
     @apply bg-background font-sans text-foreground antialiased;
   }
+}
+
+/* CodeMirror, styled from the theme tokens. Syntax colors go through
+   @lezer/highlight's tok-* classes, so no theme CSS is written at runtime. These
+   rules stay outside any layer: CodeMirror's injected base theme is unlayered and
+   would beat them otherwise. */
+.code-editor .cm-editor {
+  @apply rounded-md border border-input bg-transparent font-mono text-xs shadow-xs transition-[color,box-shadow] dark:bg-input/30;
+}
+.code-editor .cm-editor.cm-focused {
+  @apply border-ring outline-none ring-[3px] ring-ring/50;
+}
+.code-editor[aria-invalid="true"] .cm-editor {
+  @apply border-destructive ring-destructive/20 dark:ring-destructive/40;
+}
+.code-editor .cm-editor .cm-scroller {
+  @apply font-mono leading-relaxed;
+}
+.code-editor .cm-editor .cm-content {
+  @apply py-2;
+  caret-color: var(--foreground);
+}
+.code-editor .cm-editor .cm-cursor {
+  border-left-color: var(--foreground);
+}
+.code-editor .cm-editor .cm-gutters {
+  @apply rounded-l-md border-border border-r bg-muted/40 text-muted-foreground/70;
+}
+.code-editor .cm-editor .cm-activeLine,
+.code-editor .cm-editor .cm-activeLineGutter {
+  @apply bg-muted/50;
+}
+.code-editor .cm-editor:not(.cm-focused) .cm-activeLine,
+.code-editor .cm-editor:not(.cm-focused) .cm-activeLineGutter {
+  @apply bg-transparent;
+}
+.code-editor .cm-editor .cm-selectionBackground,
+.code-editor .cm-editor.cm-focused .cm-selectionBackground {
+  background: color-mix(in oklch, var(--ring) 35%, transparent) !important;
+}
+.code-editor .cm-editor .cm-matchingBracket {
+  @apply rounded-sm bg-muted text-foreground;
+}
+.code-editor .cm-editor .cm-tooltip {
+  @apply overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md;
+}
+.code-editor .cm-editor .cm-tooltip-autocomplete > ul {
+  @apply p-1 font-mono text-xs;
+}
+.code-editor .cm-editor .cm-tooltip-autocomplete > ul > li {
+  @apply rounded-sm px-2 py-1;
+}
+.code-editor .cm-editor .cm-tooltip-autocomplete > ul > li[aria-selected] {
+  @apply bg-accent text-accent-foreground;
+}
+
+.code-editor .cm-editor .tok-typeName { color: var(--code-tag); }
+.code-editor .cm-editor .tok-propertyName { color: var(--code-attribute); }
+.code-editor .cm-editor .tok-string { color: var(--code-string); }
+.code-editor .cm-editor .tok-keyword { color: var(--code-keyword); }
+.code-editor .cm-editor .tok-variableName { color: var(--code-variable); }
+.code-editor .cm-editor .tok-number,
+.code-editor .cm-editor .tok-bool,
+.code-editor .cm-editor .tok-literal,
+.code-editor .cm-editor .tok-atom { color: var(--code-number); }
+.code-editor .cm-editor .tok-comment { @apply text-muted-foreground italic; }
+.code-editor .cm-editor .tok-punctuation,
+.code-editor .cm-editor .tok-operator,
+.code-editor .cm-editor .tok-meta { @apply text-muted-foreground; }
+.code-editor .cm-editor .tok-invalid { @apply text-destructive; }
+.code-editor .cm-editor .cm-liquid,
+.code-editor .cm-editor .cm-liquid * {
+  color: var(--code-variable);
 }

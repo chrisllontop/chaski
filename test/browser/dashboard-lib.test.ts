@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { act, renderHook } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { query } from '../../src/dashboard/lib/api';
+import { useDebounced } from '../../src/dashboard/lib/debounce';
 import {
   formatChange,
   formatDuration,
@@ -8,6 +10,7 @@ import {
   formatUtcRange,
 } from '../../src/dashboard/lib/format';
 import { healthByType } from '../../src/dashboard/lib/health';
+import { liquidNamesAt, liquidReference } from '../../src/dashboard/lib/liquid';
 
 describe('dashboard query strings', () => {
   it('keeps only the filters that have a value', () => {
@@ -68,5 +71,67 @@ describe('dashboard health', () => {
       invoice_due: 'healthy',
       digest: 'paused',
     });
+  });
+});
+
+describe('liquid completions', () => {
+  const sample = { amount: 1500, invoice: { id: 'INV-1', lines: [] }, recipient: { name: 'Ana' } };
+
+  it('offers the sample data and recipient at the top level', () => {
+    expect(liquidNamesAt(sample, [])).toEqual(['amount', 'invoice', 'recipient']);
+    expect(liquidNamesAt(null, [])).toEqual(['recipient']);
+  });
+
+  it('offers the fields under a dotted path, recipient’s included', () => {
+    expect(liquidNamesAt(sample, ['invoice'])).toEqual(['id', 'lines']);
+    expect(liquidNamesAt(sample, ['recipient'])).toEqual([
+      'email',
+      'id',
+      'locale',
+      'name',
+      'phone',
+      'timezone',
+    ]);
+    expect(liquidNamesAt(sample, ['amount'])).toEqual([]);
+    expect(liquidNamesAt(sample, ['missing', 'deeper'])).toEqual([]);
+  });
+});
+
+describe('useDebounced', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('settles once the value holds still, and ignores copies of the same value', () => {
+    vi.useFakeTimers();
+    const { result, rerender } = renderHook(({ value }) => useDebounced(value), {
+      initialProps: { value: { body: 'a' } },
+    });
+    const first = result.current;
+
+    rerender({ value: { body: 'a' } });
+    act(() => vi.advanceTimersByTime(1000));
+    expect(result.current).toBe(first);
+
+    rerender({ value: { body: 'ab' } });
+    act(() => vi.advanceTimersByTime(399));
+    expect(result.current).toEqual({ body: 'a' });
+    act(() => vi.advanceTimersByTime(1));
+    expect(result.current).toEqual({ body: 'ab' });
+  });
+});
+
+describe('liquid references', () => {
+  it('reads the dotted path being typed inside an open tag', () => {
+    expect(liquidReference('<p>{{ recipient.na')).toEqual({ path: ['recipient'], prefix: 'na' });
+    expect(liquidReference('<p>{{- amo')).toEqual({ path: [], prefix: 'amo' });
+    expect(liquidReference('{% if invoice.')).toEqual({ path: ['invoice'], prefix: '' });
+  });
+
+  it('stays out of closed tags, tag names and filters', () => {
+    expect(liquidReference('<p>{{ amount }} and')).toBeNull();
+    expect(liquidReference('<p>plain text')).toBeNull();
+    expect(liquidReference('{% i')).toBeNull();
+    expect(liquidReference('{{ amount | upc')).toBeNull();
   });
 });

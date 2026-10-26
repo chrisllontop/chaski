@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { channelSchema, OFFSET_TIMESTAMP_REGEX } from '../../contract/contract';
-import { ChaskiError } from '../../contract/errors';
+import { ChaskiError, isChaskiError } from '../../contract/errors';
 import {
   TEMPLATE_FILE_FORMAT,
   TEMPLATE_FILE_VERSION,
@@ -200,16 +200,29 @@ const previewDocumentSchema = z.object({
     }),
 });
 
+const escapeHtml = (text: string) => text.replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
+
 admin.post('/templates/:id/preview/document', async (c) => {
   const form = parseInput(previewDocumentSchema, await c.req.parseBody());
-  const rendered = await TemplateService.preview(c.req.param('id'), 'email', form.data, {
-    subject: form.subject ?? null,
-    body: form.body,
-  });
-  return c.html(rendered.html, 200, {
+  const headers = {
     'Content-Security-Policy': PREVIEW_DOCUMENT_CSP,
     'X-Content-Type-Options': 'nosniff',
-  });
+  };
+  try {
+    const rendered = await TemplateService.preview(c.req.param('id'), 'email', form.data, {
+      subject: form.subject ?? null,
+      body: form.body,
+    });
+    return c.html(rendered.html, 200, headers);
+  } catch (error) {
+    // The frame shows what's wrong with the draft being typed, not a JSON body.
+    if (!isChaskiError(error) || error.code !== 'validation') throw error;
+    return c.html(
+      `<!doctype html><meta charset="utf-8"><pre style="margin:16px;font:12px/1.6 ui-monospace,monospace;color:#b91c1c;white-space:pre-wrap">${escapeHtml(error.message)}</pre>`,
+      400,
+      headers,
+    );
+  }
 });
 
 admin.post('/templates/:id/preview', async (c) => {
