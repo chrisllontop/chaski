@@ -39,6 +39,10 @@ const Results = ({ onPick }: { onPick: (url: string) => void }) => {
     [data],
   );
 
+  useEffect(() => {
+    document.getElementById(`${listId}-${highlighted}`)?.scrollIntoView({ block: 'nearest' });
+  }, [listId, highlighted]);
+
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault();
