@@ -258,7 +258,7 @@ const HEALTH = [
   {
     type: 'order_shipped · push',
     label: 'At risk',
-    tone: 'bg-warning pulse-ring text-warning',
+    tone: 'bg-warning',
     text: 'text-warning',
   },
 ];
