@@ -30,7 +30,8 @@ same in-process API over RPC to the host's other Workers.
   `pnpm test` (Vitest in workerd), `pnpm build` (dashboard, tsdown, then the declarations).
 - `pnpm dev:site` serves chaski.sh, landing and docs, with Vite. `pnpm build:site` prerenders every
   page to `site/dist/client` and writes their headers; `pnpm --filter chaski-site preview` serves
-  that build as production does. `pnpm deploy:site` publishes it: only the owner runs it.
+  that build as production does. Workers Builds publishes it (see CI); `pnpm deploy:site` is the
+  manual fallback, and only the owner runs it.
 - `pnpm drizzle-kit generate --name <name>` writes a migration into `migrations/` after a schema
   change; `.cursor/rules/database.mdc` says what else a migration needs.
 - `pnpm check` builds the dashboard, then runs typecheck, lint and test, and builds the site: the
@@ -45,6 +46,10 @@ same in-process API over RPC to the host's other Workers.
 - **Release** runs when a `v*` release is published: it checks that the tag matches
   `package.json`'s version and is on `main`, builds the package and publishes it to npm with
   trusted publishing (OIDC, no token). Bump the package version before publishing.
+- **Workers Builds** (Cloudflare, not GitHub Actions) builds `site/` for the Worker `chaski`: a
+  merge to `main` deploys chaski.sh, and every pull request gets a preview on workers.dev, linked
+  in a comment. Its settings live in the Cloudflare dashboard: root directory `site`, build
+  command `pnpm build`, deploy `npx wrangler deploy`, preview `npx wrangler preview`.
 
 ## Layout
 
