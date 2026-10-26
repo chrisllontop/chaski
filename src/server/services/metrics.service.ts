@@ -114,7 +114,7 @@ export class MetricsService extends BaseService {
     const db = MetricsService.db;
     const day = (column: typeof deliveries.updatedAt | typeof deliveries.openedAt) =>
       sql<string>`date(${column} / 1000, 'unixepoch')`;
-    const [statusRows, openedRows] = await Promise.all([
+    const [statusRows, openedRows, notificationRows] = await Promise.all([
       db
         .select({
           day: day(deliveries.updatedAt),
@@ -131,10 +131,22 @@ export class MetricsService extends BaseService {
         .where(and(gte(deliveries.openedAt, from), lt(deliveries.openedAt, to)))
         .groupBy(day(deliveries.openedAt))
         .all(),
+      db
+        .select({
+          day: sql<string>`date(${notifications.createdAt} / 1000, 'unixepoch')`,
+          count: sql<number>`count(*)`,
+        })
+        .from(notifications)
+        .where(and(gte(notifications.createdAt, from), lt(notifications.createdAt, to)))
+        .groupBy(sql`date(${notifications.createdAt} / 1000, 'unixepoch')`)
+        .all(),
     ]);
 
     const series = new Map(
-      utcDays(from, to).map((date) => [date, { date, sent: 0, failed: 0, skipped: 0, opened: 0 }]),
+      utcDays(from, to).map((date) => [
+        date,
+        { date, notifications: 0, sent: 0, failed: 0, skipped: 0, opened: 0 },
+      ]),
     );
     for (const row of statusRows) {
       const bucket = series.get(row.day);
@@ -146,6 +158,10 @@ export class MetricsService extends BaseService {
     for (const row of openedRows) {
       const bucket = series.get(row.day);
       if (bucket) bucket.opened += Number(row.count);
+    }
+    for (const row of notificationRows) {
+      const bucket = series.get(row.day);
+      if (bucket) bucket.notifications += Number(row.count);
     }
     return { period, from: from.toISOString(), series: [...series.values()] };
   };
