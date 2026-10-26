@@ -12,5 +12,7 @@
   "routes": [{ "pattern": "chaski.sh", "custom_domain": true }],
   "workers_dev": false,
   // Each pull request's preview gets a workers.dev URL, which Cloudflare marks noindex.
-  "preview_urls": true
+  "preview_urls": true,
+  // `wrangler preview` refuses to run without this block; the site has nothing to set in it.
+  "previews": {}
 }
