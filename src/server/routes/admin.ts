@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { channelSchema } from '../../contract/contract';
+import { channelSchema, OFFSET_TIMESTAMP_REGEX } from '../../contract/contract';
 import { ChaskiError } from '../../contract/errors';
 import {
   TEMPLATE_FILE_FORMAT,
@@ -15,6 +15,7 @@ import { parseInput } from '../lib/validate';
 import { ChannelService } from '../services/channel.service';
 import { DeliveryAdminService } from '../services/delivery-admin.service';
 import { METRIC_PERIODS, MetricsService } from '../services/metrics.service';
+import { ScheduleService } from '../services/schedule.service';
 import { TemplateService } from '../services/template.service';
 
 const templateInputSchema = z.object({
@@ -42,7 +43,14 @@ const channelContentSchema = z.object({
   textBody: z.string().nullable().optional(),
 });
 
+const instantSchema = z
+  .string()
+  .regex(OFFSET_TIMESTAMP_REGEX, { message: 'must be ISO 8601 with an explicit offset' })
+  .transform((value) => new Date(value));
+
 const deliveryFiltersSchema = z.object({
+  from: instantSchema.optional(),
+  to: instantSchema.optional(),
   status: z.enum(DELIVERY_STATUS).optional(),
   channel: channelSchema.optional(),
   type: z.string().max(128).optional(),
@@ -55,6 +63,26 @@ const deliveryListSchema = deliveryFiltersSchema.extend({
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
 
+const scheduleListSchema = z.object({
+  recipientId: z.string().max(256).optional(),
+  groupKey: z.string().max(512).optional(),
+  page: z.coerce.number().int().min(0).default(0),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+
+const previewSchema = z.object({
+  channel: channelSchema,
+  data: z.record(z.string(), z.unknown()).optional(),
+  // Content being edited and not saved yet; without it the stored content renders.
+  content: z
+    .object({
+      subject: z.string().max(512).nullable().optional(),
+      body: z.string(),
+      textBody: z.string().nullable().optional(),
+    })
+    .optional(),
+});
+
 const importQuerySchema = z.object({ preview: z.stringbool().default(false) });
 
 const metricsQuerySchema = z.object({ period: z.enum(METRIC_PERIODS).default('30d') });
@@ -65,9 +93,13 @@ const log = logger('admin');
 
 // Every change made through the dashboard is logged under the actor that
 // authorize let in.
+// Previews change nothing, and the editor asks for one on every edit.
+const READ_ONLY_POSTS = /\/preview(\/document)?$/;
+
 admin.use(async (c, next) => {
   await next();
   if (c.req.method === 'GET' || c.req.method === 'HEAD') return;
+  if (READ_ONLY_POSTS.test(c.req.path) || c.req.query('preview') === 'true') return;
   log.info('admin action', {
     actor: actorOf(c)?.id,
     method: c.req.method,
@@ -75,6 +107,8 @@ admin.use(async (c, next) => {
     status: c.res.status,
   });
 });
+
+admin.get('/me', (c) => c.json({ actor: actorOf(c) ?? null }));
 
 admin.get('/templates', async (c) => c.json({ templates: await TemplateService.list() }));
 
@@ -96,6 +130,16 @@ admin.post('/templates/import', async (c) => {
 admin.get('/templates/deleted', async (c) =>
   c.json({ templates: await TemplateService.listDeleted() }),
 );
+
+admin.post('/templates/:id/restore', async (c) =>
+  c.json({ template: await TemplateService.restoreTemplate(c.req.param('id')) }),
+);
+
+admin.delete('/templates/:id/permanent', async (c) => {
+  const id = c.req.param('id');
+  await TemplateService.purgeTemplate(id);
+  return c.json({ id, purged: true as const });
+});
 
 admin.post('/templates', async (c) => {
   const input = parseInput(templateInputSchema, await c.req.json());
@@ -123,15 +167,56 @@ admin.put('/templates/:id/channels/:channel', async (c) => {
   return c.json({ channel: row });
 });
 
-admin.post('/templates/:id/preview', async (c) => {
-  const input = parseInput(
-    z.object({
-      channel: channelSchema,
-      data: z.record(z.string(), z.unknown()).optional(),
+// The dashboard renders the email inside an iframe it posts this form into,
+// so the email's own inline styles and remote images apply there without
+// loosening the dashboard's CSP. The sandbox lets no script run.
+const PREVIEW_DOCUMENT_CSP = [
+  "default-src 'none'",
+  "style-src 'unsafe-inline'",
+  'img-src https: http: data:',
+  'font-src https: data:',
+  "frame-ancestors 'self'",
+  'sandbox',
+].join('; ');
+
+const previewDocumentSchema = z.object({
+  subject: z.string().max(512).optional(),
+  body: z.string(),
+  data: z
+    .string()
+    .optional()
+    .transform((text, ctx) => {
+      if (!text) return {};
+      try {
+        const value = JSON.parse(text) as unknown;
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+          return value as Record<string, unknown>;
+        }
+      } catch {
+        // Reported below.
+      }
+      ctx.addIssue({ code: 'custom', message: 'data must be a JSON object' });
+      return z.NEVER;
     }),
-    await c.req.json(),
+});
+
+admin.post('/templates/:id/preview/document', async (c) => {
+  const form = parseInput(previewDocumentSchema, await c.req.parseBody());
+  const rendered = await TemplateService.preview(c.req.param('id'), 'email', form.data, {
+    subject: form.subject ?? null,
+    body: form.body,
+  });
+  return c.html(rendered.html, 200, {
+    'Content-Security-Policy': PREVIEW_DOCUMENT_CSP,
+    'X-Content-Type-Options': 'nosniff',
+  });
+});
+
+admin.post('/templates/:id/preview', async (c) => {
+  const input = parseInput(previewSchema, await c.req.json());
+  return c.json(
+    await TemplateService.preview(c.req.param('id'), input.channel, input.data, input.content),
   );
-  return c.json(await TemplateService.preview(c.req.param('id'), input.channel, input.data));
 });
 
 admin.post('/templates/:id/test-send', async (c) => {
@@ -158,6 +243,14 @@ admin.get('/events', async (c) => {
 });
 
 admin.get('/channels', (c) => c.json(ChannelService.overview()));
+
+admin.get('/schedules', async (c) =>
+  c.json(await ScheduleService.listPage(parseInput(scheduleListSchema, c.req.query()))),
+);
+
+admin.post('/schedules/:id/cancel', async (c) =>
+  c.json(await ScheduleService.cancel({ id: c.req.param('id') })),
+);
 
 admin.get('/deliveries', async (c) =>
   c.json(await DeliveryAdminService.list(parseInput(deliveryListSchema, c.req.query()))),

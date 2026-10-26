@@ -5,12 +5,12 @@ Chaski on a route of its own Worker, the way it would mount Swagger UI or Bull B
 on that project's Cloudflare resources: email, web push and in-app notifications, with templates,
 scheduling, retries and a dashboard. Open source (MIT), published on npm as `chaski`.
 
-**Current stage: the engine and the browser clients, without dashboard screens.** `createChaski()` takes
+**Current stage: the engine, the browser clients and the dashboard; a setup guide comes next.** `createChaski()` takes
 the host's config; Chaski sends email, web push, APNs and in-app notifications through the host's
 queue, with templates, preferences, scheduled sends, retries and realtime events. `chaski.routes()`
-mounts the dashboard shell and the admin API, and `chaski.userRoutes()` the endpoints the host's
+mounts the dashboard and its admin API, and `chaski.userRoutes()` the endpoints the host's
 frontend calls for the signed-in user, which `chaski/client`, `chaski/sw` and `chaski/react` wrap
-for the page, the service worker and React. The dashboard screens come next.
+for the page, the service worker and React.
 
 ## Run it
 
@@ -21,6 +21,8 @@ for the page, the service worker and React. The dashboard screens come next.
   `/admin/notifications` and the user routes at `/me/notifications`; there is no hot reload, so
   rerun it after a dashboard change. Apply the migrations to the local D1 first:
   `pnpm wrangler d1 migrations apply CHASKI_DB --local -c test/fixture/wrangler.jsonc`.
+  `curl -X POST localhost:8787/dev/seed` then fills it with sample templates, sends and schedules
+  (`test/fixture/seed.ts`), so the dashboard has something to show.
 - `pnpm build:dashboard` (Vite) writes `src/generated/dashboard.ts`, which the server code imports.
   It is generated and gitignored; run it once before typechecking or testing on a fresh clone.
 - `pnpm typecheck` (tsc, six projects), `pnpm lint` (Biome), `pnpm format` (Biome with fixes),
@@ -69,8 +71,19 @@ for the page, the service worker and React. The dashboard screens come next.
   with `createElement`, so the package ships no JSX.
 - `migrations/` holds the D1 migrations drizzle-kit generates; hosts apply them from
   `node_modules/chaski/migrations`.
-- `src/dashboard` is the dashboard (Vite root). `vite.config.ts` embeds its build into
-  `src/generated/dashboard.ts`.
+- `src/dashboard` is the dashboard (Vite root), React with TanStack Router and Query, shadcn
+  (new-york, neutral) and lucide, dark and light. `vite.config.ts` embeds its build into
+  `src/generated/dashboard.ts`, every chunk and the Latin subsets of Geist included.
+  - `routes/` holds one page per screen, loaded on first visit; `components/app/` the dashboard's own
+    pieces; `lib/` the admin API client and its response types, formats, the theme and the
+    `/api/events` subscription that refetches what changed.
+  - `components/ui/` comes from the shadcn registry as it ships, so updates stay reviewable: add a
+    component with `node scripts/shadcn-add.ts <name>`. Biome relaxes a few rules for that folder
+    only.
+  - The shell's CSP allows no inline script and no inline style. Runtime styles take the per-load
+    nonce the server writes into the shell (Radix reads it through `get-nonce`), chart colors go
+    on the chart's `style`, and the email preview renders in an iframe the editor posts a form
+    into, under the preview document's own sandboxed CSP.
 - `brand/` holds the logo: the mark and the full logo (mark and wordmark, outlined), each in black
   (`#0A0A0A`) and white (`#FAFAFA`) ink. The README and the dashboard favicon use it; it doesn't
   ship in the package.
@@ -111,7 +124,8 @@ with the code they govern.
   the fixture host through `exports.default.fetch()`: assert status, headers and JSON; the only
   markup a test reads is the injected `<base href>`. `browser` runs `test/browser` in happy-dom,
   with a fake network and a fake socket (`test/browser/fakes.ts`) and fake timers for the
-  reconnection logic.
+  reconnection logic; it also covers the dashboard's `lib/`. The dashboard's screens have no tests:
+  check them in `pnpm dev`.
 - `test/setup.ts` applies the migrations, empties the tables and restores the fixture config before
   each test, and stubs the queue producer: tests drain deliveries with `processDeliveries()` from
   `test/helpers.ts`. Only the end-to-end test lets the real queue and consumer run.

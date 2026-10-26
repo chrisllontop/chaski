@@ -8,6 +8,7 @@ import {
   type ScheduleParams,
   type SendEmailBinding,
 } from '../../src';
+import { seed } from './seed';
 
 export type FixtureEnv = {
   CHASKI_PUBLIC_URL: string;
@@ -66,8 +67,27 @@ const notifications = chaski.userRoutes({
   allowedOrigins: ['https://frontend.host.test'],
 });
 
-const app = new Hono()
+const app = new Hono<{ Bindings: FixtureEnv }>()
   .get('/', (c) => c.text('Host home'))
+  // Fills the local database for `pnpm dev`; only in dry run, so nothing reaches a provider.
+  .post('/dev/seed', async (c) => {
+    if (c.env.CHASKI_DRY_RUN !== 'true')
+      return c.json({ error: 'not_found', message: 'no such endpoint' }, 404);
+    const origin = new URL(c.req.url).origin;
+    const result = await seed(chaski, (file) =>
+      app.request(
+        '/chaski/api/templates/import',
+        {
+          method: 'POST',
+          body: JSON.stringify(file),
+          headers: { 'content-type': 'application/json', origin },
+        },
+        c.env,
+        c.executionCtx,
+      ),
+    );
+    return c.json(result);
+  })
   .route('/me/notifications', notifications)
   .route('/chaski', dashboard)
   .route('/admin', new Hono().route('/notifications', dashboard));

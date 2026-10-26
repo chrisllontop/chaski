@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNotNull, isNull, type SQL, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNotNull, isNull, lt, type SQL, sql } from 'drizzle-orm';
 import type { Channel } from '../../contract/contract';
 import { ChaskiError } from '../../contract/errors';
 import { type DeliveryStatus, deliveries, notifications } from '../db/schema';
@@ -9,6 +9,9 @@ import { BaseService } from './base.service';
 import type { ContactSnapshot } from './contact.service';
 
 export type DeliveryFilters = {
+  /** Deliveries whose last status change falls in [from, to). */
+  from?: Date;
+  to?: Date;
   status?: DeliveryStatus;
   channel?: Channel;
   type?: string;
@@ -24,6 +27,8 @@ const REPLAY_DEAD_LIMIT = 500;
 
 const filterConditions = (filters: DeliveryFilters): SQL[] => {
   const conditions: SQL[] = [];
+  if (filters.from) conditions.push(gte(deliveries.updatedAt, filters.from));
+  if (filters.to) conditions.push(lt(deliveries.updatedAt, filters.to));
   if (filters.status) conditions.push(eq(deliveries.status, filters.status));
   if (filters.channel) conditions.push(eq(deliveries.channel, filters.channel));
   if (filters.type) conditions.push(eq(notifications.type, filters.type));
@@ -99,7 +104,7 @@ export class DeliveryAdminService extends BaseService {
     const [rows, total] = await Promise.all([
       DeliveryAdminService.selectRows()
         .where(where)
-        .orderBy(desc(notifications.createdAt), desc(deliveries.id))
+        .orderBy(desc(deliveries.updatedAt), desc(deliveries.id))
         .limit(filters.limit)
         .offset(filters.page * filters.limit)
         .all(),

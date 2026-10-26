@@ -1,4 +1,4 @@
-import { sql } from 'drizzle-orm';
+import { and, eq, isNotNull, sql } from 'drizzle-orm';
 import type { Channel } from '../../contract/contract';
 import { ChaskiError } from '../../contract/errors';
 import type {
@@ -6,7 +6,7 @@ import type {
   TemplateImportResult,
   TemplateRecord,
 } from '../../contract/template-file';
-import { notifications } from '../db/schema';
+import { notifications, templates } from '../db/schema';
 import { publishAdminEvents } from '../lib/admin-events';
 import { DeliveryError } from '../lib/errors';
 import { newId } from '../lib/ids';
@@ -158,6 +158,14 @@ export class TemplateService extends BaseService {
     const lastUsedByType = new Map(lastUsedRows.map((row) => [row.type, row.lastUsedAt]));
     return rows.map((row) => ({
       ...row,
+      // Editing a channel's content stamps only that channel, so the template
+      // was last edited at the latest of the two.
+      contentUpdatedAt: new Date(
+        Math.max(
+          row.updatedAt.getTime(),
+          ...channels.filter((c) => c.templateId === row.id).map((c) => c.updatedAt.getTime()),
+        ),
+      ).toISOString(),
       lastUsedAt:
         lastUsedByType.get(row.type) == null
           ? null
@@ -175,6 +183,29 @@ export class TemplateService extends BaseService {
       deleted: 'only',
       orderBy: [{ deletedAt: 'desc' }, { type: 'asc' }],
     });
+
+  /** Brings a deleted template back, unless another live template took its type. */
+  static restoreTemplate = async (templateId: string) => {
+    const client = TemplateService.client;
+    const deleted = await client.templates.findFirst({
+      where: { id: templateId },
+      deleted: 'only',
+    });
+    if (!deleted) throw new ChaskiError('not_found', `deleted template '${templateId}' not found`);
+    if (await client.templates.findFirst({ where: { type: deleted.type } })) {
+      throw new ChaskiError(
+        'conflict',
+        `a live template already has type '${deleted.type}'; delete or rename it first`,
+      );
+    }
+    // A conditional write: two restores at once bring the template back once.
+    await TemplateService.db
+      .update(templates)
+      .set({ deletedAt: null, updatedAt: new Date() })
+      .where(and(eq(templates.id, templateId), isNotNull(templates.deletedAt)));
+    await publishAdminEvents(['templates']);
+    return TemplateService.get(templateId);
+  };
 
   static createTemplate = async (input: {
     type: string;
@@ -364,13 +395,15 @@ export class TemplateService extends BaseService {
     return row;
   };
 
+  /** Renders a channel with sample data: the stored content, or `content` while it's being edited. */
   static preview = async (
     templateId: string,
     channel: Channel,
     data?: Record<string, unknown>,
+    content?: { subject?: string | null; body: string; textBody?: string | null },
   ): Promise<RenderedPreview> => {
     const { template, channels } = await TemplateService.get(templateId);
-    const row = channels.find((c) => c.channel === channel);
+    const row = content ?? channels.find((c) => c.channel === channel);
     if (!row?.body) {
       throw new ChaskiError('not_found', `template has no ${channel} content to preview`);
     }

@@ -36,6 +36,20 @@ describe('dashboard shell', () => {
     expect(await baseHref(response)).toBe('/chaski/');
   });
 
+  it('allows runtime styles only with a nonce that changes on every load', async () => {
+    const styleSource = async () =>
+      (await get('/chaski')).headers
+        .get('content-security-policy')
+        ?.split('; ')
+        .find((directive) => directive.startsWith('style-src'));
+
+    const first = await styleSource();
+    const second = await styleSource();
+
+    expect(first).toMatch(/^style-src 'self' 'nonce-[A-Za-z0-9+/=]{24}'$/);
+    expect(second).not.toBe(first);
+  });
+
   it('is never cached and only loads same-origin resources', async () => {
     const response = await get('/chaski');
 

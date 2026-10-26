@@ -1,5 +1,10 @@
 {
   "extends": "../../tsconfig.browser.json",
-  "include": ["."],
-  "exclude": []
+  "include": [".", "../../src/dashboard/lib"],
+  "exclude": [],
+  "compilerOptions": {
+    "paths": {
+      "~/*": ["../../src/dashboard/*"]
+    }
+  }
 }

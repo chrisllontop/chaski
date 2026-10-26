@@ -11,8 +11,8 @@ Embeddable notification infrastructure for Cloudflare Workers, dashboard include
 ![Runs on Cloudflare Workers](https://img.shields.io/badge/runs_on-Cloudflare_Workers-404040?style=flat-square)
 ![Status: pre-release](https://img.shields.io/badge/status-pre--release-404040?style=flat-square)
 
-**Status: pre-release.** The engine and the browser clients are in place. The dashboard screens and
-a setup guide come next, so Chaski isn’t ready to install yet.
+**Status: pre-release.** The engine, the browser clients and the dashboard are in place. A setup
+guide comes next, so Chaski isn’t ready to install yet.
 
 ## What it will be
 
