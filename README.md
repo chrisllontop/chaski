@@ -423,6 +423,20 @@ npx wrangler d1 migrations apply CHASKI_DB --local
 Set `dryRun: true` in the config while you develop: Chaski renders and records email and push
 deliveries, and shows them in the dashboard, without handing them to a provider.
 
+## Use Chaski with a coding agent
+
+This repository ships an [agent skill](skills/chaski/SKILL.md) for your coding agent. It sets
+Chaski up in your Worker and your frontend, audits the notifications your code already sends and
+plans moving them onto Chaski, and works through a setup that fails. Add it to your project with
+the [`skills` CLI](https://github.com/vercel-labs/skills), which installs it for Claude Code,
+Codex, Cursor and the other agents that read skills:
+
+```sh
+npx skills add chrisllontop/chaski
+```
+
+Then ask your agent to set up Chaski, or to audit the notifications your app sends.
+
 ## Contributing
 
 Issues and pull requests are welcome. Open an

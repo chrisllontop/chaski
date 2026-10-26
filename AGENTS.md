@@ -107,6 +107,11 @@ the endpoints the host's frontend calls for the signed-in user, which `chaskijs/
   generated and committed. The pages hydrate from inline scripts, so `scripts/headers.ts` writes
   each page's Content-Security-Policy, with those scripts by hash, into `_headers` after the build.
   It doesn't ship in the package either.
+- `skills/chaski` is the agent skill hosts install with `npx skills add chrisllontop/chaski`:
+  `SKILL.md` routes to `references/` (setup, browser clients, sending, the audit and its plan,
+  troubleshooting), and `scripts/find-sends.mjs` lists the sends in a codebase for the audit. It
+  quotes the config, the API and Chaski's error messages, so update it with them. It doesn't ship
+  in the package.
 - `test/fixture` is a host Worker that mounts Chaski and declares every binding it uses (D1, queue
   and dead-letter queue, both Durable Objects, the Workflow, R2 and `send_email`); the tests and
   `pnpm dev` both run it.
