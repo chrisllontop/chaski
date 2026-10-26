@@ -1,0 +1,21 @@
+{
+  "pages": [
+    "---Getting started---",
+    "index",
+    "install",
+    "local-development",
+    "---Guides---",
+    "sending",
+    "scheduling",
+    "templates",
+    "preferences",
+    "channels",
+    "browser-clients",
+    "dashboard",
+    "other-workers",
+    "---Reference---",
+    "configuration",
+    "api",
+    "errors"
+  ]
+}

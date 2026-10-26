@@ -1,0 +1,66 @@
+---
+title: Dashboard and sign-in
+description: The dashboard ships inside the package and mounts on a route of your app, behind the sign-in you choose.
+---
+
+## Mount the dashboard
+
+`chaski.routes()` mounts the dashboard, its API and the email open-tracking pixel on any path of
+your app. The dashboard ships built inside the package, so there is nothing to upload or host:
+
+```ts title="src/index.ts"
+app.route(
+  '/admin/notifications',
+  chaski.routes({
+    dashboard: { authorize: cloudflareAccess({ teamDomain, audience }) },
+  }),
+);
+```
+
+Set `publicUrl` in the config to the absolute URL of that mount, such as
+`https://acme.dev/admin/notifications`.
+
+## Choose who signs in
+
+`authorize` runs before every page and API call of the dashboard. It returns who is signed in, as
+`{ id, name? }`, `null` to answer 403, or a `Response` such as a redirect to your login page:
+
+```ts
+type Authorize = (c: Context) => Actor | null | Response | Promise<Actor | null | Response>;
+type Actor = { id: string; name?: string };
+```
+
+Admin actions, such as a replay or a template change, are recorded under the `id` it returns.
+Chaski ships two:
+
+- `cloudflareAccess({ teamDomain, audience })` checks the token of a
+  [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/applications/) application
+  that protects the mount path: its signature against your team’s keys, the application’s AUD tag,
+  the issuer and the expiry. The signed-in email becomes the actor.
+- `basicAuth({ username, password })` asks the browser for one username and password, compared in
+  constant time; read them from secrets.
+
+Your own sign-in works the same way: return the user it finds, or `null`.
+
+```ts
+authorize: async (c) => {
+  const user = await currentStaffUser(c);
+  return user ? { id: user.email, name: user.name } : null;
+},
+```
+
+## What it shows
+
+- **Overview**: notifications, sent, success rate and open rate for a period, deliveries per day,
+  delivery latency and the health of each type on each channel.
+- **Deliveries**: every delivery and its status, with each attempt’s error, and a replay for the
+  failed and dead ones.
+- **Schedules**: pending scheduled sends, which you can cancel.
+- **Templates**: the editor, with a live preview, a test send for email, and import and export.
+- **Channels**: what Chaski picked up from your config.
+
+## Live updates
+
+With the `ChaskiEvents` Durable Object bound as `events`, open dashboards refresh as deliveries
+change, and the header says **Live**. Without it, the dashboard still works, and refreshes when you
+come back to its tab or reload it.

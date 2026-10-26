@@ -1,0 +1,127 @@
+---
+title: Browser clients
+description: chaski/client, chaski/sw and chaski/react give your frontend the signed-in user’s feed, push and preferences.
+---
+
+Your frontend talks to the routes you mounted with `chaski.userRoutes()`, as the signed-in user.
+Three entries of the package cover the browser:
+
+| Entry | What it gives you |
+| --- | --- |
+| `chaski/client` | The feed, unread count, push and preferences |
+| `chaski/sw` | Shows web push in your service worker |
+| `chaski/react` | `useFeed`, `useUnreadCount`, `usePush` and `usePreferences` |
+
+None of them imports server code, so they bundle into any frontend.
+
+## Mount the user routes
+
+`identify` says who is signed in, from your app’s own session. Chaski reads the contact from it
+only, never from what the browser sends, so a page can only ever see its own user’s data.
+
+```ts title="src/index.ts"
+app.route(
+  '/me/notifications',
+  chaski.userRoutes({
+    // The signed-in user's id; null answers 401, and a Response is returned as is.
+    identify: (c) => currentUserId(c),
+  }),
+);
+```
+
+If your frontend is served from another origin, list it in `allowedOrigins`: Chaski refuses writes
+and live connections from origins it doesn’t know.
+
+## The client
+
+```ts
+import { createChaskiClient } from 'chaski/client';
+
+const client = createChaskiClient({ baseUrl: '/me/notifications' });
+
+const { items, nextCursor } = await client.feed.list({ limit: 20 });
+const { unread } = await client.feed.unreadCount();
+await client.feed.markRead({ ids: [items[0].id] });
+
+const stop = client.feed.subscribe(() => {
+  // a new notification arrived: list the feed again
+});
+```
+
+`subscribe()` opens a WebSocket for the first listener and closes it when the last one leaves. When
+the socket drops, the client reconnects with backoff, and after five failed attempts it checks for
+new items once a minute instead. `onStatusChange()` reports which of those it’s doing.
+
+A frontend on another origin passes its own `fetch` with `credentials: 'include'`, so its session
+cookie goes along:
+
+```ts
+const client = createChaskiClient({
+  baseUrl: 'https://acme.dev/me/notifications',
+  fetch: (input, init) => fetch(input, { ...init, credentials: 'include' }),
+});
+```
+
+A request Chaski refuses throws a `ChaskiRequestError`, with the HTTP `status` and an
+[error code](/docs/errors).
+
+## Web push
+
+`client.push.enable()` asks for permission, subscribes this browser and registers it for the
+signed-in user; `disable()` undoes it, and `state()` tells you where it stands.
+
+```ts
+if (client.push.isSupported()) {
+  await client.push.enable();
+}
+```
+
+Web push needs a service worker. Bundle one that hands pushes to Chaski and serve it at `/sw.js`, or
+pass its path to the client as `push.serviceWorkerPath`:
+
+```ts title="src/sw.ts"
+import { handlePushEvents } from 'chaski/sw';
+
+declare const self: ServiceWorkerGlobalScope;
+
+handlePushEvents(self, { icon: '/icon-192.png' });
+```
+
+It shows each push as a notification. A click focuses an open window and takes it to the push’s
+link, or opens one, and open windows get a message to refresh their feed.
+
+## React
+
+`chaski/react` wraps the client in hooks. Give them a client once, near the root:
+
+```tsx
+import { ChaskiProvider, useFeed, useUnreadCount } from 'chaski/react';
+
+const Bell = () => {
+  const { unread } = useUnreadCount();
+  const { items, markRead, loadMore, hasMore } = useFeed({ limit: 20 });
+  // …
+};
+
+<ChaskiProvider client={client}>
+  <Bell />
+</ChaskiProvider>;
+```
+
+The hooks share what they learn: marking an item read in the list updates the unread count on the
+same page. `usePush()` and `usePreferences()` cover the rest: a push toggle, and a preferences
+screen built from the types each topic groups.
+
+## With a query cache
+
+Apps that already run TanStack Query, SWR or a cache like them can keep Chaski’s data there instead
+of in the hooks. `chaskiQueries(client)` returns `{ queryKey, queryFn }` pairs for the feed, the
+unread count and the preferences; invalidate `CHASKI_QUERY_KEY` when the feed signals.
+
+```ts
+import { CHASKI_QUERY_KEY, chaskiQueries } from 'chaski/client';
+
+const queries = chaskiQueries(client);
+const unread = useQuery(queries.unreadCount());
+client.feed.subscribe(() => queryClient.invalidateQueries({ queryKey: CHASKI_QUERY_KEY }));
+```

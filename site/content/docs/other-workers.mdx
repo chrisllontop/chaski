@@ -1,0 +1,63 @@
+---
+title: From other Workers
+description: Export ChaskiEntrypoint, and any Worker in your account with a service binding gets the same API over RPC.
+---
+
+Chaski runs in the Worker that mounts it. Your other Workers in the same Cloudflare account reach it
+over RPC, through a service binding.
+
+## Export the entrypoint
+
+Export `ChaskiEntrypoint` from the host’s main module, next to the other classes:
+
+```ts title="src/index.ts"
+export { ChaskiEntrypoint, ChaskiEvents, ChaskiFeed, ChaskiScheduler } from 'chaski';
+```
+
+## Bind to it
+
+In the other Worker’s `wrangler.jsonc`, bind to the host by its Worker name:
+
+```jsonc title="wrangler.jsonc"
+{
+  "services": [{ "binding": "CHASKI", "service": "acme", "entrypoint": "ChaskiEntrypoint" }]
+}
+```
+
+Then call it as you would in the host:
+
+```ts title="orders-worker/src/index.ts"
+import type { ChaskiEntrypoint } from 'chaski';
+
+type Env = { CHASKI: Service<ChaskiEntrypoint> };
+
+export const sendPaymentReceived = async (env: Env, user: { id: string; email: string }) => {
+  await env.CHASKI.send({
+    type: 'payment_received',
+    recipient: { id: user.id, email: user.email },
+    payload: { amount: '$15.00' },
+  });
+  return env.CHASKI.feed().unreadCount(user.id);
+};
+```
+
+The other Worker only needs `chaski` for its types; Chaski itself runs in the host.
+
+## Groups are methods
+
+A service binding exposes methods only, so over RPC the groups are methods: `feed()`, `push()`,
+`preferences()` and `schedules()`. A call like `env.CHASKI.feed().list(query)` still takes a single
+round trip.
+
+| In the host | Over RPC |
+| --- | --- |
+| `chaski.send(request)` | `env.CHASKI.send(request)` |
+| `chaski.schedule(request)` | `env.CHASKI.schedule(request)` |
+| `chaski.schedules.cancel(query)` | `env.CHASKI.schedules().cancel(query)` |
+| `chaski.feed.unreadCount(id)` | `env.CHASKI.feed().unreadCount(id)` |
+| `chaski.preferences.get(id)` | `env.CHASKI.preferences().get(id)` |
+| `chaski.push.register(request)` | `env.CHASKI.push().register(request)` |
+
+Errors arrive with their `name` (`ChaskiError`) and `code`, such as `validation`, when both Workers
+use a compatibility date on or after `2026-04-21`. Check them with `isChaskiError()`, since class
+identity doesn’t survive the trip.

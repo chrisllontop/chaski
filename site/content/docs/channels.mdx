@@ -1,0 +1,93 @@
+---
+title: Channels
+description: Email, in-app and push, web and iOS. A channel is on when the config has an entry for it.
+---
+
+A channel is on when `channels` in the config has an entry for it, and each type’s template turns
+it on for that type. The **Channels** page in the dashboard shows what Chaski picked up from your
+config.
+
+## Email
+
+Email goes out through Cloudflare Email Service, from a domain you onboarded to it, through the
+`send_email` binding you pass as `bindings.email`.
+
+```ts
+channels: {
+  email: {
+    from: 'notifications@acme.dev',
+    fromName: 'Acme',
+    replyTo: 'support@acme.dev',
+  },
+},
+```
+
+`from` must be an address the binding allows. A send can override `fromName` and `replyTo`, and
+attach up to 10 files when `bindings.attachments` holds an R2 bucket. The HTML of every email carries a
+pixel served from your mount, which marks the delivery opened when the message is read; that’s
+why `publicUrl` must be the absolute URL of the dashboard.
+
+A contact without an email address skips the channel with `missing_email`.
+
+## In-app
+
+The in-app channel keeps a feed per contact in the `ChaskiFeed` Durable Object, and pushes each new
+item to their open pages over a WebSocket.
+
+```ts
+channels: {
+  in_app: {},
+},
+```
+
+It has no options yet: `{}` turns it on, with `bindings.feed` set. Your frontend reads the feed
+through `chaski.userRoutes()`, as [Browser clients](/docs/browser-clients) shows; on the server,
+`chaski.feed` lists it, counts the unread items and marks them read.
+
+## Push
+
+Push reaches browsers through web push and Apple devices through APNs. Configure either or both:
+
+```ts
+channels: {
+  push: {
+    vapid: {
+      subject: 'mailto:ops@acme.dev',
+      publicKey: env.VAPID_PUBLIC_KEY,
+      privateKey: env.VAPID_PRIVATE_KEY,
+    },
+    apns: {
+      teamId: '<Apple team id>',
+      keyId: '<APNs key id>',
+      bundleId: 'dev.acme.app',
+      environment: 'production',
+      privateKey: env.APNS_PRIVATE_KEY,
+    },
+  },
+},
+```
+
+- `vapid` takes the key pair web-push tools print: the base64url public key and the private key,
+  or the whole private JWK as JSON. `subject` is a `mailto:` or `https:` contact the push services
+  can reach you at.
+- `apns` takes your team id, the key’s id, your app’s bundle id, `sandbox` or `production`, and the
+  contents of the `.p8` file.
+
+A contact receives push on the devices registered to them. Browsers register with
+`client.push.enable()` from `chaski/client`; your app can register an iOS device token from the
+server:
+
+```ts
+await chaski.push.register({
+  recipient: { id: user.id },
+  platform: 'ios',
+  deviceToken,
+});
+```
+
+A contact without a registered device skips the channel with `no_device_tokens`.
+
+<Callout title="Subscriptions belong to the key they were made with.">
+  Keep your VAPID key pair once browsers subscribe: a subscription made with another public key can
+  never receive this server’s pushes, and the client subscribes again when it sees one.
+</Callout>
