@@ -5,12 +5,12 @@ chaski on a route of its own Worker, the way it would mount Swagger UI or Bull B
 on that project's Cloudflare resources: email, web push and in-app notifications, with templates,
 scheduling, retries and a dashboard. Open source (MIT), published on npm as `chaski`.
 
-**Current stage: the engine, without browser clients or dashboard screens.** `createChaski()` takes
+**Current stage: the engine and the browser clients, without dashboard screens.** `createChaski()` takes
 the host's config; chaski sends email, web push, APNs and in-app notifications through the host's
 queue, with templates, preferences, scheduled sends, retries and realtime events. `chaski.routes()`
 mounts the dashboard shell and the admin API, and `chaski.userRoutes()` the endpoints the host's
-frontend calls for the signed-in user. The browser clients (`chaski/client`, `chaski/sw`,
-`chaski/react`) and the dashboard screens come next.
+frontend calls for the signed-in user, which `chaski/client`, `chaski/sw` and `chaski/react` wrap
+for the page, the service worker and React. The dashboard screens come next.
 
 ## Run it
 
@@ -23,7 +23,7 @@ frontend calls for the signed-in user. The browser clients (`chaski/client`, `ch
   `pnpm wrangler d1 migrations apply CHASKI_DB --local -c test/fixture/wrangler.jsonc`.
 - `pnpm build:dashboard` (Vite) writes `src/generated/dashboard.ts`, which the server code imports.
   It is generated and gitignored; run it once before typechecking or testing on a fresh clone.
-- `pnpm typecheck` (tsc, four projects), `pnpm lint` (Biome), `pnpm format` (Biome with fixes),
+- `pnpm typecheck` (tsc, six projects), `pnpm lint` (Biome), `pnpm format` (Biome with fixes),
   `pnpm test` (Vitest in workerd), `pnpm build` (dashboard, tsdown, then the declarations).
 - `pnpm drizzle-kit generate --name <name>` writes a migration into `migrations/` after a schema
   change; `.cursor/rules/database.mdc` says what else a migration needs.
@@ -47,6 +47,9 @@ frontend calls for the signed-in user. The browser clients (`chaski/client`, `ch
   `dist` and `migrations/*.sql` ship, along with `README.md` and `LICENSE`. Hono is a peer
   dependency; React and the rest of the dashboard stack are dev dependencies, because they ship
   already built inside `dist`.
+- Four entries, one per runtime: `chaski` (the Worker), `chaski/client` (the page), `chaski/sw`
+  (the service worker) and `chaski/react` (hooks over the client). React is an optional peer
+  dependency, and no browser entry may import server code.
 - `src/contract` is what hosts and clients see: the zod schemas and types of the API, the
   in-process API's interface, the errors and the template file format.
 - `src/server` is the engine:
@@ -62,6 +65,8 @@ frontend calls for the signed-in user. The browser clients (`chaski/client`, `ch
     Durable Objects and `workflows/` the `ChaskiScheduler` Workflow. The host re-exports all three
     from its main module.
   - `auth.ts` defines `Actor`, `Authorize` and the `cloudflareAccess()` and `basicAuth()` helpers.
+- `src/client`, `src/sw` and `src/react` are the browser entries; `src/react` builds its elements
+  with `createElement`, so the package ships no JSX.
 - `migrations/` holds the D1 migrations drizzle-kit generates; hosts apply them from
   `node_modules/chaski/migrations`.
 - `src/dashboard` is the dashboard (Vite root). `vite.config.ts` embeds its build into
@@ -85,8 +90,10 @@ with the code they govern.
 - chaski runs inside the host's Worker and only on the bindings the host declares. Do not assume
   binding names or reach for resources the host did not hand over.
 - Each runtime has its own types: `tsconfig.json` (the Worker side of `src`, Workers types),
+  `tsconfig.browser.json` (the browser entries and the contract, DOM types),
   `src/dashboard/tsconfig.json` (DOM and JSX), `test/tsconfig.json` (Workers plus the Vitest
-  plugin) and `tsconfig.node.json` (the config files).
+  plugin), `test/browser/tsconfig.json` (the browser tests) and `tsconfig.node.json` (the config
+  files and scripts).
 - tsdown bundles the JavaScript and TypeScript 7's compiler emits the declarations
   (`pnpm build:types`), so exported Drizzle tables and zod schemas keep their inferred types.
   `scripts/fix-declaration-imports.ts` then gives their relative imports the file extensions that
@@ -97,9 +104,11 @@ with the code they govern.
 - Test logic and observable behavior. Do not assert markup or props.
 - **Never wait with sleeps or arbitrary timeouts.** Use the test runner's own waiting, `vi.waitFor`
   or fake timers.
-- Tests run inside workerd with `@cloudflare/vitest-plugin`, against the fixture host through
-  `exports.default.fetch()`. Assert status, headers and JSON; the only markup a test reads is the
-  injected `<base href>`.
+- Vitest runs two projects. `worker` runs inside workerd with `@cloudflare/vitest-plugin`, against
+  the fixture host through `exports.default.fetch()`: assert status, headers and JSON; the only
+  markup a test reads is the injected `<base href>`. `browser` runs `test/browser` in happy-dom,
+  with a fake network and a fake socket (`test/browser/fakes.ts`) and fake timers for the
+  reconnection logic.
 - `test/setup.ts` applies the migrations, empties the tables and restores the fixture config before
   each test, and stubs the queue producer: tests drain deliveries with `processDeliveries()` from
   `test/helpers.ts`. Only the end-to-end test lets the real queue and consumer run.

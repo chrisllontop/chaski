@@ -1,11 +1,14 @@
-export type ChaskiErrorCode =
-  | 'validation'
-  | 'config'
-  | 'unauthorized'
-  | 'forbidden'
-  | 'not_found'
-  | 'conflict'
-  | 'internal';
+export const CHASKI_ERROR_CODES = [
+  'validation',
+  'config',
+  'unauthorized',
+  'forbidden',
+  'not_found',
+  'conflict',
+  'internal',
+] as const;
+
+export type ChaskiErrorCode = (typeof CHASKI_ERROR_CODES)[number];
 
 export class ChaskiError extends Error {
   readonly code: ChaskiErrorCode;
