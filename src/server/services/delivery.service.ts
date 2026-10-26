@@ -1,4 +1,5 @@
 import { and, eq, sql } from 'drizzle-orm';
+import { isChaskiError, isRetryableChaskiError } from '../../contract/errors';
 import { deliveries } from '../db/schema';
 import { DeliveryError } from '../lib/errors';
 import type { DeliveryMessage } from '../types';
@@ -143,6 +144,14 @@ export class DeliveryService extends BaseService {
   ): { permanent: boolean; code: string; message: string } => {
     if (error instanceof DeliveryError) {
       return { permanent: error.permanent, code: error.errorCode, message: error.message };
+    }
+    // A template Liquid rejects, or a config the host has to fix, fails the same way next time.
+    if (isChaskiError(error)) {
+      return {
+        permanent: !isRetryableChaskiError(error),
+        code: error.code,
+        message: error.message,
+      };
     }
     const message = error instanceof Error ? error.message : String(error);
     return { permanent: false, code: 'unknown', message };
