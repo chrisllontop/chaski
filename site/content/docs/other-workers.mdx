@@ -11,7 +11,7 @@ over RPC, through a service binding.
 Export `ChaskiEntrypoint` from the host’s main module, next to the other classes:
 
 ```ts title="src/index.ts"
-export { ChaskiEntrypoint, ChaskiEvents, ChaskiFeed, ChaskiScheduler } from 'chaski';
+export { ChaskiEntrypoint, ChaskiEvents, ChaskiFeed, ChaskiScheduler } from 'chaskijs';
 ```
 
 ## Bind to it
@@ -27,7 +27,7 @@ In the other Worker’s `wrangler.jsonc`, bind to the host by its Worker name:
 Then call it as you would in the host:
 
 ```ts title="orders-worker/src/index.ts"
-import type { ChaskiEntrypoint } from 'chaski';
+import type { ChaskiEntrypoint } from 'chaskijs';
 
 type Env = { CHASKI: Service<ChaskiEntrypoint> };
 
