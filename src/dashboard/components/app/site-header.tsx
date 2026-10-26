@@ -10,6 +10,7 @@ import {
 } from '~/components/ui/breadcrumb';
 import { Separator } from '~/components/ui/separator';
 import { SidebarTrigger } from '~/components/ui/sidebar';
+import { LiveStatus } from './live-status';
 import { ModeToggle } from './mode-toggle';
 
 type Crumb = { label: string; to?: string };
@@ -28,7 +29,7 @@ export const SiteHeader = ({ current }: { current?: string }) => {
   if (current) trail.push({ label: current });
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
+    <header className="sticky top-0 z-10 flex h-12 shrink-0 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur">
       <SidebarTrigger className="-ml-1" />
       <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
       <Breadcrumb>
@@ -49,7 +50,8 @@ export const SiteHeader = ({ current }: { current?: string }) => {
           ))}
         </BreadcrumbList>
       </Breadcrumb>
-      <div className="ml-auto">
+      <div className="ml-auto flex items-center gap-3">
+        <LiveStatus />
         <ModeToggle />
       </div>
     </header>

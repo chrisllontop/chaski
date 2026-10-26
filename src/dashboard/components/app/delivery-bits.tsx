@@ -1,43 +1,25 @@
-import {
-  Bell,
-  CircleCheck,
-  CircleMinus,
-  CirclePause,
-  CircleX,
-  Loader,
-  Mail,
-  OctagonX,
-  Smartphone,
-  TriangleAlert,
-} from 'lucide-react';
-import { Badge } from '~/components/ui/badge';
+import { Bell, Mail, Smartphone } from 'lucide-react';
 import { CHANNEL_LABELS } from '~/lib/format';
 import type { Channel, DeliveryStatus, Health } from '~/lib/types';
+import { Pill, type Tone } from './pill';
 
-const STATUS: Record<
-  DeliveryStatus,
-  { label: string; icon: typeof CircleCheck; className: string }
-> = {
-  sent: { label: 'Sent', icon: CircleCheck, className: 'text-success' },
-  pending: { label: 'Pending', icon: Loader, className: 'text-muted-foreground' },
-  failed: { label: 'Failed', icon: CircleX, className: 'text-destructive' },
-  dead: { label: 'Dead', icon: CircleX, className: 'text-destructive' },
-  skipped: { label: 'Skipped', icon: CircleMinus, className: 'text-muted-foreground' },
+const STATUS: Record<DeliveryStatus, { label: string; tone: Tone }> = {
+  sent: { label: 'Sent', tone: 'success' },
+  pending: { label: 'Pending', tone: 'info' },
+  failed: { label: 'Failed', tone: 'danger' },
+  dead: { label: 'Dead', tone: 'danger' },
+  skipped: { label: 'Skipped', tone: 'neutral' },
 };
 
 export const STATUS_LABELS = Object.fromEntries(
   Object.entries(STATUS).map(([status, { label }]) => [status, label]),
 ) as Record<DeliveryStatus, string>;
 
-export const StatusBadge = ({ status }: { status: DeliveryStatus }) => {
-  const { label, icon: Icon, className } = STATUS[status];
-  return (
-    <Badge variant="outline" className="gap-1 px-1.5 text-muted-foreground">
-      <Icon className={className} />
-      {label}
-    </Badge>
-  );
-};
+export const StatusBadge = ({ status }: { status: DeliveryStatus }) => (
+  <Pill tone={STATUS[status].tone} pulse={status === 'pending'}>
+    {STATUS[status].label}
+  </Pill>
+);
 
 export const CHANNEL_ICONS: Record<Channel, typeof Mail> = {
   email: Mail,
@@ -55,19 +37,13 @@ export const ChannelLabel = ({ channel }: { channel: Channel }) => {
   );
 };
 
-const HEALTH: Record<Health, { label: string; icon: typeof CircleCheck; className: string }> = {
-  healthy: { label: 'Healthy', icon: CircleCheck, className: 'text-success' },
-  at_risk: { label: 'At risk', icon: TriangleAlert, className: 'text-warning' },
-  blocked: { label: 'Blocked', icon: OctagonX, className: 'text-destructive' },
-  paused: { label: 'Paused', icon: CirclePause, className: 'text-muted-foreground' },
+const HEALTH: Record<Health, { label: string; tone: Tone }> = {
+  healthy: { label: 'Healthy', tone: 'success' },
+  at_risk: { label: 'At risk', tone: 'warning' },
+  blocked: { label: 'Blocked', tone: 'danger' },
+  paused: { label: 'Paused', tone: 'neutral' },
 };
 
-export const HealthBadge = ({ health }: { health: Health }) => {
-  const { label, icon: Icon, className } = HEALTH[health];
-  return (
-    <Badge variant="outline" className="gap-1 px-1.5 text-muted-foreground">
-      <Icon className={className} />
-      {label}
-    </Badge>
-  );
-};
+export const HealthBadge = ({ health }: { health: Health }) => (
+  <Pill tone={HEALTH[health].tone}>{HEALTH[health].label}</Pill>
+);

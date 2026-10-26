@@ -7,14 +7,16 @@ export const PageHeader = ({
   description,
   actions,
 }: {
-  title: string;
+  title: ReactNode;
   description?: ReactNode;
   actions?: ReactNode;
 }) => (
-  <div className="flex flex-wrap items-start justify-between gap-4">
-    <div className="space-y-1">
-      <h1 className="font-semibold text-2xl tracking-tight">{title}</h1>
-      {description ? <p className="text-muted-foreground text-sm">{description}</p> : null}
+  <div className="flex flex-wrap items-end justify-between gap-4">
+    <div className="min-w-0 space-y-1">
+      <h1 className="text-balance font-semibold text-xl tracking-tight">{title}</h1>
+      {description ? (
+        <p className="text-pretty text-muted-foreground text-sm">{description}</p>
+      ) : null}
     </div>
     {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
   </div>
