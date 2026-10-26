@@ -18,9 +18,9 @@ const FEED = [
 ];
 
 const PACKAGES = [
-  { name: 'chaski/client', text: 'The feed, unread count, push and preferences' },
-  { name: 'chaski/sw', text: 'Shows web push in your service worker' },
-  { name: 'chaski/react', text: 'useFeed, useUnreadCount, usePush and usePreferences' },
+  { name: 'chaskijs/client', text: 'The feed, unread count, push and preferences' },
+  { name: 'chaskijs/sw', text: 'Shows web push in your service worker' },
+  { name: 'chaskijs/react', text: 'useFeed, useUnreadCount, usePush and usePreferences' },
 ];
 
 const BellMock = () => (

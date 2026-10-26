@@ -14,7 +14,7 @@ export const wranglerSample = `{
       "database_name": "my-app-chaski",
       "database_id": "<printed by wrangler d1 create>",
       // Chaski's tables come from the package.
-      "migrations_dir": "node_modules/chaski/migrations"
+      "migrations_dir": "node_modules/chaskijs/migrations"
     }
   ],
   "queues": {
@@ -32,7 +32,7 @@ export const wranglerSample = `{
   "send_email": [{ "name": "CHASKI_EMAIL" }]
 }`;
 
-export const indexSample = `import { cloudflareAccess, createChaski } from 'chaski';
+export const indexSample = `import { cloudflareAccess, createChaski } from 'chaskijs';
 
 export const chaski = createChaski((env: Env) => ({
   publicUrl: env.CHASKI_PUBLIC_URL,

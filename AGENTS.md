@@ -3,15 +3,15 @@
 Embeddable notification infrastructure for Cloudflare Workers, dashboard included. A project mounts
 Chaski on a route of its own Worker, and Chaski runs on that project's Cloudflare resources: email,
 web push and in-app notifications, with templates, scheduling, retries and a dashboard. Open source
-(MIT), published on npm as `chaski`.
+(MIT), published on npm as `chaskijs`.
 
 **Current stage: the engine, the browser clients, the dashboard and the setup guide in the README.**
 `createChaski()` takes the host's config; Chaski sends email, web push, APNs and in-app
 notifications through the host's queue, with templates, preferences, scheduled sends, retries and
 realtime events. `chaski.routes()` mounts the dashboard and its admin API, and `chaski.userRoutes()`
-the endpoints the host's frontend calls for the signed-in user, which `chaski/client`, `chaski/sw`
-and `chaski/react` wrap for the page, the service worker and React. `ChaskiEntrypoint` serves the
-same in-process API over RPC to the host's other Workers.
+the endpoints the host's frontend calls for the signed-in user, which `chaskijs/client`,
+`chaskijs/sw` and `chaskijs/react` wrap for the page, the service worker and React.
+`ChaskiEntrypoint` serves the same in-process API over RPC to the host's other Workers.
 
 ## Run it
 
@@ -53,15 +53,15 @@ same in-process API over RPC to the host's other Workers.
 
 ## Layout
 
-- The repository root is the package published to npm as `chaski`; `site/` is the only other
+- The repository root is the package published to npm as `chaskijs`; `site/` is the only other
   workspace member.
   tsdown bundles `src/index.ts` into `dist` and TypeScript emits the declarations next to it; only
   `dist` and `migrations/*.sql` ship, along with `README.md` and `LICENSE`. Hono is a peer
   dependency; React and the rest of the dashboard stack are dev dependencies, because they ship
   already built inside `dist`.
-- Four entries, one per runtime: `chaski` (the Worker), `chaski/client` (the page), `chaski/sw`
-  (the service worker) and `chaski/react` (hooks over the client). React is an optional peer
-  dependency, and no browser entry may import server code.
+- Four entries, one per runtime: `chaskijs` (the Worker), `chaskijs/client` (the page),
+  `chaskijs/sw` (the service worker) and `chaskijs/react` (hooks over the client). React is an
+  optional peer dependency, and no browser entry may import server code.
 - `src/contract` is what hosts and clients see: the zod schemas and types of the API, the
   in-process API's interface, the errors and the template file format.
 - `src/server` is the engine:
@@ -82,7 +82,7 @@ same in-process API over RPC to the host's other Workers.
 - `src/client`, `src/sw` and `src/react` are the browser entries; `src/react` builds its elements
   with `createElement`, so the package ships no JSX.
 - `migrations/` holds the D1 migrations drizzle-kit generates; hosts apply them from
-  `node_modules/chaski/migrations`.
+  `node_modules/chaskijs/migrations`.
 - `src/dashboard` is the dashboard (Vite root), React with TanStack Router and Query, shadcn
   (new-york, neutral) and lucide, dark and light. `vite.config.ts` embeds its build into
   `src/generated/dashboard.ts`, every chunk and the Latin subsets of Geist included.
@@ -128,7 +128,7 @@ with the code they govern.
   `tsconfig.browser.json` (the browser entries and the contract, DOM types),
   `src/dashboard/tsconfig.json` (DOM and JSX), `test/tsconfig.json` (Workers plus the Vitest
   plugin), `test/browser/tsconfig.json` (the browser tests), `test/sw/tsconfig.json` (a real service
-  worker scope against `chaski/sw`, WebWorker types), `site/tsconfig.json` (the site, DOM types),
+  worker scope against `chaskijs/sw`, WebWorker types), `site/tsconfig.json` (the site, DOM types),
   `site/tsconfig.node.json` (its config files and build script) and `tsconfig.node.json` (the config
   files and scripts).
 - tsdown bundles the JavaScript and TypeScript 7's compiler emits the declarations

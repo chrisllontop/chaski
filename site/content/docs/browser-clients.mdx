@@ -1,6 +1,6 @@
 ---
 title: Browser clients
-description: chaski/client, chaski/sw and chaski/react give your frontend the signed-in user’s feed, push and preferences.
+description: chaskijs/client, chaskijs/sw and chaskijs/react give your frontend the signed-in user’s feed, push and preferences.
 ---
 
 Your frontend talks to the routes you mounted with `chaski.userRoutes()`, as the signed-in user.
@@ -8,9 +8,9 @@ Three entries of the package cover the browser:
 
 | Entry | What it gives you |
 | --- | --- |
-| `chaski/client` | The feed, unread count, push and preferences |
-| `chaski/sw` | Shows web push in your service worker |
-| `chaski/react` | `useFeed`, `useUnreadCount`, `usePush` and `usePreferences` |
+| `chaskijs/client` | The feed, unread count, push and preferences |
+| `chaskijs/sw` | Shows web push in your service worker |
+| `chaskijs/react` | `useFeed`, `useUnreadCount`, `usePush` and `usePreferences` |
 
 None of them imports server code, so they bundle into any frontend.
 
@@ -35,7 +35,7 @@ and live connections from origins it doesn’t know.
 ## The client
 
 ```ts
-import { createChaskiClient } from 'chaski/client';
+import { createChaskiClient } from 'chaskijs/client';
 
 const client = createChaskiClient({ baseUrl: '/me/notifications' });
 
@@ -80,7 +80,7 @@ Web push needs a service worker. Bundle one that hands pushes to Chaski and serv
 pass its path to the client as `push.serviceWorkerPath`:
 
 ```ts title="src/sw.ts"
-import { handlePushEvents } from 'chaski/sw';
+import { handlePushEvents } from 'chaskijs/sw';
 
 declare const self: ServiceWorkerGlobalScope;
 
@@ -92,10 +92,10 @@ link, or opens one, and open windows get a message to refresh their feed.
 
 ## React
 
-`chaski/react` wraps the client in hooks. Give them a client once, near the root:
+`chaskijs/react` wraps the client in hooks. Give them a client once, near the root:
 
 ```tsx
-import { ChaskiProvider, useFeed, useUnreadCount } from 'chaski/react';
+import { ChaskiProvider, useFeed, useUnreadCount } from 'chaskijs/react';
 
 const Bell = () => {
   const { unread } = useUnreadCount();
@@ -119,7 +119,7 @@ of in the hooks. `chaskiQueries(client)` returns `{ queryKey, queryFn }` pairs f
 unread count and the preferences; invalidate `CHASKI_QUERY_KEY` when the feed signals.
 
 ```ts
-import { CHASKI_QUERY_KEY, chaskiQueries } from 'chaski/client';
+import { CHASKI_QUERY_KEY, chaskiQueries } from 'chaskijs/client';
 
 const queries = chaskiQueries(client);
 const unread = useQuery(queries.unreadCount());

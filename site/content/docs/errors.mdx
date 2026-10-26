@@ -28,7 +28,7 @@ Detect a Chaski error with `isChaskiError()`, not `instanceof`: the error keeps 
 `code` when it crosses a service binding or a queue, but not its class.
 
 ```ts
-import { isChaskiError } from 'chaski';
+import { isChaskiError } from 'chaskijs';
 
 try {
   await chaski.send(request);
@@ -47,18 +47,18 @@ worth another try, every other code is permanent, and errors that aren’t Chask
 network failure, are assumed to pass.
 
 ```ts
-import { isRetryableChaskiError } from 'chaski';
+import { isRetryableChaskiError } from 'chaskijs';
 
 if (isRetryableChaskiError(error)) message.retry();
 ```
 
 ## In the browser
 
-`chaski/client` throws `ChaskiRequestError`, a `ChaskiError` that also carries the HTTP `status`
+`chaskijs/client` throws `ChaskiRequestError`, a `ChaskiError` that also carries the HTTP `status`
 the route answered with. An answer without a code Chaski knows arrives as `internal`.
 
 ```ts
-import { ChaskiRequestError } from 'chaski/client';
+import { ChaskiRequestError } from 'chaskijs/client';
 
 try {
   await client.preferences.update({ mutedTypes });

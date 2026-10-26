@@ -5,7 +5,7 @@ const repo = 'https://github.com/chrisllontop/chaski';
 export const site = {
   url: 'https://chaski.sh',
   repo,
-  npm: 'https://www.npmjs.com/package/chaski',
+  npm: 'https://www.npmjs.com/package/chaskijs',
   releases: `${repo}/releases`,
   issues: `${repo}/issues`,
   version,

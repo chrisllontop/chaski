@@ -93,7 +93,7 @@ type FeedPage = { items: FeedItem[]; nextCursor: string | null };
 ## User routes
 
 `chaski.userRoutes()` answers these paths, relative to where you mount it, for the user `identify`
-returns. `chaski/client` calls them for you.
+returns. `chaskijs/client` calls them for you.
 
 | Method and path | |
 | --- | --- |
@@ -117,6 +117,6 @@ Writes and socket upgrades from an origin other than the request’s own, `publi
 | Entry | Runs in | |
 | --- | --- | --- |
 | `chaski` | Your Worker | `createChaski`, the auth helpers, the Durable Objects, the Workflow, `ChaskiEntrypoint`, the errors and every type. |
-| `chaski/client` | The browser | `createChaskiClient`, `chaskiQueries`, `ChaskiRequestError`. |
-| `chaski/sw` | Your service worker | `handlePushEvents`. |
-| `chaski/react` | The browser, with React 18 or 19 | `ChaskiProvider` and the hooks. |
+| `chaskijs/client` | The browser | `createChaskiClient`, `chaskiQueries`, `ChaskiRequestError`. |
+| `chaskijs/sw` | Your service worker | `handlePushEvents`. |
+| `chaskijs/react` | The browser, with React 18 or 19 | `ChaskiProvider` and the hooks. |

@@ -28,9 +28,9 @@ state and the next useful action obvious.
 ## Product language
 
 - The product is **Chaski**, capitalized, in prose, UI copy, error messages and alt text. Lowercase
-  `chaski` is code: the npm package and its entries, imports, the `chaski` variable in examples,
-  bindings, log tags and protocol values such as `chaski.delivery`. The logo's wordmark is drawn
-  in lowercase.
+  `chaski` is code: the `chaski` variable in examples, bindings, log tags and protocol values such
+  as `chaski.delivery`. The npm package is `chaskijs`, so installs and imports read `chaskijs`,
+  `chaskijs/client`, `chaskijs/sw` and `chaskijs/react`. The logo's wordmark is drawn in lowercase.
 - Use the same term for the same concept across navigation, headings, actions, and messages.
 - Use **notification** for what an app sends to a contact, **delivery** for one notification going
   out through one channel, **channel** for email, push, and in-app, and **template** for the

@@ -2,7 +2,7 @@ import { Link } from '@tanstack/react-router';
 import { CopyStatus, useCopy } from './copy';
 import { ArrowRightIcon, CheckIcon, CopyIcon } from './icons';
 
-const INSTALL = 'npm install chaski';
+const INSTALL = 'npm install chaskijs';
 
 export const DocsButton = () => (
   <Link

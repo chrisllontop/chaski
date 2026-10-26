@@ -18,7 +18,7 @@ fixed.
 ## Add the package [step]
 
 ```npm
-npm install chaski hono
+npm install chaskijs hono
 ```
 
 ## Create the resources [step]
@@ -57,7 +57,7 @@ In `wrangler.jsonc`:
       "database_name": "my-app-chaski",
       "database_id": "<id printed by wrangler d1 create>",
       // Chaski's tables come from the package.
-      "migrations_dir": "node_modules/chaski/migrations"
+      "migrations_dir": "node_modules/chaskijs/migrations"
     }
   ],
   "queues": {
@@ -125,11 +125,11 @@ import {
   type DeliveryMessage,
   type ScheduleParams,
   type SendEmailBinding,
-} from 'chaski';
+} from 'chaskijs';
 import { currentUserId } from './session'; // your app’s own sign-in
 
 // The bindings find Chaski's classes through the main module's exports.
-export { ChaskiEvents, ChaskiFeed, ChaskiScheduler } from 'chaski';
+export { ChaskiEvents, ChaskiFeed, ChaskiScheduler } from 'chaskijs';
 
 type Env = {
   CHASKI_PUBLIC_URL: string;

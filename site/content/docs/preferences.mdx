@@ -29,7 +29,7 @@ Your frontend reads and changes the signed-in user’s preferences through the r
 with `chaski.userRoutes()`. With React:
 
 ```tsx title="src/settings/notifications.tsx"
-import { usePreferences } from 'chaski/react';
+import { usePreferences } from 'chaskijs/react';
 
 export const NotificationSettings = () => {
   const { preferences, topics, update } = usePreferences();
@@ -51,7 +51,7 @@ export const NotificationSettings = () => {
 ```
 
 `topics` lists your notification types grouped by the topic their template sets, so the screen can
-offer what your app actually sends. Without React, `client.preferences` from `chaski/client` has
+offer what your app actually sends. Without React, `client.preferences` from `chaskijs/client` has
 the same `get()`, `update()` and `topics()`.
 
 <Callout title="An update merges channels and overwrites muted types.">
