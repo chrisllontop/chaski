@@ -1,7 +1,7 @@
 import { Link } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
 import { site } from '~/lib/site';
-import { BookIcon, DashboardIcon, GitHubIcon, PackageIcon } from '../icons';
+import { BookIcon, GitHubIcon, PackageIcon } from '../icons';
 import { Logo } from '../logo';
 
 const linkClass =
@@ -24,12 +24,6 @@ export const SiteHeader = () => (
               <BookIcon />
               <NavLabel>Docs</NavLabel>
             </Link>
-          </li>
-          <li>
-            <a href="#dashboard" className={linkClass}>
-              <DashboardIcon />
-              <NavLabel>Dashboard</NavLabel>
-            </a>
           </li>
           <li>
             <a href={site.repo} className={linkClass}>
