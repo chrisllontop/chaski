@@ -21,9 +21,15 @@ export const PageHeader = ({
 );
 
 /** What a failed request says to the person using the dashboard. */
-export const ErrorAlert = ({ error }: { error: unknown }) => (
+export const ErrorAlert = ({
+  error,
+  title = 'We couldn’t load this.',
+}: {
+  error: unknown;
+  title?: string;
+}) => (
   <Alert variant="destructive">
-    <AlertTitle>We couldn’t load this.</AlertTitle>
+    <AlertTitle>{title}</AlertTitle>
     <AlertDescription>
       {error instanceof ApiError ? error.message : 'Check your connection and try again.'}
     </AlertDescription>

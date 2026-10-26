@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from '@tanstack/react-router';
 import { Send } from 'lucide-react';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { CodeEditor } from '~/components/app/code-editor';
 import { ErrorAlert, PageHeader } from '~/components/app/page';
 import { SiteHeader } from '~/components/app/site-header';
 import { Badge } from '~/components/ui/badge';
@@ -22,6 +23,7 @@ import { Switch } from '~/components/ui/switch';
 import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs';
 import { Textarea } from '~/components/ui/textarea';
 import { ApiError, api } from '~/lib/api';
+import { useDebounced } from '~/lib/debounce';
 import { CHANNEL_LABELS } from '~/lib/format';
 import type { Channel, RenderedPreview, TemplateChannelContent, TemplateDetail } from '~/lib/types';
 
@@ -57,15 +59,6 @@ const parseSample = (text: string): Record<string, unknown> | null => {
   } catch {
     return null;
   }
-};
-
-const useDebounced = <T,>(value: T, delayMs = 400) => {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), delayMs);
-    return () => clearTimeout(timer);
-  }, [value, delayMs]);
-  return debounced;
 };
 
 // ─── Previews ───
@@ -240,7 +233,7 @@ export const TemplateEditorPage = () => {
   }, [detail.data, drafts]);
 
   const draft = drafts?.[channel] ?? EMPTY_DRAFT;
-  const sample = parseSample(sampleText ?? '{}');
+  const sample = useMemo(() => parseSample(sampleText ?? '{}'), [sampleText]);
   const stored = toDraft(detail.data?.channels.find((row) => row.channel === channel));
   const dirty = JSON.stringify(draft) !== JSON.stringify(stored);
   const sampleDirty = sampleText !== (detail.data?.template.sampleData ?? '{}');
@@ -359,13 +352,29 @@ export const TemplateEditorPage = () => {
                       />
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="field-body">{labels.body}</Label>
-                      <Textarea
-                        id="field-body"
-                        value={draft.body}
-                        onChange={(event) => update({ body: event.target.value })}
-                        className={channel === 'email' ? 'min-h-56 font-mono text-xs' : 'min-h-24'}
-                      />
+                      <Label
+                        id="field-body-label"
+                        htmlFor={channel === 'email' ? undefined : 'field-body'}
+                      >
+                        {labels.body}
+                      </Label>
+                      {channel === 'email' ? (
+                        <CodeEditor
+                          value={draft.body}
+                          onChange={(body) => update({ body })}
+                          language="html"
+                          sample={sample}
+                          labelledBy="field-body-label"
+                          className="[&_.cm-scroller]:max-h-[32rem] [&_.cm-scroller]:min-h-56"
+                        />
+                      ) : (
+                        <Textarea
+                          id="field-body"
+                          value={draft.body}
+                          onChange={(event) => update({ body: event.target.value })}
+                          className="min-h-24"
+                        />
+                      )}
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="field-text">{labels.textBody}</Label>
@@ -402,18 +411,20 @@ export const TemplateEditorPage = () => {
                 </Card>
                 <Card>
                   <CardHeader>
-                    <CardTitle>Sample data</CardTitle>
+                    <CardTitle id="sample-data-title">Sample data</CardTitle>
                     <CardDescription>
                       What the preview renders with. Sends fill{' '}
                       <code className="font-mono">recipient</code> from the contact.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="grid gap-3">
-                    <Textarea
+                    <CodeEditor
                       value={sampleText ?? ''}
-                      onChange={(event) => setSampleText(event.target.value)}
-                      className="min-h-32 font-mono text-xs"
-                      aria-invalid={sample === null}
+                      onChange={setSampleText}
+                      language="json"
+                      labelledBy="sample-data-title"
+                      invalid={sample === null}
+                      className="[&_.cm-scroller]:min-h-32"
                     />
                     {sample === null ? (
                       <p className="text-destructive text-sm">
@@ -456,7 +467,7 @@ export const TemplateEditorPage = () => {
                           <span className="font-medium">{preview.data.subject}</span>
                         </div>
                       ) : null}
-                      {preview.error ? <ErrorAlert error={preview.error} /> : null}
+                      {/* The frame shows what Liquid rejects in the subject or body. */}
                       <EmailPreview templateId={templateId} draft={draft} sample={sample} />
                     </>
                   ) : !draft.body ? (
@@ -464,7 +475,7 @@ export const TemplateEditorPage = () => {
                       Write a message to see the preview.
                     </p>
                   ) : preview.error ? (
-                    <ErrorAlert error={preview.error} />
+                    <ErrorAlert error={preview.error} title="We couldn’t render this preview." />
                   ) : preview.data ? (
                     channel === 'in_app' ? (
                       <FeedPreview rendered={preview.data} />
