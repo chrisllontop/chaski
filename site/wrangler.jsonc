@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "chaski-site",
+  "compatibility_date": "2026-10-15",
+  // No main module: every page is prerendered at build time and served as a static asset. The Vite
+  // plugin writes the deploy config next to the build output, so `wrangler deploy` uploads dist/client.
+  "assets": {
+    "not_found_handling": "404-page"
+  },
+  "routes": [{ "pattern": "chaski.sh", "custom_domain": true }],
+  "workers_dev": false
+}

@@ -1,0 +1,101 @@
+---
+title: Sending
+description: One call records a notification and fans it out to every channel its template turns on, through your queue.
+---
+
+## Send a notification
+
+Every notification has a type, and each type needs a [template](/docs/templates) before you send
+it. Then send from anywhere in your Worker:
+
+```ts title="src/billing.ts"
+const result = await chaski.send({
+  type: 'payment_received',
+  recipient: { id: user.id, email: user.email, name: user.name },
+  payload: { amount: '$15.00' },
+  // Optional: a retried request with the same key sends only once.
+  idempotencyKey: `payment:${payment.id}`,
+});
+```
+
+Chaski delivers through every channel the template has turned on, except the ones the contact
+muted. Each delivery goes through the queue, and the dashboard shows it as it moves.
+
+| Field | What it does |
+| --- | --- |
+| `type` | The notification type, which picks the template. Letters, digits, `_`, `.` and `-`. |
+| `recipient` | Who gets it: `id` is required; `email`, `name`, `phone`, `timezone` and `locale` are optional. |
+| `payload` | The values the template renders with. |
+| `channels` | Narrows the send to some of the template’s channels, such as `['email']`. |
+| `transactional` | Sends regardless of the contact’s preferences, for receipts and password resets. |
+| `email` | Per-send email options: `fromName`, `replyTo` and up to 10 `attachments`. |
+| `idempotencyKey` | Makes the send safe to repeat: the same key returns the first send’s result. |
+
+The recipient’s fields are saved with the notification, so a retry later delivers to the address
+the send named even if the contact changes in between.
+
+## What a send returns
+
+```ts
+type SendResult = {
+  notificationId: string;
+  // true when idempotencyKey matched an earlier send, which is returned instead.
+  replayed: boolean;
+  outcome: 'delivered' | 'suppressed' | 'undeliverable';
+  deliveries: Array<{
+    id?: string;
+    channel: 'email' | 'in_app' | 'push';
+    status: 'pending' | 'sent' | 'skipped';
+    reason?: string;
+  }>;
+};
+```
+
+`delivered` means at least one channel took the notification. `suppressed` means the contact’s
+own preferences skipped every channel, and `undeliverable` means the config or the contact’s data
+did, such as an email delivery for a recipient without an address.
+
+A channel is skipped, with its reason, when it isn’t configured (`channel_not_configured`), the
+contact muted it (`muted_by_preferences`), the recipient has no address or device for it
+(`missing_email`, `no_device_tokens`) or the template has no content for it (`no_template`).
+
+## Attachments
+
+Email attachments carry either base64 `content` or a `url` Chaski fetches. Chaski stores them in
+the R2 bucket you bind as `attachments` when the send is made, so retries read the same file.
+
+```ts
+await chaski.send({
+  type: 'invoice_issued',
+  recipient: { id: user.id, email: user.email },
+  payload: { invoice: 'INV-1042' },
+  email: {
+    attachments: [
+      { filename: 'INV-1042.pdf', contentType: 'application/pdf', url: invoice.pdfUrl },
+    ],
+  },
+});
+```
+
+## How a delivery moves
+
+A delivery starts `pending` on your queue, and the channels skipped at send time are recorded as
+`skipped` with their reason. Your consumer hands each batch to `chaski.queue()`, which renders the
+template and calls the provider: the delivery is `sent` when the provider accepts it. Opening an
+email marks it opened, through a pixel served from your mount.
+
+## Retries and replay [#retries]
+
+A failure that might pass, such as a provider answering 503, goes back on the queue with
+exponential backoff: a minute, then two, then four, up to an hour between attempts, plus up to 30%
+of jitter. A permanent failure, such as a template Liquid can’t render or a misconfigured channel,
+stops at once as `failed`.
+
+A delivery that runs out of attempts is marked `dead`, and the queue moves it to the dead-letter
+queue. **Deliveries** in the dashboard shows each one with its last error. Replay a failed or dead
+delivery once the cause is fixed, or replay every dead one at once.
+
+<Callout title="Keep the two retry counts in step.">
+  `maxRetries` in Chaski’s config must match `max_retries` on your queue consumer. Chaski’s defaults
+  to 5, so set the consumer’s to 5 too, or set both.
+</Callout>

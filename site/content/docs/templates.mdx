@@ -1,0 +1,70 @@
+---
+title: Templates
+description: Each notification type has a template with content for each channel, written in Liquid and edited in the dashboard.
+---
+
+## Create a template
+
+A template belongs to one notification type, such as `payment_received`, and holds the content for
+each channel that type uses. Create it in the dashboard under **Templates**, then write and turn on
+each channel it should go out on. Sending a type without a template fails with a `validation` error
+that names the type.
+
+Each channel has three fields:
+
+| Channel | Fields |
+| --- | --- |
+| Email | Subject, HTML body and an optional text body |
+| In-app | Title, message and an optional link the item opens |
+| Push | Title, message and an optional link the notification opens |
+
+A template can also carry a description, and a topic that groups it with others on your
+[preferences](/docs/preferences) screen.
+
+## Write the content
+
+Templates are [Liquid](https://liquidjs.com). They see the payload you send, plus `recipient`:
+
+```liquid
+Thanks, {{ recipient.name }}. We received your payment of {{ amount }}.
+```
+
+`recipient` holds the fields the send gave it: `id`, and `email`, `name`, `phone`, `timezone` and
+`locale` when present. A key the payload lacks renders empty instead of failing the delivery.
+
+A template Liquid can’t parse is the author’s to fix: the dashboard names the field when you save
+it, and a delivery that hits one fails at once instead of retrying.
+
+## Preview and test
+
+The editor previews each channel as you type, rendered with sample data you keep with the
+template. For email, **Send test** delivers the saved content, rendered with the sample data, to the
+address you enter.
+
+## Move templates between environments
+
+**Export** downloads every template as a JSON file, and **Import** applies one, staging to
+production say. Templates are keyed by type, so importing the same file twice changes nothing, and
+the import shows what it creates and updates before it applies anything. Channels the file leaves
+out are never touched.
+
+```json title="chaski-templates.json"
+{
+  "format": "chaski.templates",
+  "version": 1,
+  "templates": [
+    {
+      "type": "payment_received",
+      "topic": "Billing",
+      "channels": [
+        {
+          "channel": "email",
+          "enabled": true,
+          "subject": "Payment of {{ amount }} received",
+          "body": "<p>Thanks, {{ recipient.name }}.</p>"
+        }
+      ]
+    }
+  ]
+}
+```

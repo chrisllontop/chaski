@@ -1,0 +1,16 @@
+# The base policy, for the 404 page and every file that isn't a page. scripts/headers.ts writes
+# the policy in, and appends a rule per prerendered page that swaps in one allowing that page's
+# own inline scripts by hash.
+/*
+  Content-Security-Policy: {{POLICY}}
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Cross-Origin-Opener-Policy: same-origin
+
+# The favicon switches its stroke with an inline <style>, which the policy above would block.
+/favicon.svg
+  ! Content-Security-Policy
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

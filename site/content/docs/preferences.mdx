@@ -1,0 +1,81 @@
+---
+title: Preferences
+description: Contacts turn channels off and mute notification types. Chaski checks their choices before every send.
+---
+
+## What a contact can choose
+
+A contact’s preferences have two parts:
+
+- **Channels**: `email`, `in_app` and `push`, each on or off. A channel the contact never set
+  stays on.
+- **Muted types**: notification types the contact doesn’t want. An entry ending in `*` mutes every
+  type that starts with it, and a `channel:` prefix limits it to one channel: `push:reminder.*`
+  mutes reminders on push only.
+
+```ts
+type ChaskiPreferences = {
+  channels: { email?: boolean; in_app?: boolean; push?: boolean };
+  mutedTypes: string[];
+};
+```
+
+Every send checks them, channel by channel. A send with `transactional: true` skips the check, for
+receipts, password resets and other notifications the contact must get.
+
+## Build a settings screen
+
+Your frontend reads and changes the signed-in user’s preferences through the routes you mounted
+with `chaski.userRoutes()`. With React:
+
+```tsx title="src/settings/notifications.tsx"
+import { usePreferences } from 'chaski/react';
+
+export const NotificationSettings = () => {
+  const { preferences, topics, update } = usePreferences();
+  if (!preferences) return null;
+  return (
+    <>
+      <label>
+        <input
+          type="checkbox"
+          checked={preferences.channels.email !== false}
+          onChange={(event) => update({ channels: { email: event.target.checked } })}
+        />
+        Email
+      </label>
+      {/* One section per topic, with a switch for each of its types. */}
+    </>
+  );
+};
+```
+
+`topics` lists your notification types grouped by the topic their template sets, so the screen can
+offer what your app actually sends. Without React, `client.preferences` from `chaski/client` has
+the same `get()`, `update()` and `topics()`.
+
+<Callout title="An update merges channels and overwrites muted types.">
+  Channel entries merge key by key, so `{ channels: { email: false } }` leaves the others alone.
+  `mutedTypes`, when given, overwrites the whole list: send the full set each time.
+</Callout>
+
+## Mute types for everyone
+
+`defaultMutedTypes` in the config lists types every contact has muted until they save preferences
+of their own, such as a weekly digest people opt into.
+
+```ts
+export const chaski = createChaski((env: Env) => ({
+  // …
+  defaultMutedTypes: ['weekly_digest'],
+}));
+```
+
+## On the server
+
+`chaski.preferences` reads and writes any contact’s preferences from your Worker, by recipient id:
+
+```ts
+await chaski.preferences.set(user.id, { mutedTypes: ['marketing.*'] });
+const { channels, mutedTypes } = await chaski.preferences.get(user.id);
+```

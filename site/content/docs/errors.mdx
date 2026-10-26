@@ -1,0 +1,70 @@
+---
+title: Errors
+description: Every error Chaski throws is a ChaskiError with a code, and the same codes answer from its routes.
+---
+
+## ChaskiError
+
+Chaski throws `ChaskiError`, with a `code` from a short, fixed list and a message that says what to
+change. Its routes answer with the same code, as JSON:
+
+```json
+{ "error": "validation", "message": "scheduledAt is in the past" }
+```
+
+| Code | HTTP status | When |
+| --- | --- | --- |
+| `validation` | 400 | The request or a template is wrong: a missing field, an unknown type, Liquid that won’t parse. |
+| `config` | 500 | The host’s setup is: a missing binding, an invalid option, migrations not applied. |
+| `unauthorized` | 401 | No one is signed in. |
+| `forbidden` | 403 | The signed-in user may not do this, or the request came from an origin Chaski doesn’t know. |
+| `not_found` | 404 | The template, delivery or endpoint doesn’t exist. |
+| `conflict` | 409 | It already exists, or another request holds it. |
+| `internal` | 500 | Something failed along the way that a retry may fix. |
+
+## Check for one
+
+Detect a Chaski error with `isChaskiError()`, not `instanceof`: the error keeps its `name` and
+`code` when it crosses a service binding or a queue, but not its class.
+
+```ts
+import { isChaskiError } from 'chaski';
+
+try {
+  await chaski.send(request);
+} catch (error) {
+  if (isChaskiError(error) && error.code === 'validation') {
+    // the request needs fixing; trying again won't help
+  }
+  throw error;
+}
+```
+
+## Retries
+
+`isRetryableChaskiError()` is the rule Chaski’s own queue consumer follows: `internal` errors are
+worth another try, every other code is permanent, and errors that aren’t Chaski’s, such as a
+network failure, are assumed to pass.
+
+```ts
+import { isRetryableChaskiError } from 'chaski';
+
+if (isRetryableChaskiError(error)) message.retry();
+```
+
+## In the browser
+
+`chaski/client` throws `ChaskiRequestError`, a `ChaskiError` that also carries the HTTP `status`
+the route answered with. An answer without a code Chaski knows arrives as `internal`.
+
+```ts
+import { ChaskiRequestError } from 'chaski/client';
+
+try {
+  await client.preferences.update({ mutedTypes });
+} catch (error) {
+  if (error instanceof ChaskiRequestError && error.status === 401) {
+    // the session ended: send the user to sign in
+  }
+}
+```

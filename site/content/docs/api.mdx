@@ -1,0 +1,122 @@
+---
+title: API
+description: The in-process API your Worker calls, the routes Chaski mounts and the user routes your frontend calls.
+---
+
+## The chaski object
+
+`createChaski()` returns the in-process API: your Worker calls it directly, with no HTTP in between.
+[ChaskiEntrypoint](/docs/other-workers) serves the same calls to your other Workers.
+
+| Call | Returns | |
+| --- | --- | --- |
+| `send(request)` | `SendResult` | Sends now; see [Sending](/docs/sending). |
+| `schedule(request)` | `ScheduleResult` | Sends at `scheduledAt`; see [Scheduling](/docs/scheduling). |
+| `schedules.list({ recipientId? })` | `ScheduledItem[]` | Pending schedules, soonest first. |
+| `schedules.cancel(query)` | `{ cancelled }` | Cancels by `id`, `idempotencyKey` or `groupKey`. |
+| `feed.list(query)` | `FeedPage` | A recipient’s feed, newest first, a page at a time. |
+| `feed.unreadCount(recipientId)` | `{ unread }` | |
+| `feed.markRead(input)` | `{ marked }` | Marks `ids`, everything `before` an instant, or the whole feed. |
+| `preferences.get(recipientId)` | `ChaskiPreferences` | |
+| `preferences.set(recipientId, update)` | `ChaskiPreferences` | Merges channels; `mutedTypes` overwrites the list. |
+| `preferences.topics()` | `{ topic, types }[]` | Template types grouped by topic. |
+| `push.register(request)` | `{ id }` | Registers a web push subscription or an iOS device token. |
+| `push.unregister(query)` | `{ unregistered }` | By `recipientId`, `endpoint` or `deviceToken`. |
+| `push.vapidPublicKey()` | `{ publicKey }` | The key for `pushManager.subscribe()`, or `null`. |
+
+It also mounts and consumes:
+
+| Call | |
+| --- | --- |
+| `routes(options)` | The dashboard, its API and the open-tracking pixel, as a Hono app to mount. |
+| `userRoutes(options)` | The signed-in user’s feed, devices and preferences, as a Hono app to mount. |
+| `queue(batch, env, ctx)` | Handles a batch from Chaski’s queue and returns `true`; leaves any other batch untouched and returns `false`. |
+
+## Requests
+
+```ts
+type SendRequest = {
+  type: string;
+  recipient: Recipient;
+  payload?: Record<string, unknown>;
+  channels?: Array<'email' | 'in_app' | 'push'>;
+  transactional?: boolean;
+  email?: { fromName?: string; replyTo?: string; attachments?: AttachmentInput[] };
+  idempotencyKey?: string;
+};
+
+type ScheduleRequest = SendRequest & {
+  // ISO 8601 with an explicit offset: Z or ±hh:mm.
+  scheduledAt: string;
+  groupKey?: string;
+};
+
+type Recipient = {
+  id: string;
+  email?: string;
+  name?: string;
+  phone?: string;
+  timezone?: string;
+  locale?: string;
+};
+
+type AttachmentInput = {
+  filename: string;
+  contentType: string;
+  // Exactly one of content (base64) or url.
+  content?: string;
+  url?: string;
+  disposition?: 'attachment' | 'inline';
+  contentId?: string;
+};
+```
+
+## Feed items
+
+```ts
+type FeedItem = {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  href?: string;
+  readAt: string | null;
+  createdAt: string;
+};
+
+type FeedPage = { items: FeedItem[]; nextCursor: string | null };
+```
+
+`feed.list()` takes a `recipientId`, and optionally a `cursor` from the last page, a `limit` up to
+100 and `unreadOnly`.
+
+## User routes
+
+`chaski.userRoutes()` answers these paths, relative to where you mount it, for the user `identify`
+returns. `chaski/client` calls them for you.
+
+| Method and path | |
+| --- | --- |
+| `GET /feed` | The feed; `cursor`, `limit` and `unreadOnly` as query parameters. |
+| `GET /feed/unread-count` | `{ unread }` |
+| `POST /feed/read` | Marks items read: `{ ids?, before? }`, or `{}` for the whole feed. |
+| `GET /feed/socket` | A WebSocket that announces new items. |
+| `GET /preferences` | The user’s preferences. |
+| `PATCH /preferences` | Updates them. |
+| `GET /preferences/topics` | Template types grouped by topic. |
+| `GET /push/vapid-public-key` | `{ publicKey }` |
+| `POST /push/subscriptions` | Registers this browser’s subscription, or an iOS device token. |
+| `DELETE /push/subscriptions` | Drops one, by `endpoint` or `deviceToken`. |
+
+Writes and socket upgrades from an origin other than the request’s own, `publicUrl`’s or one in
+`allowedOrigins` answer 403. Errors answer as `{ error, message }`, with the codes in
+[Errors](/docs/errors).
+
+## Package entries
+
+| Entry | Runs in | |
+| --- | --- | --- |
+| `chaski` | Your Worker | `createChaski`, the auth helpers, the Durable Objects, the Workflow, `ChaskiEntrypoint`, the errors and every type. |
+| `chaski/client` | The browser | `createChaskiClient`, `chaskiQueries`, `ChaskiRequestError`. |
+| `chaski/sw` | Your service worker | `handlePushEvents`. |
+| `chaski/react` | The browser, with React 18 or 19 | `ChaskiProvider` and the hooks. |

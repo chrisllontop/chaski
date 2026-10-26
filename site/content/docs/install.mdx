@@ -1,0 +1,243 @@
+---
+title: Install
+description: Add Chaski to a Worker you already have. It takes a database, a queue and a few lines in your main module.
+---
+
+## Requirements
+
+- A Worker built with [Hono](https://hono.dev) 4.8 or later. Chaski’s routes are Hono apps you mount
+  on yours.
+- For email, the Workers Paid plan and a domain onboarded to
+  [Email Service](https://developers.cloudflare.com/email-service/get-started/send-emails/).
+- For web push, a VAPID key pair. For iOS, an APNs key from your Apple developer account.
+
+Chaski runs only on the bindings you declare. This guide declares all of them, and step 3 says which
+ones you can leave out. Resource and binding names are yours to choose; only the class names are
+fixed.
+
+## Add the package [step]
+
+```npm
+npm install chaski hono
+```
+
+## Create the resources [step]
+
+Names are yours to choose. The rest of the guide uses these.
+
+```bash
+npx wrangler d1 create my-app-chaski
+npx wrangler queues create my-app-deliveries
+npx wrangler queues create my-app-deliveries-dlq
+npx wrangler r2 bucket create my-app-attachments  # only for attachments
+```
+
+<Callout title="Only the database and the queue are required.">
+  Add the rest when you turn on the feature that uses it. The Durable Objects and the Workflow are
+  created when you deploy.
+</Callout>
+
+## Declare the bindings [step]
+
+In `wrangler.jsonc`:
+
+```jsonc title="wrangler.jsonc"
+{
+  "name": "my-app",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-15",
+  "vars": {
+    // The absolute URL where you mount the dashboard (step 5).
+    "CHASKI_PUBLIC_URL": "https://app.example.com/admin/notifications",
+    "VAPID_PUBLIC_KEY": "<public key from step 6>"
+  },
+  "d1_databases": [
+    {
+      "binding": "CHASKI_DB",
+      "database_name": "my-app-chaski",
+      "database_id": "<id printed by wrangler d1 create>",
+      // Chaski's tables come from the package.
+      "migrations_dir": "node_modules/chaski/migrations"
+    }
+  ],
+  "queues": {
+    "producers": [{ "binding": "CHASKI_QUEUE", "queue": "my-app-deliveries" }],
+    "consumers": [
+      {
+        "queue": "my-app-deliveries",
+        "max_batch_size": 10,
+        "max_batch_timeout": 1,
+        // Must match Chaski's maxRetries, which defaults to 5.
+        "max_retries": 5,
+        "dead_letter_queue": "my-app-deliveries-dlq"
+      }
+    ]
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "CHASKI_FEED", "class_name": "ChaskiFeed" },
+      { "name": "CHASKI_EVENTS", "class_name": "ChaskiEvents" }
+    ]
+  },
+  "migrations": [{ "tag": "chaski-v1", "new_sqlite_classes": ["ChaskiFeed", "ChaskiEvents"] }],
+  "workflows": [
+    { "name": "my-app-scheduler", "binding": "CHASKI_SCHEDULER", "class_name": "ChaskiScheduler" }
+  ],
+  "r2_buckets": [{ "binding": "CHASKI_ATTACHMENTS", "bucket_name": "my-app-attachments" }],
+  "send_email": [{ "name": "CHASKI_EMAIL" }]
+}
+```
+
+If your Worker already has Durable Object migrations, add Chaski’s after them with a tag of its own.
+Give Chaski a database of its own, since a D1 binding takes its migrations from a single folder.
+
+Only `db` and `queue` are required. Leave out what you don’t use, both here and in Chaski’s config
+(step 5):
+
+| `bindings` key | Needed for |
+| --- | --- |
+| `feed` (ChaskiFeed) | The in-app channel |
+| `events` (ChaskiEvents) | Live updates in the dashboard |
+| `scheduler` (ChaskiScheduler) | `chaski.schedule()` |
+| `email` (`send_email`) | The email channel |
+| `attachments` (R2) | Email attachments |
+
+## Create the tables [step]
+
+```bash
+npx wrangler d1 migrations apply CHASKI_DB --remote
+```
+
+Run it again after every Chaski upgrade. Chaski checks that every migration it ships has been
+applied, and refuses to run until they are, naming the missing ones.
+
+## Mount Chaski [step]
+
+In your main module:
+
+```ts title="src/index.ts"
+import { Hono } from 'hono';
+import {
+  type ChaskiEvents,
+  type ChaskiFeed,
+  cloudflareAccess,
+  createChaski,
+  type DeliveryMessage,
+  type ScheduleParams,
+  type SendEmailBinding,
+} from 'chaski';
+import { currentUserId } from './session'; // your app’s own sign-in
+
+// The bindings find Chaski's classes through the main module's exports.
+export { ChaskiEvents, ChaskiFeed, ChaskiScheduler } from 'chaski';
+
+type Env = {
+  CHASKI_PUBLIC_URL: string;
+  VAPID_PUBLIC_KEY: string;
+  VAPID_PRIVATE_KEY: string;
+  CHASKI_DB: D1Database;
+  CHASKI_QUEUE: Queue<DeliveryMessage>;
+  CHASKI_FEED: DurableObjectNamespace<ChaskiFeed>;
+  CHASKI_EVENTS: DurableObjectNamespace<ChaskiEvents>;
+  CHASKI_SCHEDULER: Workflow<ScheduleParams>;
+  CHASKI_EMAIL: SendEmailBinding;
+  CHASKI_ATTACHMENTS: R2Bucket;
+};
+
+// Chaski reads this on every call, so secrets and vars come from the env of the moment.
+export const chaski = createChaski((env: Env) => ({
+  publicUrl: env.CHASKI_PUBLIC_URL,
+  bindings: {
+    db: env.CHASKI_DB,
+    queue: env.CHASKI_QUEUE,
+    feed: env.CHASKI_FEED,
+    events: env.CHASKI_EVENTS,
+    scheduler: env.CHASKI_SCHEDULER,
+    email: env.CHASKI_EMAIL,
+    attachments: env.CHASKI_ATTACHMENTS,
+  },
+  // A channel is on when it has an entry here.
+  channels: {
+    email: { from: 'notifications@example.com', fromName: 'My App' },
+    in_app: {},
+    push: {
+      vapid: {
+        subject: 'mailto:ops@example.com',
+        publicKey: env.VAPID_PUBLIC_KEY,
+        privateKey: env.VAPID_PRIVATE_KEY,
+      },
+    },
+  },
+}));
+
+const app = new Hono<{ Bindings: Env }>()
+  // The dashboard and its API, for your team.
+  .route(
+    '/admin/notifications',
+    chaski.routes({
+      dashboard: {
+        authorize: cloudflareAccess({
+          teamDomain: 'example.cloudflareaccess.com',
+          audience: '<Access application AUD tag>',
+        }),
+      },
+    }),
+  )
+  // Feed, devices and preferences of the signed-in user, for your frontend.
+  .route(
+    '/me/notifications',
+    chaski.userRoutes({
+      // The signed-in user's id, or null to answer 401.
+      identify: (c) => currentUserId(c),
+    }),
+  );
+
+export default {
+  fetch: app.fetch,
+  queue: async (batch, env, ctx) => {
+    // chaski.queue() returns false for a batch from any other queue.
+    if (await chaski.queue(batch, env, ctx)) return;
+    // batches from your other queues
+  },
+} satisfies ExportedHandler<Env>;
+```
+
+`publicUrl` must be the absolute URL of the dashboard’s mount: Chaski builds the email open-tracking
+link from it, and accepts writes from its origin. [Dashboard and sign-in](/docs/dashboard) covers
+`authorize`, and [Browser clients](/docs/browser-clients) covers `identify`.
+
+## Add the push keys [step]
+
+For web push, generate a VAPID key pair and keep the private key as a secret:
+
+```bash
+npx web-push generate-vapid-keys
+npx wrangler secret put VAPID_PRIVATE_KEY
+```
+
+The public key goes in `VAPID_PUBLIC_KEY` (step 3). For iOS, add `apns` next to `vapid`:
+
+```ts
+push: {
+  apns: {
+    teamId: '<Apple team id>',
+    keyId: '<APNs key id>',
+    bundleId: 'com.example.app',
+    environment: 'production', // 'sandbox' for development builds
+    privateKey: env.APNS_PRIVATE_KEY, // the contents of the .p8 file
+  },
+},
+```
+
+```bash
+npx wrangler secret put APNS_PRIVATE_KEY < AuthKey_XXXXXXXXXX.p8
+```
+
+## Deploy [step]
+
+```bash
+npx wrangler deploy
+```
+
+Then open `https://app.example.com/admin/notifications`. The **Channels** page shows what Chaski picked up
+from your config, and [Templates](/docs/templates) is where your first notification type begins.
