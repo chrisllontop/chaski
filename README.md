@@ -17,9 +17,8 @@ release.
 
 ## What it does
 
-Chaski lives inside your Worker. You mount it on a route, the way you’d mount Swagger UI or Bull
-Board, and it runs on your own Cloudflare resources. It deploys with your Worker, and your data stays
-in your account.
+Chaski lives inside your Worker. You mount it on a route of your app, and it runs on your own
+Cloudflare resources. It deploys with your Worker, and your data stays in your account.
 
 - **Email, push, and in-app.** Email through Cloudflare Email Service, web push, push to iOS through
   APNs, and an in-app feed that updates live.
@@ -452,14 +451,10 @@ Before you open a pull request:
 [`AGENTS.md`](AGENTS.md) maps the code, and [`.cursor/rules`](.cursor/rules) holds the conventions
 for code, copy, the API and the database.
 
-## The name
+## Logo
 
-The chaskis were the relay messengers of the Inca Empire. They ran the Qhapaq Ñan, the Inca road
-network, each one covering a short stretch before handing the message to the next runner. That’s how
-news crossed the Andes in days.
-
-The logo is that handoff: a single stroke runs along one lane, steps across and carries on in the
-next. [`brand/`](brand) holds the mark and the full logo, in black and in white.
+The mark is a handoff: a single stroke runs along one lane, steps across and carries on in the next.
+[`brand/`](brand) holds the mark and the full logo, in black and in white.
 
 ## License
 

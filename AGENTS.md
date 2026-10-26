@@ -1,9 +1,9 @@
 # Chaski
 
 Embeddable notification infrastructure for Cloudflare Workers, dashboard included. A project mounts
-Chaski on a route of its own Worker, the way it would mount Swagger UI or Bull Board, and Chaski runs
-on that project's Cloudflare resources: email, web push and in-app notifications, with templates,
-scheduling, retries and a dashboard. Open source (MIT), published on npm as `chaski`.
+Chaski on a route of its own Worker, and Chaski runs on that project's Cloudflare resources: email,
+web push and in-app notifications, with templates, scheduling, retries and a dashboard. Open source
+(MIT), published on npm as `chaski`.
 
 **Current stage: the engine, the browser clients, the dashboard and the setup guide in the README.**
 `createChaski()` takes the host's config; Chaski sends email, web push, APNs and in-app
