@@ -2,7 +2,7 @@ import { env } from 'cloudflare:workers';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getClient } from '../src/server/db';
 import { NotificationService } from '../src/server/services/notification.service';
-import { processDeliveries, recipient, seedTemplate, stubEmail, useConfig } from './helpers';
+import { api, processDeliveries, recipient, seedTemplate, stubEmail, useConfig } from './helpers';
 
 const findEmailDelivery = (notificationId: string) =>
   getClient().deliveries.findFirst({ where: { notificationId, channel: 'email' } });
@@ -58,6 +58,49 @@ describe('email channel', () => {
     expect(sent[0]?.html).toContain(
       `<img src="https://app.example.com/notifications/t/o/${delivery?.id}"`,
     );
+  });
+
+  describe('HTML body', () => {
+    const NAME = 'Ana <a href="https://evil.test">Reset your password</a> & co';
+    const ESCAPED =
+      'Ana &lt;a href=&#34;https://evil.test&#34;&gt;Reset your password&lt;/a&gt; &amp; co';
+    const BODY = '<p>{{ recipient.name }}|{{ recipient.name | escape }}</p>{{ summary | raw }}';
+
+    const seedHtmlTemplate = async () => {
+      await seedTemplate('payment_received', 'email');
+      await getClient().templateChannels.updateMany({
+        where: { channel: 'email' },
+        data: { subject: 'Hi {{ recipient.name }}', body: BODY, textBody: '{{ recipient.name }}' },
+      });
+    };
+
+    it('escapes every value unless the template marks it raw', async () => {
+      await seedHtmlTemplate();
+      const sent = stubEmail();
+
+      await sendPayment({
+        recipient: { ...recipient(), name: NAME },
+        payload: { summary: '<ul><li>1500</li></ul>' },
+      });
+
+      // `| escape` isn't escaped twice, and only the HTML body is escaped.
+      expect(sent[0]?.html).toContain(`<p>${ESCAPED}|${ESCAPED}</p><ul><li>1500</li></ul>`);
+      expect(sent[0]).toMatchObject({ subject: `Hi ${NAME}`, text: NAME });
+    });
+
+    it('previews the body as it goes out', async () => {
+      await seedHtmlTemplate();
+
+      const response = await api('/templates/tpl_payment_received/preview', {
+        method: 'POST',
+        body: JSON.stringify({ channel: 'email', data: { recipient: { name: NAME } } }),
+      });
+
+      expect(await response.json()).toMatchObject({
+        subject: `Hi ${NAME}`,
+        html: `<p>${ESCAPED}|${ESCAPED}</p>`,
+      });
+    });
   });
 
   it('applies per-send sender overrides', async () => {

@@ -1,7 +1,7 @@
 import { injectOpenPixel, openPixelUrl } from '../../lib/email-open';
 import { DeliveryError } from '../../lib/errors';
 import { parseJson } from '../../lib/json';
-import { renderTemplate } from '../../lib/render';
+import { renderHtml, renderTemplate } from '../../lib/render';
 import type { EmailAttachment } from '../../types';
 import type { StoredAttachment } from '../attachment.service';
 import { AttachmentService } from '../attachment.service';
@@ -46,7 +46,7 @@ export class EmailAdapter extends BaseService {
 
     const [subject, renderedHtml, text] = await Promise.all([
       renderTemplate(content.subject ?? '', data),
-      renderTemplate(content.body, data),
+      renderHtml(content.body, data),
       content.textBody ? renderTemplate(content.textBody, data) : Promise.resolve(undefined),
     ]);
 

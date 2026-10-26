@@ -11,7 +11,7 @@ import { publishAdminEvents } from '../lib/admin-events';
 import { DeliveryError } from '../lib/errors';
 import { newId } from '../lib/ids';
 import { parseJson } from '../lib/json';
-import { assertTemplates, renderTemplate } from '../lib/render';
+import { assertTemplates, renderHtml, renderTemplate } from '../lib/render';
 import { BaseService } from './base.service';
 import { EmailSenderService } from './email-sender.service';
 
@@ -423,7 +423,7 @@ export class TemplateService extends BaseService {
     const sample = data ?? parseJson<Record<string, unknown>>(template.sampleData, {});
     const [subject, html, text] = await Promise.all([
       renderTemplate(row.subject ?? '', sample),
-      renderTemplate(row.body, sample),
+      (channel === 'email' ? renderHtml : renderTemplate)(row.body, sample),
       row.textBody ? renderTemplate(row.textBody, sample) : Promise.resolve(undefined),
     ]);
     return { subject, html, text };
