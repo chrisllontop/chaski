@@ -5,12 +5,13 @@ Chaski on a route of its own Worker, the way it would mount Swagger UI or Bull B
 on that project's Cloudflare resources: email, web push and in-app notifications, with templates,
 scheduling, retries and a dashboard. Open source (MIT), published on npm as `chaski`.
 
-**Current stage: the engine, the browser clients and the dashboard; a setup guide comes next.** `createChaski()` takes
-the host's config; Chaski sends email, web push, APNs and in-app notifications through the host's
-queue, with templates, preferences, scheduled sends, retries and realtime events. `chaski.routes()`
-mounts the dashboard and its admin API, and `chaski.userRoutes()` the endpoints the host's
-frontend calls for the signed-in user, which `chaski/client`, `chaski/sw` and `chaski/react` wrap
-for the page, the service worker and React.
+**Current stage: the engine, the browser clients, the dashboard and the setup guide in the README.**
+`createChaski()` takes the host's config; Chaski sends email, web push, APNs and in-app
+notifications through the host's queue, with templates, preferences, scheduled sends, retries and
+realtime events. `chaski.routes()` mounts the dashboard and its admin API, and `chaski.userRoutes()`
+the endpoints the host's frontend calls for the signed-in user, which `chaski/client`, `chaski/sw`
+and `chaski/react` wrap for the page, the service worker and React. `ChaskiEntrypoint` serves the
+same in-process API over RPC to the host's other Workers.
 
 ## Run it
 
@@ -55,8 +56,10 @@ for the page, the service worker and React.
 - `src/contract` is what hosts and clients see: the zod schemas and types of the API, the
   in-process API's interface, the errors and the template file format.
 - `src/server` is the engine:
-  - `chaski.ts` (`createChaski()` and the in-process API) and `config.ts` (the host's config,
-    validated on every call).
+  - `chaski.ts` (`createChaski()`), `api.ts` (the in-process API), `entrypoint.ts`
+    (`ChaskiEntrypoint`, that API over RPC) and `config.ts` (the host's config, validated on every
+    call). A service binding sees methods, never getters, so over RPC the groups are methods:
+    `feed()`, `push()`, `preferences()`, `schedules()`.
   - `routes/` holds the Hono sub-apps: the dashboard shell and assets, the admin API under `/api`,
     the open-tracking pixel and the user routes.
   - `services/` holds the business logic (`.cursor/rules/services.mdc`), with one adapter per
@@ -65,7 +68,7 @@ for the page, the service worker and React.
     until the host applied every migration.
   - `consumer.ts` handles the queue batches, `durable/` holds the `ChaskiFeed` and `ChaskiEvents`
     Durable Objects and `workflows/` the `ChaskiScheduler` Workflow. The host re-exports all three
-    from its main module.
+    from its main module, plus `ChaskiEntrypoint` when its other Workers call Chaski.
   - `auth.ts` defines `Actor`, `Authorize` and the `cloudflareAccess()` and `basicAuth()` helpers.
 - `src/client`, `src/sw` and `src/react` are the browser entries; `src/react` builds its elements
   with `createElement`, so the package ships no JSX.

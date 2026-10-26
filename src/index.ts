@@ -61,6 +61,7 @@ export type {
 } from './server/config';
 export { ChaskiEvents } from './server/durable/events';
 export { ChaskiFeed } from './server/durable/feed';
+export { ChaskiEntrypoint } from './server/entrypoint';
 export type { RoutesOptions } from './server/routes';
 export type { Identify, UserRoutesOptions } from './server/routes/user';
 export type {

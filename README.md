@@ -326,6 +326,44 @@ await chaski.schedules.cancel({ idempotencyKey: 'invoice-due:INV-1042' });
 The same object answers for a contact’s feed (`chaski.feed`), devices (`chaski.push`) and
 preferences (`chaski.preferences`) on the server.
 
+## Call Chaski from your other Workers
+
+Chaski runs in the Worker that mounts it. Your other Workers in the same Cloudflare account reach it
+over RPC, through a service binding. Export the entrypoint from the host’s main module, next to the
+other classes:
+
+```ts
+export { ChaskiEntrypoint, ChaskiEvents, ChaskiFeed, ChaskiScheduler } from 'chaski';
+```
+
+Then bind to it from the other Worker’s `wrangler.jsonc`, with the host’s Worker name as `service`:
+
+```jsonc
+{
+  "services": [{ "binding": "CHASKI", "service": "my-app", "entrypoint": "ChaskiEntrypoint" }]
+}
+```
+
+```ts
+import type { ChaskiEntrypoint } from 'chaski';
+
+type Env = { CHASKI: Service<ChaskiEntrypoint> };
+
+export const sendPaymentReceived = async (env: Env, user: { id: string; email: string }) => {
+  await env.CHASKI.send({
+    type: 'payment_received',
+    recipient: { id: user.id, email: user.email },
+    payload: { amount: '$15.00' },
+  });
+  return env.CHASKI.feed().unreadCount(user.id);
+};
+```
+
+A service binding exposes methods only, so over RPC the groups are methods: `feed()`, `push()`,
+`preferences()` and `schedules()`. A call like `env.CHASKI.feed().list(query)` still takes a single
+round trip. Errors arrive with their `name` (`ChaskiError`) and `code`, such as `validation`, when
+both Workers use a compatibility date on or after `2026-04-21`.
+
 ## In the browser
 
 `chaski/client` talks to the routes you mounted with `chaski.userRoutes()`:

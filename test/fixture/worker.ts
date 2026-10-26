@@ -40,8 +40,9 @@ export const fixtureConfig = (env: FixtureEnv): ChaskiConfig => ({
   dryRun: env.CHASKI_DRY_RUN === 'true',
 });
 
-// The host's main module re-exports Chaski's classes so its bindings can find them.
-export { ChaskiEvents, ChaskiFeed, ChaskiScheduler } from '../../src';
+// The host's main module re-exports Chaski's classes so its bindings, and the
+// service bindings of its other Workers, can find them.
+export { ChaskiEntrypoint, ChaskiEvents, ChaskiFeed, ChaskiScheduler } from '../../src';
 
 export const chaski = createChaski(fixtureConfig);
 
