@@ -29,8 +29,26 @@ app.route(
 );
 ```
 
-If your frontend is served from another origin, list it in `allowedOrigins`: Chaski refuses writes
-and live connections from origins it doesn’t know.
+If your frontend is served from another origin, it needs two things from these routes. List the
+origin in `allowedOrigins`, so Chaski accepts its writes and live connections; it refuses them from
+origins it doesn’t know. Then answer CORS for it with `hono/cors`, so the browser lets the page read
+the responses and send JSON writes:
+
+```ts title="src/index.ts"
+import { cors } from 'hono/cors';
+
+const frontend = ['https://www.example.com'];
+
+app.use('/me/notifications/*', cors({ origin: frontend, credentials: true }));
+app.route(
+  '/me/notifications',
+  chaski.userRoutes({ identify: (c) => currentUserId(c), allowedOrigins: frontend }),
+);
+```
+
+Register `cors()` before the routes: it answers the browser’s preflight on its own, and a preflight
+carries no session cookie for `identify` to read. The live connection is a WebSocket, which CORS
+doesn’t cover, so `allowedOrigins` alone admits it.
 
 ## The client
 
