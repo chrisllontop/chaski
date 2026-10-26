@@ -8,7 +8,7 @@ import { decodeBase64Url, encodeBase64Url } from './lib/base64';
 import type { DeliveryMessage, ScheduleParams, SendEmailBinding } from './types';
 
 export type ChaskiBindings = {
-  /** The D1 database chaski keeps its data in. */
+  /** The D1 database Chaski keeps its data in. */
   db: D1Database;
   /** The delivery queue; the host's consumer passes its batches to chaski.queue(). */
   queue: Queue<DeliveryMessage>;
@@ -74,7 +74,7 @@ export type ErrorContext = {
 };
 
 export type ChaskiConfig = {
-  /** Absolute URL where the host mounts chaski, e.g. `https://app.example.com/chaski`. */
+  /** Absolute URL where the host mounts Chaski, e.g. `https://app.example.com/chaski`. */
   publicUrl: string;
   bindings: ChaskiBindings;
   /** A channel is active when it has a config entry. */
@@ -91,7 +91,7 @@ export type ChaskiConfig = {
   maxRetries?: number;
   /** Must match `migrations_table` on the host's D1 binding; defaults to `d1_migrations`. */
   migrationsTable?: string;
-  /** Receives every unexpected error chaski handles on its own. */
+  /** Receives every unexpected error Chaski handles on its own. */
   onError?: (error: unknown, context: ErrorContext) => void;
 };
 
@@ -112,7 +112,7 @@ export type ResolvedConfig = {
 };
 
 const fail = (message: string): never => {
-  throw new ChaskiError('config', `chaski config: ${message}`);
+  throw new ChaskiError('config', `Chaski config: ${message}`);
 };
 
 // Subscriptions are bound to the public key they were made with, so hosts bring
@@ -170,7 +170,7 @@ export const validateConfig = (config: ChaskiConfig): ResolvedConfig => {
     // Reported below with the rest of the publicUrl rule.
   }
   if (!publicUrl || !/^https?:$/.test(publicUrl.protocol)) {
-    fail('publicUrl must be the absolute http(s) URL where chaski is mounted');
+    fail('publicUrl must be the absolute http(s) URL where Chaski is mounted');
   }
 
   const bindings = config.bindings ?? fail('bindings is required');
@@ -234,7 +234,7 @@ export const resolveConfig = (): ResolvedConfig => {
   if (!configure) {
     throw new ChaskiError(
       'config',
-      "chaski is not configured: call createChaski() in your Worker's main module",
+      "Chaski is not configured: call createChaski() in your Worker's main module",
     );
   }
   return validateConfig(configure(env as never));

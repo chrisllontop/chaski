@@ -66,7 +66,7 @@ describe('chaski.queue', () => {
     expect(result).toMatchObject({ explicitAcks: [], retryMessages: [], ackAll: false });
   });
 
-  it('leaves a batch that mixes chaski and foreign messages untouched', async () => {
+  it('leaves a batch that mixes Chaski and foreign messages untouched', async () => {
     const { handled, result } = await consume([
       { attempts: 1, body: MESSAGE },
       { attempts: 1, body: 'foreign' },

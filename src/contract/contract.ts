@@ -186,7 +186,7 @@ export const feedSocketEventSchema = z.object({
 });
 export type FeedSocketEvent = z.infer<typeof feedSocketEventSchema>;
 
-/** What a web push carries; chaski's service worker shows it as a notification. */
+/** What a web push carries; Chaski's service worker shows it as a notification. */
 export type PushPayload = {
   title: string;
   body: string;

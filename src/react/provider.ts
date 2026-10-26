@@ -20,7 +20,7 @@ export const ChaskiProvider = ({
 
 export const useChaskiContext = (): ChaskiContextValue => {
   const value = useContext(ChaskiContext);
-  if (!value) throw new Error('chaski hooks need a <ChaskiProvider> above them');
+  if (!value) throw new Error('Chaski hooks need a <ChaskiProvider> above them');
   return value;
 };
 

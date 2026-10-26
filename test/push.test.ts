@@ -370,7 +370,7 @@ describe('push config', () => {
 
   it('names the missing APNs field', () => {
     expect(withPush({ apns: { ...apns, teamId: '' } })).toThrowError(
-      'chaski config: channels.push.apns.teamId is required',
+      'Chaski config: channels.push.apns.teamId is required',
     );
   });
 });

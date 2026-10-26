@@ -41,7 +41,7 @@ export interface ChaskiFeedApi {
   markRead(input: MarkFeedReadInput): Promise<{ marked: number }>;
 }
 
-/** chaski's in-process API: the host's Worker calls it directly, with no HTTP in between. */
+/** Chaski's in-process API: the host's Worker calls it directly, with no HTTP in between. */
 export interface ChaskiApi {
   send(request: SendRequest): Promise<SendResult>;
   /** Sends later, at scheduledAt; needs the ChaskiScheduler Workflow binding. */

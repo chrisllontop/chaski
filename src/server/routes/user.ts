@@ -15,7 +15,7 @@ import { PushSubscriptionService } from '../services/push-subscription.service';
 import { handleError, requireReady, sameOrigin } from './http';
 
 /**
- * Says who is signed in: the recipient id chaski keys their feed, devices and
+ * Says who is signed in: the recipient id Chaski keys their feed, devices and
  * preferences by. null answers 401, and a Response is returned as is.
  */
 export type Identify<E extends Env = Env> = (

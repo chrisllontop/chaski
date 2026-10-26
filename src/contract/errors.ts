@@ -28,7 +28,7 @@ export const isChaskiError = (e: unknown): e is ChaskiError =>
   e.name === 'ChaskiError' &&
   typeof (e as { code?: unknown }).code === 'string';
 
-/** Retry policy for queue consumers: chaski codes other than `internal` are
+/** Retry policy for queue consumers: Chaski codes other than `internal` are
  * permanent (caller bug or config error; retrying cannot fix them).
  * Other errors (network, runtime) are assumed transient. */
 export const isRetryableChaskiError = (e: unknown): boolean =>

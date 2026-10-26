@@ -128,7 +128,7 @@ describe('usePreferences', () => {
 describe('ChaskiProvider', () => {
   it('is required above the hooks', () => {
     expect(() => renderHook(() => useFeed())).toThrowError(
-      'chaski hooks need a <ChaskiProvider> above them',
+      'Chaski hooks need a <ChaskiProvider> above them',
     );
   });
 });

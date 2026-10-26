@@ -57,6 +57,16 @@ describe('dashboard assets', () => {
     expect(response.headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
   });
 
+  it('serves the favicon the shell links to', async () => {
+    const favicon = Object.keys(assets).find((path) => /favicon-[\w-]+\.svg$/.test(path));
+    expect(favicon).toBeDefined();
+
+    const response = await get(`/chaski/${favicon}`);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toBe('image/svg+xml; charset=utf-8');
+  });
+
   it('answers 404 for a missing asset instead of falling back to the shell', async () => {
     const response = await get('/chaski/assets/missing-0000.js');
 

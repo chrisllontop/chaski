@@ -6,7 +6,7 @@ description: Database design and normalization rules for new features
 
 When a feature adds or changes tables in `src/server/db/schema/`, keep the data normalized by default. Denormalize only deliberately, and document why in a short schema comment.
 
-chaski is single-instance: one host, one database. Tables carry no tenant or project column.
+Chaski is single-instance: one host, one database. Tables carry no tenant or project column.
 
 ### Defaults for new tables
 
