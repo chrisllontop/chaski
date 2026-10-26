@@ -75,11 +75,14 @@
     "build:dashboard": "vite build",
     "build:types": "tsc -p tsconfig.json --noEmit false --declaration --emitDeclarationOnly --outDir dist --rootDir src && tsc -p tsconfig.browser.json --noEmit false --declaration --emitDeclarationOnly --outDir dist --rootDir src && node scripts/fix-declaration-imports.ts dist",
     "build": "pnpm build:dashboard && tsdown && pnpm build:types",
-    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.browser.json && tsc -p src/dashboard/tsconfig.json && tsc -p test/tsconfig.json && tsc -p test/browser/tsconfig.json && tsc -p test/sw/tsconfig.json && tsc -p tsconfig.node.json",
+    "dev:site": "pnpm --filter chaski-site dev",
+    "build:site": "pnpm --filter chaski-site build",
+    "deploy:site": "pnpm build:site && pnpm --filter chaski-site run deploy",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.browser.json && tsc -p src/dashboard/tsconfig.json && tsc -p test/tsconfig.json && tsc -p test/browser/tsconfig.json && tsc -p test/sw/tsconfig.json && tsc -p site/tsconfig.json && tsc -p site/tsconfig.node.json && tsc -p tsconfig.node.json",
     "lint": "biome check .",
     "format": "biome check --write .",
     "test": "vitest run",
-    "check": "pnpm build:dashboard && pnpm typecheck && pnpm lint && pnpm test"
+    "check": "pnpm build:dashboard && pnpm typecheck && pnpm lint && pnpm test && pnpm build:site"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.2",

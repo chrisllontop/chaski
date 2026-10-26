@@ -1,0 +1,583 @@
+@import "tailwindcss";
+
+/* Geist and Geist Mono, Latin subset only: the site is in English. */
+@font-face {
+  font-family: "Geist Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("../node_modules/@fontsource-variable/geist/files/geist-latin-wght-normal.woff2")
+    format("woff2-variations");
+}
+
+@font-face {
+  font-family: "Geist Mono Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("../node_modules/@fontsource-variable/geist-mono/files/geist-mono-latin-wght-normal.woff2")
+    format("woff2-variations");
+}
+
+/* The dashboard's dark palette, plus the one accent the site adds: the amber of the relay line. */
+@theme {
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, monospace;
+
+  --color-background: #080808;
+  --color-foreground: #f5f5f5;
+  --color-card: #0e0e0e;
+  --color-raised: #111111;
+  --color-popover: #121212;
+  --color-sidebar-accent: #161616;
+  --color-muted: #181818;
+  --color-accent: #1d1d1d;
+  --color-muted-foreground: #929292;
+  --color-faint: #636363;
+  --color-prose: #c9c9c9;
+  --color-callout: #bdbdbd;
+  --color-border: rgb(255 255 255 / 8%);
+  --color-primary: #e8e8e8;
+  --color-primary-foreground: #121212;
+  --color-success: #4bc680;
+  --color-info: #589aed;
+  --color-warning: #f0b135;
+  --color-destructive: #f75c61;
+  --color-signal: #f4a340;
+  --color-signal-ink: #1a1205;
+
+  --color-code-keyword: #8a8a8a;
+  --color-code-string: #e6c7a0;
+  --color-code-comment: #6b6b6b;
+
+  --ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@utility wrap {
+  width: 100%;
+  max-width: calc(1200px + 2 * 24px);
+  margin-inline: auto;
+  padding-inline: 24px;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+    background-color: var(--color-background);
+    scroll-padding-top: 88px;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    color: var(--color-foreground);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background-color: color-mix(in oklab, var(--color-signal) 35%, transparent);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-signal);
+    outline-offset: 3px;
+    border-radius: 6px;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
+  }
+}
+
+@layer components {
+  .kicker {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 16px;
+    color: var(--color-signal);
+  }
+
+  .h2 {
+    font-size: 34px;
+    line-height: 38px;
+    font-weight: 600;
+    letter-spacing: -0.035em;
+    text-wrap: balance;
+    @variant sm {
+      font-size: 44px;
+      line-height: 48px;
+    }
+  }
+
+  .lede {
+    font-size: 17px;
+    line-height: 28px;
+    color: var(--color-muted-foreground);
+    text-wrap: pretty;
+  }
+
+  .cell-title {
+    font-size: 20px;
+    line-height: 28px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+
+  .cell-text {
+    font-size: 15px;
+    line-height: 24px;
+    color: var(--color-muted-foreground);
+    text-wrap: pretty;
+  }
+
+  .code {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 22px;
+    white-space: pre;
+    tab-size: 2;
+  }
+
+  .tk-keyword {
+    color: var(--color-code-keyword);
+  }
+
+  .tk-string {
+    color: var(--color-code-string);
+  }
+
+  .tk-comment {
+    color: var(--color-code-comment);
+  }
+
+  .tk-signal {
+    color: var(--color-signal);
+  }
+}
+
+/*
+  Motion. Every state below is a starting frame that only applies with motion allowed, so reduced
+  motion, and a page without JavaScript, show the final frame.
+*/
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+
+@keyframes shot-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.985);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+}
+
+@keyframes drop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+}
+
+@keyframes pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.25);
+  }
+}
+
+@keyframes vanish {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes grow-down {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+@keyframes fill-down {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes ring {
+  from {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(2.8);
+  }
+}
+
+@layer components {
+  .draw-path {
+    stroke-dasharray: 1;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .hero-in {
+      animation: rise-in 800ms var(--ease-soft) both;
+    }
+
+    .shot-in {
+      animation: shot-in 900ms var(--ease-soft) 350ms both;
+    }
+
+    .relay-line {
+      animation: draw 900ms cubic-bezier(0.65, 0, 0.35, 1) 700ms both;
+    }
+
+    .relay-branch {
+      animation: draw 160ms ease-in-out both;
+    }
+
+    .relay-row {
+      animation: slide-in 450ms var(--ease-soft) both;
+    }
+
+    .pulse-ring::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background-color: currentColor;
+      animation: ring 1.8s linear infinite;
+    }
+
+    .code-in {
+      animation: fade-in 350ms var(--ease-soft) both;
+    }
+
+    [data-reveal="hidden"] {
+      opacity: 0;
+      transform: translateY(18px);
+    }
+
+    [data-reveal="shown"] {
+      transition:
+        opacity 800ms var(--ease-soft) var(--reveal-delay, 0ms),
+        transform 800ms var(--ease-soft) var(--reveal-delay, 0ms);
+    }
+
+    [data-play="armed"] .play-line {
+      transform: scaleY(0);
+    }
+
+    [data-play="armed"] .play-item,
+    [data-play="armed"] .play-drop {
+      opacity: 0;
+    }
+
+    [data-play="on"] .play-line {
+      animation: grow-down 900ms cubic-bezier(0.65, 0, 0.35, 1) both;
+    }
+
+    [data-play="on"] .play-item {
+      animation: pop-in 420ms var(--ease-soft) both;
+    }
+
+    [data-play="on"] .play-drop {
+      animation: drop-in 450ms var(--ease-soft) both;
+    }
+
+    [data-play="armed"] .badge-prev,
+    [data-play="on"] .badge-prev {
+      opacity: 1;
+    }
+
+    [data-play="armed"] .badge-next {
+      opacity: 0;
+    }
+
+    [data-play="on"] .badge-next {
+      animation: pop-in 450ms var(--ease-soft) 500ms both;
+    }
+
+    [data-play="on"] .badge-prev {
+      animation: vanish 0s linear 500ms forwards;
+    }
+
+    .step-fill {
+      animation: fill-down 6s linear both;
+    }
+
+    /* Hover or focus pauses the steps; so does scrolling the section out of view. */
+    .steps-auto:hover .step-fill,
+    .steps-auto:focus-within .step-fill,
+    .steps-auto:not([data-in-view]) .step-fill {
+      animation-play-state: paused;
+    }
+  }
+
+  .badge-prev {
+    opacity: 0;
+  }
+}
+
+/* The docs' article body, written in MDX. Headings, lists and inline code come straight from
+   Markdown, so they're styled here rather than as components. */
+@layer components {
+  .docs-prose {
+    font-size: 16px;
+    line-height: 28px;
+    color: var(--color-prose);
+
+    & > :first-child {
+      margin-top: 40px;
+      @variant lg {
+        margin-top: 32px;
+      }
+    }
+
+    & h2 {
+      margin-top: 40px;
+      margin-bottom: 14px;
+      scroll-margin-top: 112px;
+      font-size: 21px;
+      line-height: 28px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--color-foreground);
+      text-wrap: balance;
+      @variant lg {
+        margin-top: 48px;
+        margin-bottom: 16px;
+        scroll-margin-top: 88px;
+        font-size: 24px;
+        line-height: 32px;
+      }
+    }
+
+    & h3 {
+      margin-top: 32px;
+      margin-bottom: 10px;
+      scroll-margin-top: 112px;
+      font-size: 18px;
+      line-height: 26px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: var(--color-foreground);
+      @variant lg {
+        scroll-margin-top: 88px;
+      }
+    }
+
+    & p {
+      margin-block: 14px;
+      text-wrap: pretty;
+    }
+
+    & ul {
+      margin-block: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    & ul > li {
+      position: relative;
+      padding-left: 19px;
+    }
+
+    & ul > li::before {
+      content: "";
+      position: absolute;
+      top: 12px;
+      left: 0;
+      width: 5px;
+      height: 5px;
+      border-radius: 999px;
+      background-color: var(--color-faint);
+    }
+
+    & ol {
+      margin-block: 14px;
+      padding-left: 20px;
+      list-style: decimal;
+    }
+
+    & ol > li + li {
+      margin-top: 10px;
+    }
+
+    & ol > li::marker {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--color-muted-foreground);
+    }
+
+    & strong {
+      font-weight: 500;
+      color: var(--color-foreground);
+    }
+
+    & a {
+      color: var(--color-foreground);
+      text-decoration-line: underline;
+      text-decoration-color: color-mix(in oklab, var(--color-signal) 50%, transparent);
+      text-underline-offset: 3px;
+      transition: text-decoration-color 150ms;
+      &:hover {
+        text-decoration-color: var(--color-signal);
+      }
+    }
+
+    & :not(pre) > code {
+      padding: 1px 5px;
+      border: 1px solid var(--color-border);
+      border-radius: 5px;
+      background-color: var(--color-muted);
+      font-family: var(--font-mono);
+      font-size: 0.875em;
+      color: var(--color-foreground);
+      overflow-wrap: anywhere;
+    }
+
+    & table {
+      display: block;
+      width: 100%;
+      margin-block: 20px;
+      overflow-x: auto;
+      border-collapse: collapse;
+      font-size: 14px;
+      line-height: 22px;
+    }
+
+    & th {
+      padding: 0 16px 10px 0;
+      border-bottom: 1px solid var(--color-border);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 16px;
+      font-weight: 400;
+      color: var(--color-muted-foreground);
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    & td {
+      padding: 10px 16px 10px 0;
+      border-bottom: 1px solid var(--color-border);
+      vertical-align: top;
+    }
+
+    & .code-block {
+      margin-block: 16px;
+      overflow: hidden;
+      border: 1px solid var(--color-border);
+      border-radius: 12px;
+      background-color: var(--color-card);
+      color: var(--color-foreground);
+    }
+
+    & .callout {
+      display: flex;
+      gap: 12px;
+      margin-block: 16px;
+      padding: 14px 16px;
+      border: 1px solid color-mix(in oklab, var(--color-signal) 22%, transparent);
+      border-radius: 10px;
+      background-color: color-mix(in oklab, var(--color-signal) 6%, transparent);
+      font-size: 14.5px;
+      line-height: 23px;
+      @variant lg {
+        gap: 14px;
+        padding: 16px 18px;
+        font-size: 15px;
+        line-height: 24px;
+      }
+    }
+
+    & .callout-title {
+      margin: 0;
+      font-weight: 500;
+      color: var(--color-foreground);
+    }
+
+    & .callout-body {
+      color: var(--color-callout);
+      & p {
+        margin: 0;
+      }
+      & p + p {
+        margin-top: 8px;
+      }
+    }
+
+    & .fd-steps {
+      counter-reset: step;
+    }
+
+    & .fd-step {
+      counter-increment: step;
+    }
+
+    & .fd-step > h2 {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      @variant lg {
+        gap: 12px;
+      }
+    }
+
+    & .fd-step > h2::before {
+      content: counter(step);
+      display: grid;
+      flex-shrink: 0;
+      place-items: center;
+      width: 24px;
+      height: 24px;
+      border: 1px solid color-mix(in oklab, var(--color-signal) 45%, transparent);
+      border-radius: 999px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      line-height: 14px;
+      font-weight: 400;
+      letter-spacing: 0;
+      color: var(--color-signal);
+      @variant lg {
+        width: 26px;
+        height: 26px;
+        font-size: 12px;
+      }
+    }
+  }
+}
