@@ -130,6 +130,13 @@ it was made with. Put the earlier pair back, or have users turn push on again.
   headers; register Hono’s `cors()` with `credentials: true` for that path
   ([browser-clients.md](browser-clients.md)).
 
+## Dashboard
+
+- **The header says live updates are off, and the browser console shows failed WebSocket
+  connections to `<mount>/api/events`.** The `ChaskiEvents` Durable Object isn’t bound as
+  `events`. The dashboard keeps trying the socket, and still works: it refreshes when its tab
+  comes back into focus or reloads. Bind `events` for live updates.
+
 ## Content-Security-Policy
 
 - **The dashboard loads unstyled, dialogs misbehave, or the console reports CSP violations.** The

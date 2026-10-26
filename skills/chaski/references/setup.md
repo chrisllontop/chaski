@@ -51,10 +51,11 @@ npm view chaski version
   git clone --depth 1 https://github.com/chrisllontop/chaski.git "$SRC"
   (cd "$SRC" && pnpm install && pnpm build && pnpm pack)
   mkdir -p vendor && cp "$SRC"/chaski-*.tgz vendor/
-  npm install ./vendor/chaski-<version>.tgz hono   # or pnpm add / yarn add / bun add
+  npm install ./vendor/chaski-<version>.tgz   # or pnpm add / yarn add / bun add
   ```
 
-  Tell the user the dependency points at a file in `vendor/` until Chaski is on npm.
+  Add `hono` the same way when it’s missing or older than 4.8. Tell the user the dependency points
+  at a file in `vendor/` until Chaski is on npm.
 
 **Done when** `node_modules/chaski/dist/index.d.ts` and
 `node_modules/chaski/migrations/0000_init.sql` exist next to the Worker. In a monorepo the package
@@ -80,7 +81,7 @@ Everything, in `wrangler.jsonc`:
 ```jsonc
 {
   "vars": {
-    // The absolute URL of the dashboard's mount (step 5), in production.
+    // The absolute URL of the dashboard's mount (step 5), in production; ask the user.
     "CHASKI_PUBLIC_URL": "https://app.example.com/admin/notifications",
     "VAPID_PUBLIC_KEY": "<public key from step 6>"
   },
@@ -182,6 +183,9 @@ Merge these into the existing config; every entry the Worker already has stays a
   deliveries, so a queue shared with the host’s own messages stalls both.
 - **The Workflow’s `name`** is unique across the Cloudflare account, so prefix it with the Worker’s
   name.
+- **`CHASKI_PUBLIC_URL`** is the production URL of the dashboard’s mount. When the user doesn’t
+  know it yet, leave a placeholder: `.dev.vars` sets the local one (step 7), and step 8 checks it
+  before deploying.
 - **Remote resources come later.** `wrangler dev` simulates every binding locally, so nothing has
   to exist in the account yet. Until the user creates the database (step 8), use
   `00000000-0000-0000-0000-000000000000` as `database_id`. A new id later means a new, empty local
@@ -190,8 +194,8 @@ Merge these into the existing config; every entry the Worker already has stays a
 If the project generates its types with `wrangler types`, run it again now. Its generated `Env`
 works as Chaski’s bindings as is.
 
-**Done when** each feature the user picked has its bindings declared, and a diff of the config
-shows only additions.
+**Done when** each feature the user picked has its bindings declared, and every entry the config
+had before keeps its values.
 
 ## 4. Create the local tables
 
@@ -271,7 +275,8 @@ export const chaski = createChaski((env: Env) => ({
 ```
 
 When the project already has an `Env` type, from `wrangler types` or by hand, add the fields to it
-and use it here instead. Every option is in
+and use it here instead. An `Env` declared in the main module moves into `src/chaski.ts` (or a
+`src/env.ts` both import), since importing it from the main module here would be circular. Every option is in
 `node_modules/chaski/dist/server/config.d.ts`; `email.from` must be an address on the domain
 onboarded to Email Service.
 
@@ -282,13 +287,18 @@ someone allowed in, `null` to answer 403, or a `Response` such as a redirect to 
 `id` signs every admin action. Pick by what step 1 found, and ask the user when it found nothing
 clear:
 
-- **The app has an admin or staff role:** write `authorize` over the app’s own session.
+- **The app has an admin or staff role:** write `authorize` over the app’s own session. Pass the
+  app’s Hono env type to `chaski.routes()`, and `c` reads what its session middleware set:
 
   ```ts
-  authorize: async (c) => {
-    const user = await currentStaffUser(c); // the app's own lookup
-    return user ? { id: user.email, name: user.name } : null;
-  },
+  chaski.routes<AppEnv>({
+    dashboard: {
+      authorize: (c) => {
+        const user = c.get('user');
+        return user?.isAdmin ? { id: user.email, name: user.name } : null;
+      },
+    },
+  });
   ```
 
 - **The team uses Cloudflare Access:** `cloudflareAccess({ teamDomain, audience })` checks the
@@ -316,9 +326,9 @@ clear:
   },
   ```
 
-`basicAuth()` and `cloudflareAccess()` return an `Authorize` for Hono’s default `Env`, so call
-`chaski.routes()` without a type argument and type the context as Hono’s `Context`, as above.
-Passing a typed context into them fails to compile.
+`basicAuth()` and `cloudflareAccess()` return an `Authorize` for Hono’s default `Env`. With either
+of them, call `chaski.routes()` without a type argument and type the context as Hono’s `Context`,
+as above: passing a typed context into them fails to compile.
 
 ### The user routes
 
@@ -339,26 +349,26 @@ notifications.
 
 ```ts
 // src/index.ts, the Worker's main module
-import { type Context, Hono } from 'hono';
-import { basicAuth } from 'chaski';
+import { Hono } from 'hono';
 import { chaski, type Env } from './chaski';
+import type { User } from './session'; // the app's own
 
 // The bindings find Chaski's classes through the main module's exports; export the ones you bind.
 export { ChaskiEvents, ChaskiFeed, ChaskiScheduler } from 'chaski';
 
 // The app's own Hono env: Variables holds what its session middleware sets.
-type AppEnv = { Bindings: Env; Variables: { user?: { id: string } } };
+type AppEnv = { Bindings: Env; Variables: { user: User | null } };
 
 const app = new Hono<AppEnv>()
   // …the app's own middleware and routes, its session middleware first
   .route(
     '/admin/notifications',
-    chaski.routes({
+    chaski.routes<AppEnv>({
       dashboard: {
-        // Whichever of the three sign-ins above the user chose.
-        authorize: (c: Context) => {
-          const { ADMIN_USER = '', ADMIN_PASSWORD = '' } = c.env as Env;
-          return basicAuth({ username: ADMIN_USER, password: ADMIN_PASSWORD })(c);
+        // Whichever of the three sign-ins above the user chose; here, the app's own admins.
+        authorize: (c) => {
+          const user = c.get('user');
+          return user?.isAdmin ? { id: user.email } : null;
         },
       },
     }),
@@ -432,7 +442,8 @@ Otherwise generate one:
 npx web-push generate-vapid-keys --json
 ```
 
-`publicKey` goes in `vars` as `VAPID_PUBLIC_KEY`. `privateKey` is a secret: put it in `.dev.vars`
+`publicKey` goes in `vars` as `VAPID_PUBLIC_KEY`. `vapid.subject` in the config is a
+`mailto:` or `https:` contact the push services can reach the team at; ask the user for it. `privateKey` is a secret: put it in `.dev.vars`
 for local runs, and set it in the account at deploy time (step 8). Keep the pair once browsers
 subscribe: a subscription made with another public key can never receive this server’s pushes.
 
@@ -460,7 +471,8 @@ Set the local values in `.dev.vars`, which overrides `vars` under `wrangler dev`
 ```sh
 CHASKI_DRY_RUN=true
 CHASKI_PUBLIC_URL=http://localhost:8787/admin/notifications
-# plus CHASKI_LOCAL_ADMIN=true, ADMIN_USER/ADMIN_PASSWORD or VAPID_PRIVATE_KEY, as steps 5 and 6 chose
+# The sign-in's values, if it has any: CHASKI_LOCAL_ADMIN=true, or ADMIN_USER and ADMIN_PASSWORD.
+# With web push: VAPID_PRIVATE_KEY.
 ```
 
 Match `CHASKI_PUBLIC_URL` to the address `wrangler dev` prints and the mount path. Start the
@@ -471,18 +483,21 @@ project’s dev command, then check each of these, in order:
 2. **Chaski read the config.** `GET <mount>/api/channels` returns `"dryRun": true` and the
    channels the user picked with `"enabled": true`. The dashboard’s **Channels** page shows the
    same.
-3. **A template exists.** Sending a type without one fails. Write a template file
-   ([sending.md](sending.md) has the format) and import it in the dashboard under **Templates**,
-   **Import**. From a terminal, the dashboard’s own endpoint takes the same file:
+3. **A template exists.** Sending a type without one fails. Write a template file for a `welcome`
+   type with the channels the user picked ([sending.md](sending.md) has the format) to a
+   throwaway path such as `/tmp/chaski-templates.json`: once imported, the template lives in the
+   local database. Import it in the dashboard under **Templates**, **Import**, or from a terminal
+   through the dashboard’s own endpoint:
 
    ```sh
    curl -u "$ADMIN_USER:$ADMIN_PASSWORD" -H 'content-type: application/json' \
-     --data @chaski-templates.json \
+     --data @/tmp/chaski-templates.json \
      'http://localhost:8787/admin/notifications/api/templates/import?preview=true'
    ```
 
    `?preview=true` shows what it would create or update; drop it to apply. The sign-in is the
-   dashboard’s: `-u` for `basicAuth()`, nothing with the local Access bypass.
+   dashboard’s: `-u` for `basicAuth()`, the app’s session cookie (`-b 'session=…'`) for its own
+   sign-in, nothing with the local Access bypass. The other checks sign in the same way.
 4. **A send goes through.** Add a temporary route that only answers in dry run, and call it:
 
    ```ts
@@ -498,15 +513,20 @@ project’s dev command, then check each of these, in order:
    });
    ```
 
-   The result’s `outcome` is `delivered`. When it isn’t, each delivery with `status: 'skipped'`
-   carries a `reason`, and [troubleshooting.md](troubleshooting.md) says what each one means.
+   The result’s `outcome` is `delivered`. Each delivery with `status: 'skipped'` carries a
+   `reason`, and [troubleshooting.md](troubleshooting.md) says what each one means; `push` skips
+   with `no_device_tokens` until a browser enables push.
 5. **The delivery moved.** The dashboard’s **Deliveries** page, or `GET <mount>/api/deliveries`,
    shows each delivery `sent` once the local queue consumer ran, usually within seconds. A
    delivery stuck at `pending` means the queue handler isn’t wired.
+6. **A schedule fires**, when the user turned scheduling on. Have the temporary route call
+   `chaski.schedule()` with the same send, an `idempotencyKey` and a `scheduledAt` 20 seconds
+   out (`new Date(Date.now() + 20_000).toISOString()`). `GET <mount>/api/schedules` lists it;
+   once the time passes, it leaves that list and its deliveries show up as in check 5.
 
 Take the temporary route out once the checks pass.
 
-**Done when** all five checks pass. Report each result to the user.
+**Done when** every check that applies passes. Report each result to the user.
 
 ## 8. Deploy
 
