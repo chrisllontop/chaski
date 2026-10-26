@@ -10,6 +10,11 @@ import { AppSidebar } from './components/app/app-sidebar';
 import { SidebarInset, SidebarProvider } from './components/ui/sidebar';
 import { TooltipProvider } from './components/ui/tooltip';
 import { useAdminEvents } from './lib/events';
+import type { Channel, DeliveryStatus } from './lib/types';
+import type { DeliverySearch } from './routes/deliveries';
+
+const STATUSES: DeliveryStatus[] = ['pending', 'sent', 'failed', 'dead', 'skipped'];
+const CHANNELS: Channel[] = ['email', 'in_app', 'push'];
 
 const Layout = () => {
   useAdminEvents();
@@ -47,6 +52,11 @@ const routeTree = rootRoute.addChildren([
   createRoute({
     getParentRoute: () => rootRoute,
     path: '/deliveries',
+    validateSearch: (search: Record<string, unknown>): DeliverySearch => ({
+      status: STATUSES.find((status) => status === search.status),
+      type: typeof search.type === 'string' && search.type ? search.type : undefined,
+      channel: CHANNELS.find((channel) => channel === search.channel),
+    }),
     component: lazyRouteComponent(() => import('./routes/deliveries'), 'DeliveriesPage'),
     staticData: { crumbs: [{ label: 'Deliveries' }] },
   }),

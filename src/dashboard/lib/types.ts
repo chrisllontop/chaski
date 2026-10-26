@@ -64,6 +64,7 @@ export type Overview = Totals & {
 
 export type DayOutcome = {
   date: string;
+  notifications: number;
   sent: number;
   failed: number;
   skipped: number;
@@ -149,6 +150,7 @@ export type SchedulePage = {
 
 export type ChannelsOverview = {
   dryRun: boolean;
+  realtime: boolean;
   channels: [
     {
       channel: 'email';

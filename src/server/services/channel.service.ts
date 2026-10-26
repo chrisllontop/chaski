@@ -5,10 +5,12 @@ export class ChannelService extends BaseService {
 
   /** The channels the host configured, without a single secret. */
   static overview = () => {
-    const { channels, dryRun } = ChannelService.config;
+    const { channels, dryRun, bindings } = ChannelService.config;
     const { email, push } = channels;
     return {
       dryRun,
+      // Without the ChaskiEvents binding the dashboard refreshes on its own instead of live.
+      realtime: Boolean(bindings.events),
       channels: [
         {
           channel: 'email' as const,

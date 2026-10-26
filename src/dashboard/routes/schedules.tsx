@@ -2,31 +2,26 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ConfirmDialog } from '~/components/app/confirm-dialog';
+import {
+  DataBody,
+  DataCell,
+  DataEmpty,
+  DataHead,
+  DataHeader,
+  DataRow,
+  DataTable,
+  rowActionClass,
+} from '~/components/app/data-table';
 import { ErrorAlert, PageHeader } from '~/components/app/page';
 import { Pager } from '~/components/app/pager';
 import { SiteHeader } from '~/components/app/site-header';
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '~/components/ui/table';
+import { Skeleton } from '~/components/ui/skeleton';
 import { api, query } from '~/lib/api';
+import { useDebounced } from '~/lib/debounce';
 import { formatDateTime, formatRelative } from '~/lib/format';
 import type { ScheduledItem, SchedulePage } from '~/lib/types';
-
-const useDebounced = (value: string, delayMs = 300) => {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), delayMs);
-    return () => clearTimeout(timer);
-  }, [value, delayMs]);
-  return debounced;
-};
 
 export const SchedulesPage = () => {
   const client = useQueryClient();
@@ -35,8 +30,8 @@ export const SchedulesPage = () => {
   const [page, setPage] = useState(0);
   const [limit, setLimit] = useState(25);
   const [cancelling, setCancelling] = useState<ScheduledItem | null>(null);
-  const recipientId = useDebounced(contact.trim());
-  const groupKey = useDebounced(group.trim());
+  const recipientId = useDebounced(contact.trim(), 300);
+  const groupKey = useDebounced(group.trim(), 300);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: the filters are the trigger
   useEffect(() => setPage(0), [recipientId, groupKey, limit]);
@@ -58,73 +53,82 @@ export const SchedulesPage = () => {
   return (
     <>
       <SiteHeader />
-      <div className="flex flex-1 flex-col gap-6 p-6">
+      <div className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col gap-5 px-6 pt-6 pb-10">
         <PageHeader title="Schedules" description="Notifications waiting for their time to send" />
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative w-64">
-            <Search className="-translate-y-1/2 absolute top-1/2 left-2.5 size-4 text-muted-foreground" />
+          <div className="relative w-60">
+            <Search className="-translate-y-1/2 absolute top-1/2 left-2.5 size-3.5 text-muted-foreground" />
             <Input
               value={contact}
               onChange={(event) => setContact(event.target.value)}
               placeholder="Filter by contact ID…"
-              className="pl-8"
+              className="h-8 pl-8 text-[13px]"
             />
           </div>
           <Input
             value={group}
             onChange={(event) => setGroup(event.target.value)}
             placeholder="Filter by group…"
-            className="w-56"
+            className="h-8 w-52 text-[13px]"
           />
         </div>
         {list.error ? <ErrorAlert error={list.error} /> : null}
-        <div className="overflow-hidden rounded-lg border">
-          <Table>
-            <TableHeader className="bg-muted">
-              <TableRow>
-                <TableHead>Contact</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Sends</TableHead>
-                <TableHead>Group</TableHead>
-                <TableHead>Key</TableHead>
-                <TableHead className="w-24" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {list.data?.schedules.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                    Nothing is scheduled.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                list.data?.schedules.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-medium">{item.recipientId}</TableCell>
-                    <TableCell className="font-mono">{item.type}</TableCell>
-                    <TableCell>
-                      <div>{formatDateTime(item.scheduledAt)}</div>
-                      <div className="text-muted-foreground text-xs">
-                        {formatRelative(item.scheduledAt)}
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-mono text-muted-foreground text-xs">
-                      {item.groupKey ?? '–'}
-                    </TableCell>
-                    <TableCell className="font-mono text-muted-foreground text-xs">
-                      {item.idempotencyKey ?? '–'}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" onClick={() => setCancelling(item)}>
-                        Cancel
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable>
+          <DataHeader>
+            <DataRow>
+              <DataHead>Sends</DataHead>
+              <DataHead>Contact</DataHead>
+              <DataHead>Type</DataHead>
+              <DataHead>Group</DataHead>
+              <DataHead>Key</DataHead>
+              <DataHead className="w-24" />
+            </DataRow>
+          </DataHeader>
+          <DataBody>
+            {!list.data ? (
+              <DataEmpty colSpan={6}>
+                <Skeleton className="mx-auto h-4 w-48" />
+              </DataEmpty>
+            ) : list.data.schedules.length === 0 ? (
+              <DataEmpty colSpan={6}>Nothing is scheduled.</DataEmpty>
+            ) : (
+              list.data.schedules.map((item) => (
+                <DataRow key={item.id}>
+                  <DataCell>
+                    <div className="font-medium">{formatRelative(item.scheduledAt)}</div>
+                    <div className="text-muted-foreground text-xs tabular-nums">
+                      {formatDateTime(item.scheduledAt)}
+                    </div>
+                  </DataCell>
+                  <DataCell>{item.recipientId}</DataCell>
+                  <DataCell className="font-mono text-xs">{item.type}</DataCell>
+                  <DataCell>
+                    {item.groupKey ? (
+                      <span className="inline-flex h-5 items-center rounded-md border px-1.5 font-mono text-muted-foreground text-xs">
+                        {item.groupKey}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">–</span>
+                    )}
+                  </DataCell>
+                  <DataCell className="max-w-56 truncate font-mono text-muted-foreground text-xs">
+                    {item.idempotencyKey ?? '–'}
+                  </DataCell>
+                  <DataCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={`text-muted-foreground hover:text-destructive ${rowActionClass}`}
+                      onClick={() => setCancelling(item)}
+                    >
+                      Cancel
+                    </Button>
+                  </DataCell>
+                </DataRow>
+              ))
+            )}
+          </DataBody>
+        </DataTable>
         {list.data ? (
           <Pager
             page={page}

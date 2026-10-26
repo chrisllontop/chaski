@@ -1,5 +1,5 @@
 import { type QueryClient, useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { eventsUrl } from './api';
 
 type AdminSocketEvent = { type: 'invalidate'; topics: string[]; at: string };
@@ -16,6 +16,27 @@ const invalidate = (client: QueryClient, topics: string[]) => {
     for (const queryKey of QUERY_KEYS[topic] ?? []) void client.invalidateQueries({ queryKey });
   }
 };
+
+export type LiveStatus = 'connecting' | 'live' | 'reconnecting';
+
+// One socket per dashboard, so its state is module-wide; the header reads it.
+let liveStatus: LiveStatus = 'connecting';
+const listeners = new Set<() => void>();
+
+const setLiveStatus = (next: LiveStatus) => {
+  if (next === liveStatus) return;
+  liveStatus = next;
+  for (const listener of listeners) listener();
+};
+
+export const useLiveStatus = () =>
+  useSyncExternalStore(
+    (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    () => liveStatus,
+  );
 
 /**
  * Keeps the dashboard's data fresh from /api/events. The socket only says what
@@ -35,6 +56,7 @@ export const useAdminEvents = () => {
       socket = new WebSocket(eventsUrl());
       socket.onopen = () => {
         attempts = 0;
+        setLiveStatus('live');
       };
       socket.onmessage = (message) => {
         try {
@@ -46,6 +68,7 @@ export const useAdminEvents = () => {
       };
       socket.onclose = () => {
         if (stopped) return;
+        setLiveStatus('reconnecting');
         const delay = Math.min(30_000, 1_000 * 2 ** attempts) * (0.5 + Math.random() / 2);
         attempts += 1;
         retry = setTimeout(connect, delay);

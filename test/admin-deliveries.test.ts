@@ -225,7 +225,7 @@ describe('metrics', () => {
     const { body } = await json('/metrics/timeseries?period=7d');
 
     expect(body.series.length).toBeGreaterThanOrEqual(7);
-    expect(body.series.at(-1)).toMatchObject({ sent: 2 });
+    expect(body.series.at(-1)).toMatchObject({ notifications: 1, sent: 2 });
   });
 
   it('breaks outcomes down by type and channel', async () => {
@@ -272,6 +272,7 @@ describe('GET /api/channels', () => {
 
     expect(JSON.parse(text)).toEqual({
       dryRun: false,
+      realtime: true,
       channels: [
         expect.objectContaining({
           channel: 'email',
@@ -283,5 +284,13 @@ describe('GET /api/channels', () => {
       ],
     });
     expect(text).not.toContain(jwk.d);
+  });
+
+  it('says when realtime events are off', async () => {
+    useConfig({ bindings: { ...fixtureConfig(env).bindings, events: undefined } });
+
+    const response = await api('/channels');
+
+    expect(await response.json()).toMatchObject({ realtime: false });
   });
 });

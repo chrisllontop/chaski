@@ -1,13 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from '@tanstack/react-router';
+import { cn } from 'cn';
 import { Send } from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { CodeEditor } from '~/components/app/code-editor';
 import { ErrorAlert, PageHeader } from '~/components/app/page';
+import { Panel, PanelHeader } from '~/components/app/panel';
 import { SiteHeader } from '~/components/app/site-header';
-import { Badge } from '~/components/ui/badge';
 import { Button } from '~/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -236,6 +236,10 @@ export const TemplateEditorPage = () => {
   const sample = useMemo(() => parseSample(sampleText ?? '{}'), [sampleText]);
   const stored = toDraft(detail.data?.channels.find((row) => row.channel === channel));
   const dirty = JSON.stringify(draft) !== JSON.stringify(stored);
+  const unsaved = (key: Channel) =>
+    drafts !== null &&
+    JSON.stringify(drafts[key]) !==
+      JSON.stringify(toDraft(detail.data?.channels.find((row) => row.channel === key)));
   const sampleDirty = sampleText !== (detail.data?.template.sampleData ?? '{}');
 
   const debounced = useDebounced({ channel, draft, sample });
@@ -284,7 +288,7 @@ export const TemplateEditorPage = () => {
   return (
     <>
       <SiteHeader current={template?.type} />
-      <div className="flex flex-1 flex-col gap-6 p-6">
+      <div className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col gap-6 px-6 pt-6 pb-10">
         {detail.error ? <ErrorAlert error={detail.error} /> : null}
         {!template || !drafts ? (
           detail.error ? null : (
@@ -293,10 +297,14 @@ export const TemplateEditorPage = () => {
         ) : (
           <>
             <PageHeader
-              title={template.type}
+              title={<span className="font-mono">{template.type}</span>}
               description={
                 <span className="flex items-center gap-2">
-                  {template.topic ? <Badge variant="outline">{template.topic}</Badge> : null}
+                  {template.topic ? (
+                    <span className="inline-flex h-5 items-center rounded-md border px-1.5 text-xs">
+                      {template.topic}
+                    </span>
+                  ) : null}
                   {template.description}
                 </span>
               }
@@ -304,6 +312,7 @@ export const TemplateEditorPage = () => {
                 channel === 'email' ? (
                   <Button
                     variant="outline"
+                    size="sm"
                     onClick={() => setTesting(true)}
                     disabled={!stored.body}
                   >
@@ -313,36 +322,43 @@ export const TemplateEditorPage = () => {
               }
             />
             <Tabs value={channel} onValueChange={(value) => setChannel(value as Channel)}>
-              <TabsList>
+              <TabsList variant="line" className="w-full justify-start border-b">
                 {(['email', 'in_app', 'push'] as Channel[]).map((key) => (
-                  <TabsTrigger key={key} value={key}>
+                  <TabsTrigger key={key} value={key} className="flex-none px-3">
+                    <span
+                      className={cn(
+                        'size-1.5 rounded-full',
+                        drafts[key].enabled ? 'bg-success' : 'bg-muted-foreground/40',
+                      )}
+                    />
                     {CHANNEL_LABELS[key]}
+                    {unsaved(key) ? (
+                      <span className="text-muted-foreground text-xs">· unsaved</span>
+                    ) : null}
                   </TabsTrigger>
                 ))}
               </TabsList>
             </Tabs>
-            <div className="grid gap-6 lg:grid-cols-2">
-              <div className="grid content-start gap-6">
-                <Card>
-                  <CardHeader className="flex flex-row items-start justify-between gap-4">
-                    <div className="space-y-1">
-                      <CardTitle>{CHANNEL_LABELS[channel]} content</CardTitle>
-                      <CardDescription>
-                        Liquid tags such as {'{{ amount }}'} read the payload of each send.
-                      </CardDescription>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Label htmlFor="channel-enabled" className="text-sm">
-                        Enabled
-                      </Label>
-                      <Switch
-                        id="channel-enabled"
-                        checked={draft.enabled}
-                        onCheckedChange={(enabled) => update({ enabled })}
-                      />
-                    </div>
-                  </CardHeader>
-                  <CardContent className="grid gap-4">
+            <div className="grid items-start gap-4 lg:grid-cols-2">
+              <div className="grid content-start gap-4">
+                <Panel>
+                  <PanelHeader
+                    title={`${CHANNEL_LABELS[channel]} content`}
+                    description="Liquid tags such as {{ amount }} read the payload of each send."
+                    actions={
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="channel-enabled" className="font-normal text-xs">
+                          {draft.enabled ? 'Enabled' : 'Disabled'}
+                        </Label>
+                        <Switch
+                          id="channel-enabled"
+                          checked={draft.enabled}
+                          onCheckedChange={(enabled) => update({ enabled })}
+                        />
+                      </div>
+                    }
+                  />
+                  <div className="grid gap-4 p-4">
                     <div className="grid gap-2">
                       <Label htmlFor="field-subject">{labels.subject}</Label>
                       <Input
@@ -396,28 +412,39 @@ export const TemplateEditorPage = () => {
                       )}
                     </div>
                     {saveChannel.error ? <ErrorAlert error={saveChannel.error} /> : null}
-                    <div className="flex justify-end gap-2">
-                      <Button variant="outline" disabled={!dirty} onClick={() => update(stored)}>
-                        Discard changes
-                      </Button>
-                      <Button
-                        disabled={!dirty || saveChannel.isPending}
-                        onClick={() => saveChannel.mutate()}
-                      >
-                        Save {CHANNEL_LABELS[channel]}
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader>
-                    <CardTitle id="sample-data-title">Sample data</CardTitle>
-                    <CardDescription>
-                      What the preview renders with. Sends fill{' '}
-                      <code className="font-mono">recipient</code> from the contact.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="grid gap-3">
+                  </div>
+                  <footer className="flex items-center justify-end gap-2 border-t bg-muted/30 px-4 py-2.5">
+                    {dirty ? (
+                      <span className="mr-auto text-muted-foreground text-xs">Unsaved changes</span>
+                    ) : null}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={!dirty}
+                      onClick={() => update(stored)}
+                    >
+                      Discard changes
+                    </Button>
+                    <Button
+                      size="sm"
+                      disabled={!dirty || saveChannel.isPending}
+                      onClick={() => saveChannel.mutate()}
+                    >
+                      Save {CHANNEL_LABELS[channel]}
+                    </Button>
+                  </footer>
+                </Panel>
+                <Panel>
+                  <PanelHeader
+                    title={<span id="sample-data-title">Sample data</span>}
+                    description={
+                      <>
+                        What the preview renders with. Sends fill{' '}
+                        <code className="font-mono">recipient</code> from the contact.
+                      </>
+                    }
+                  />
+                  <div className="grid gap-2 p-4">
                     <CodeEditor
                       value={sampleText ?? ''}
                       onChange={setSampleText}
@@ -427,34 +454,35 @@ export const TemplateEditorPage = () => {
                       className="[&_.cm-scroller]:min-h-32"
                     />
                     {sample === null ? (
-                      <p className="text-destructive text-sm">
+                      <p className="text-destructive text-xs">
                         The sample data must be a JSON object.
                       </p>
                     ) : null}
-                    <div className="flex justify-end">
-                      <Button
-                        variant="outline"
-                        disabled={!sampleDirty || sample === null || saveSample.isPending}
-                        onClick={() => saveSample.mutate()}
-                      >
-                        Save sample data
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                  <footer className="flex justify-end border-t bg-muted/30 px-4 py-2.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={!sampleDirty || sample === null || saveSample.isPending}
+                      onClick={() => saveSample.mutate()}
+                    >
+                      Save sample data
+                    </Button>
+                  </footer>
+                </Panel>
               </div>
-              <Card className="content-start">
-                <CardHeader>
-                  <CardTitle>Preview</CardTitle>
-                  <CardDescription>
-                    {channel === 'email'
+              <Panel className="lg:sticky lg:top-16">
+                <PanelHeader
+                  title="Preview"
+                  description={
+                    channel === 'email'
                       ? 'As the email renders, with the sample data'
                       : channel === 'in_app'
                         ? 'As the item shows in the feed'
-                        : 'As the notification shows on a device'}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="grid gap-3">
+                        : 'As the notification shows on a device'
+                  }
+                />
+                <div className="grid gap-3 p-4">
                   {sample === null ? (
                     <p className="text-muted-foreground text-sm">
                       Fix the sample data to see the preview.
@@ -462,7 +490,7 @@ export const TemplateEditorPage = () => {
                   ) : channel === 'email' ? (
                     <>
                       {preview.data?.subject ? (
-                        <div className="text-sm">
+                        <div className="rounded-md border bg-muted/30 px-3 py-2 text-[13px]">
                           <span className="text-muted-foreground">Subject </span>
                           <span className="font-medium">{preview.data.subject}</span>
                         </div>
@@ -485,8 +513,8 @@ export const TemplateEditorPage = () => {
                   ) : (
                     <Skeleton className="h-20" />
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </Panel>
             </div>
           </>
         )}

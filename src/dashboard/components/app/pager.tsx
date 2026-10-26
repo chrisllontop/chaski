@@ -29,14 +29,14 @@ export const Pager = ({
   const first = total === 0 ? 0 : page * limit + 1;
   const last = Math.min(total, (page + 1) * limit);
   return (
-    <div className="flex flex-wrap items-center justify-between gap-4 text-sm">
-      <span className="text-muted-foreground">
+    <div className="flex flex-wrap items-center justify-between gap-4 text-[13px] text-muted-foreground">
+      <span className="tabular-nums">
         {formatNumber(first)}–{formatNumber(last)} of {formatNumber(total)} {noun}
       </span>
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-5">
         {onLimit ? (
           <div className="flex items-center gap-2">
-            <span className="font-medium">Rows per page</span>
+            <span>Rows per page</span>
             <Select value={String(limit)} onValueChange={(value) => onLimit(Number(value))}>
               <SelectTrigger size="sm" className="w-20">
                 <SelectValue />
@@ -51,14 +51,14 @@ export const Pager = ({
             </Select>
           </div>
         ) : null}
-        <span className="font-medium">
+        <span className="tabular-nums">
           Page {formatNumber(page + 1)} of {formatNumber(pages)}
         </span>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <Button
             variant="outline"
             size="icon"
-            className="size-8"
+            className="size-7"
             disabled={page === 0}
             onClick={() => onPage(0)}
           >
@@ -68,7 +68,7 @@ export const Pager = ({
           <Button
             variant="outline"
             size="icon"
-            className="size-8"
+            className="size-7"
             disabled={page === 0}
             onClick={() => onPage(page - 1)}
           >
@@ -78,7 +78,7 @@ export const Pager = ({
           <Button
             variant="outline"
             size="icon"
-            className="size-8"
+            className="size-7"
             disabled={page >= pages - 1}
             onClick={() => onPage(page + 1)}
           >
@@ -88,7 +88,7 @@ export const Pager = ({
           <Button
             variant="outline"
             size="icon"
-            className="size-8"
+            className="size-7"
             disabled={page >= pages - 1}
             onClick={() => onPage(pages - 1)}
           >

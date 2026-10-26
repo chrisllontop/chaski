@@ -1,80 +1,66 @@
-import { useQuery } from '@tanstack/react-query';
-import { Bell, FlaskConical, Mail, Smartphone } from 'lucide-react';
+import { Activity, Bell, Mail, Smartphone } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { useChannelsOverview } from '~/components/app/live-status';
 import { ErrorAlert, PageHeader } from '~/components/app/page';
+import { Panel } from '~/components/app/panel';
+import { Pill } from '~/components/app/pill';
 import { SiteHeader } from '~/components/app/site-header';
-import { Badge } from '~/components/ui/badge';
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '~/components/ui/card';
 import { Skeleton } from '~/components/ui/skeleton';
-import { api } from '~/lib/api';
-import type { ChannelsOverview } from '~/lib/types';
 
 const Row = ({ label, children }: { label: string; children: ReactNode }) => (
-  <div className="grid grid-cols-3 gap-2 py-2 text-sm">
+  <div className="grid grid-cols-[8rem_1fr] gap-3 px-4 py-2.5 text-[13px]">
     <dt className="text-muted-foreground">{label}</dt>
-    <dd className="col-span-2 break-all">{children ?? '–'}</dd>
+    <dd className="min-w-0 break-all">
+      {children ?? <span className="text-muted-foreground">–</span>}
+    </dd>
   </div>
 );
 
-const State = ({ on }: { on: boolean }) => (
-  <Badge variant={on ? 'secondary' : 'outline'}>{on ? 'On' : 'Not configured'}</Badge>
+const SetupHint = ({ configKey }: { configKey: string }) => (
+  <p className="px-4 py-3 text-muted-foreground text-sm">
+    Add <code className="font-mono text-foreground text-xs">{configKey}</code> to the config your
+    Worker passes to <code className="font-mono text-foreground text-xs">createChaski()</code>.
+  </p>
 );
 
-const ChannelCard = ({
+const ChannelPanel = ({
   icon: Icon,
   title,
   description,
-  on,
-  configKey,
+  state,
   children,
 }: {
   icon: typeof Mail;
   title: string;
   description: string;
-  on: boolean;
-  configKey: string;
-  children?: ReactNode;
+  state: ReactNode;
+  children: ReactNode;
 }) => (
-  <Card>
-    <CardHeader>
-      <CardTitle className="flex items-center gap-2">
-        <Icon className="size-4" /> {title}
-      </CardTitle>
-      <CardDescription>{description}</CardDescription>
-      <CardAction>
-        <State on={on} />
-      </CardAction>
-    </CardHeader>
-    <CardContent>
-      {on ? (
-        <dl className="divide-y">{children}</dl>
-      ) : (
-        <p className="text-muted-foreground text-sm">
-          Add <code className="font-mono">{configKey}</code> to the config your Worker passes to{' '}
-          <code className="font-mono">createChaski()</code>.
-        </p>
-      )}
-    </CardContent>
-  </Card>
+  <Panel className="flex flex-col">
+    <header className="flex items-start gap-3 border-b px-4 py-3">
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-muted/40">
+        <Icon className="size-4" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <h2 className="font-medium text-sm leading-6">{title}</h2>
+        <p className="text-pretty text-muted-foreground text-xs">{description}</p>
+      </div>
+      {state}
+    </header>
+    <dl className="flex-1 divide-y">{children}</dl>
+  </Panel>
 );
 
+const configured = (on: boolean) =>
+  on ? <Pill tone="success">On</Pill> : <Pill tone="neutral">Not configured</Pill>;
+
 export const ChannelsPage = () => {
-  const { data, error } = useQuery({
-    queryKey: ['channels'],
-    queryFn: () => api.get<ChannelsOverview>('channels'),
-  });
+  const { data, error } = useChannelsOverview();
   const [email, inApp, push] = data?.channels ?? [];
   return (
     <>
       <SiteHeader />
-      <div className="flex flex-1 flex-col gap-6 p-6">
+      <div className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col gap-6 px-6 pt-6 pb-10">
         <PageHeader
           title="Channels"
           description="Set in your Worker’s Chaski config, so changes ship with a deploy. Secrets never show here."
@@ -82,65 +68,91 @@ export const ChannelsPage = () => {
         {error ? <ErrorAlert error={error} /> : null}
         {!data || !email || !inApp || !push ? (
           error ? null : (
-            <Skeleton className="h-64" />
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Skeleton className="h-44" />
+              <Skeleton className="h-44" />
+            </div>
           )
         ) : (
           <div className="grid gap-4 lg:grid-cols-2">
-            <ChannelCard
+            <ChannelPanel
               icon={Mail}
               title="Email"
               description="Sent through the send_email binding of your Worker"
-              on={email.enabled}
-              configKey="channels.email"
+              state={configured(email.enabled)}
             >
-              <Row label="From">{email.from}</Row>
-              <Row label="From name">{email.fromName}</Row>
-              <Row label="Reply-to">{email.replyTo}</Row>
-            </ChannelCard>
-            <ChannelCard
+              {email.enabled ? (
+                <>
+                  <Row label="From">{email.from}</Row>
+                  <Row label="From name">{email.fromName}</Row>
+                  <Row label="Reply-to">{email.replyTo}</Row>
+                </>
+              ) : (
+                <SetupHint configKey="channels.email" />
+              )}
+            </ChannelPanel>
+            <ChannelPanel
               icon={Bell}
               title="In-app"
               description="The feed each contact reads in your app"
-              on={inApp.enabled}
-              configKey="channels.in_app"
+              state={configured(inApp.enabled)}
             >
-              <Row label="Realtime">One ChaskiFeed object per contact</Row>
-            </ChannelCard>
-            <ChannelCard
+              {inApp.enabled ? (
+                <Row label="Feed">One ChaskiFeed object per contact, live over a WebSocket</Row>
+              ) : (
+                <SetupHint configKey="channels.in_app" />
+              )}
+            </ChannelPanel>
+            <ChannelPanel
               icon={Smartphone}
               title="Push"
               description="Web push with VAPID, iOS through APNs"
-              on={push.enabled}
-              configKey="channels.push"
+              state={configured(push.enabled)}
             >
-              <Row label="Web push">
-                {push.web ? (
-                  <code className="font-mono text-xs">{push.web.vapidPublicKey}</code>
-                ) : (
-                  'Not configured'
-                )}
+              {push.enabled ? (
+                <>
+                  <Row label="Web push">
+                    {push.web ? (
+                      <code className="font-mono text-xs">{push.web.vapidPublicKey}</code>
+                    ) : (
+                      'Not configured'
+                    )}
+                  </Row>
+                  <Row label="iOS">
+                    {push.ios ? `${push.ios.bundleId} · ${push.ios.environment}` : 'Not configured'}
+                  </Row>
+                </>
+              ) : (
+                <SetupHint configKey="channels.push" />
+              )}
+            </ChannelPanel>
+            <ChannelPanel
+              icon={Activity}
+              title="Delivery"
+              description="How sends and this dashboard behave"
+              state={null}
+            >
+              <Row label="Dry run">
+                <div className="flex items-start gap-2">
+                  {data.dryRun ? <Pill tone="warning">On</Pill> : <Pill tone="neutral">Off</Pill>}
+                  <span className="text-muted-foreground">
+                    {data.dryRun
+                      ? 'Email and push render and record without reaching their providers.'
+                      : 'Email and push reach their providers.'}
+                  </span>
+                </div>
               </Row>
-              <Row label="iOS">
-                {push.ios ? `${push.ios.bundleId} · ${push.ios.environment}` : 'Not configured'}
+              <Row label="Live updates">
+                <div className="flex items-start gap-2">
+                  {data.realtime ? <Pill tone="success">On</Pill> : <Pill tone="neutral">Off</Pill>}
+                  <span className="text-muted-foreground">
+                    {data.realtime
+                      ? 'The dashboard shows changes as they happen.'
+                      : 'Add bindings.events to see changes as they happen.'}
+                  </span>
+                </div>
               </Row>
-            </ChannelCard>
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FlaskConical className="size-4" /> Dry run
-                </CardTitle>
-                <CardDescription>
-                  {data.dryRun
-                    ? 'Email and push deliveries render and record without reaching their providers.'
-                    : 'Email and push deliveries reach their providers.'}
-                </CardDescription>
-                <CardAction>
-                  <Badge variant={data.dryRun ? 'secondary' : 'outline'}>
-                    {data.dryRun ? 'On' : 'Off'}
-                  </Badge>
-                </CardAction>
-              </CardHeader>
-            </Card>
+            </ChannelPanel>
           </div>
         )}
       </div>
