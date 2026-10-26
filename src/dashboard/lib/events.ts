@@ -1,6 +1,7 @@
 import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useSyncExternalStore } from 'react';
 import { eventsUrl } from './api';
+import { useChannelsOverview } from './channels';
 
 type AdminSocketEvent = { type: 'invalidate'; topics: string[]; at: string };
 
@@ -45,8 +46,12 @@ export const useLiveStatus = () =>
  */
 export const useAdminEvents = () => {
   const client = useQueryClient();
+  // Without bindings.events the server answers the upgrade with a 404, which a browser only sees
+  // as a closed socket, so the socket waits for the server to say realtime is on.
+  const realtime = useChannelsOverview().data?.realtime === true;
 
   useEffect(() => {
+    if (!realtime) return;
     let socket: WebSocket | null = null;
     let retry: ReturnType<typeof setTimeout> | null = null;
     let attempts = 0;
@@ -87,5 +92,5 @@ export const useAdminEvents = () => {
       if (retry) clearTimeout(retry);
       socket?.close();
     };
-  }, [client]);
+  }, [client, realtime]);
 };

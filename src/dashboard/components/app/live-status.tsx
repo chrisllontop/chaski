@@ -1,16 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
 import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip';
-import { api } from '~/lib/api';
+import { useChannelsOverview } from '~/lib/channels';
 import { useLiveStatus } from '~/lib/events';
-import type { ChannelsOverview } from '~/lib/types';
 import { Pill } from './pill';
-
-export const useChannelsOverview = () =>
-  useQuery({
-    queryKey: ['channels'],
-    queryFn: () => api.get<ChannelsOverview>('channels'),
-    staleTime: Number.POSITIVE_INFINITY,
-  });
 
 const LIVE = {
   live: { label: 'Live', tone: 'success', hint: 'Changes show up here as they happen.' },

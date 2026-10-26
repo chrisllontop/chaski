@@ -13,6 +13,20 @@ export default defineConfig({
   platform: 'neutral',
   // tsc emits the declarations (pnpm build:types): it infers the Drizzle and zod types.
   dts: false,
-  external: ['cloudflare:workers'],
+  deps: {
+    neverBundle: ['cloudflare:workers'],
+    // better-drizzle ships inside the bundle: its peer range pins drizzle-orm ^0.30, so npm would
+    // install that older release next to ours and bundlers would pick it up. Its imports of
+    // drizzle-orm stay external and reach the release Chaski depends on.
+    onlyBundle: ['better-drizzle'],
+  },
+  // better-drizzle is Apache-2.0, which asks that its license travel with the code.
+  copy: [
+    {
+      from: 'node_modules/better-drizzle/LICENSE',
+      to: 'dist/licenses',
+      rename: 'better-drizzle.txt',
+    },
+  ],
   clean: true,
 });

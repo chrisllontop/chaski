@@ -132,7 +132,7 @@ export const cloudflareAccess = (options: {
   teamDomain: string;
   /** The Access application's AUD tag, or several. */
   audience: string | string[];
-}): Authorize => {
+}) => {
   const issuer = new URL(
     options.teamDomain.includes('://') ? options.teamDomain : `https://${options.teamDomain}`,
   ).origin;
@@ -140,7 +140,9 @@ export const cloudflareAccess = (options: {
   if (audiences.length === 0) {
     throw new ChaskiError('config', 'Chaski config: cloudflareAccess needs an audience');
   }
-  return async (c) => {
+  // Generic in the env, so it fits chaski.routes<E>() of a host that types its app and can be
+  // called with that host's context; Hono's Context is invariant in its env.
+  return async <E extends Env>(c: Context<E>): Promise<Actor | null> => {
     const token = c.req.header('cf-access-jwt-assertion');
     if (!token) return null;
     try {
@@ -180,16 +182,13 @@ const decodeCredentials = (header: string | undefined): [string, string] | null 
 };
 
 /** One username and password, checked in constant time; the browser asks for them. */
-export const basicAuth = (options: {
-  username: string;
-  password: string;
-  realm?: string;
-}): Authorize => {
+export const basicAuth = (options: { username: string; password: string; realm?: string }) => {
   if (!options.username || !options.password) {
     throw new ChaskiError('config', 'Chaski config: basicAuth needs a username and a password');
   }
   const challenge = `Basic realm="${options.realm ?? 'Chaski'}", charset="UTF-8"`;
-  return async (c) => {
+  // Generic in the env for the same reason as cloudflareAccess.
+  return async <E extends Env>(c: Context<E>): Promise<Actor | Response> => {
     const [username, password] = decodeCredentials(c.req.header('authorization')) ?? ['', ''];
     // Both comparisons always run, so the answer time doesn't tell which failed.
     const [userMatches, passwordMatches] = await Promise.all([

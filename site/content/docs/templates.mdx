@@ -32,6 +32,19 @@ Thanks, {{ recipient.name }}. We received your payment of {{ amount }}.
 `recipient` holds the fields the send gave it: `id`, and `email`, `name`, `phone`, `timezone` and
 `locale` when present. A key the payload lacks renders empty instead of failing the delivery.
 
+The email body is HTML, so Chaski escapes every value it outputs there: a name such as `Ana <b>`
+arrives as text, not markup, and a value you already pass through `escape` isn’t escaped twice. End
+a tag with `raw` to output HTML you built yourself:
+
+```liquid
+<p>Thanks, {{ recipient.name }}.</p>
+{{ receipt_html | raw }}
+```
+
+`raw` applies to the whole value, so escape text from people before adding markup to it:
+`{{ comment | escape | newline_to_br | raw }}`. The subject, the text body, and in-app and push
+content are plain text and come out as written, so show in-app items as text in your frontend.
+
 A template Liquid can’t parse is the author’s to fix: the dashboard names the field when you save
 it, and a delivery that hits one fails at once instead of retrying.
 

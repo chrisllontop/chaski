@@ -241,7 +241,9 @@ Admin actions in the dashboard are recorded under the `id` that `authorize` retu
 
 `userRoutes` reads the contact from `identify` only, never from what the browser sends. If your frontend is
 served from another origin, list it in `allowedOrigins`: Chaski refuses writes and live
-connections from origins it doesn’t know.
+connections from origins it doesn’t know. The browser also needs CORS on these routes, which your
+app answers: register `cors({ origin, credentials: true })` from `hono/cors` on the mount path
+before `userRoutes`, so it answers the preflight before `identify` runs.
 
 ### 6. Add the push keys
 

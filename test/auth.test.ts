@@ -13,6 +13,11 @@ afterEach(() => {
 const mounted = (authorize: Authorize) =>
   new Hono().route('/chaski', chaski.routes({ dashboard: { authorize } }));
 
+// A host that types its app passes its env to chaski.routes(); the helpers must fit it without a
+// cast, and `pnpm typecheck` holds them to it.
+type HostEnv = { Bindings: { ADMIN_PASSWORD: string }; Variables: { requestId: string } };
+const HOST_ENV: HostEnv['Bindings'] = { ADMIN_PASSWORD: 'correct horse' };
+
 describe('authorize', () => {
   it('logs every change under the actor it let in', async () => {
     const info = vi.spyOn(console, 'info');
@@ -136,8 +141,13 @@ describe('cloudflareAccess', () => {
       expect(String(input)).toBe(`${TEAM}/cdn-cgi/access/certs`);
       return Response.json({ keys: [jwk] });
     });
-    const app = mounted(
-      cloudflareAccess({ teamDomain: 'team.cloudflareaccess.com', audience: AUD }),
+    const app = new Hono<HostEnv>().route(
+      '/chaski',
+      chaski.routes<HostEnv>({
+        dashboard: {
+          authorize: cloudflareAccess({ teamDomain: 'team.cloudflareaccess.com', audience: AUD }),
+        },
+      }),
     );
     return app.request(
       '/chaski/api/channels',
@@ -185,6 +195,29 @@ describe('basicAuth', () => {
     expect((await withCredentials('ops:correct horse')).status).toBe(200);
     expect((await withCredentials('ops:wrong')).status).toBe(401);
     expect((await withCredentials('root:correct horse')).status).toBe(401);
+  });
+
+  it('fits a host that types its env, built once or per request', async () => {
+    const once = new Hono<HostEnv>().route(
+      '/chaski',
+      chaski.routes<HostEnv>({
+        dashboard: { authorize: basicAuth({ username: 'ops', password: 'correct horse' }) },
+      }),
+    );
+    const perRequest = new Hono<HostEnv>().route(
+      '/chaski',
+      chaski.routes<HostEnv>({
+        dashboard: {
+          authorize: (c) => basicAuth({ username: 'ops', password: c.env.ADMIN_PASSWORD })(c),
+        },
+      }),
+    );
+    const headers = { authorization: `Basic ${btoa('ops:correct horse')}` };
+
+    for (const host of [once, perRequest]) {
+      expect((await host.request('/chaski/api/channels', {}, HOST_ENV)).status).toBe(401);
+      expect((await host.request('/chaski/api/channels', { headers }, HOST_ENV)).status).toBe(200);
+    }
   });
 
   it('needs a username and a password', () => {

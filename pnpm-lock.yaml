@@ -166,9 +166,6 @@ importers:
 
   .:
     dependencies:
-      better-drizzle:
-        specifier: ^0.2.0
-        version: 0.2.0(drizzle-orm@0.45.4(@cloudflare/workers-types@5.20261023.1))(typescript@7.0.2)(zod@4.6.7)
       drizzle-orm:
         specifier: ^0.45.4
         version: 0.45.4(@cloudflare/workers-types@5.20261023.1)
@@ -248,6 +245,9 @@ importers:
       '@vitejs/plugin-react':
         specifier: ^6.1.2
         version: 6.1.2(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+      better-drizzle:
+        specifier: ^0.2.0
+        version: 0.2.0(drizzle-orm@0.45.4(@cloudflare/workers-types@5.20261023.1))(typescript@7.0.2)(zod@4.6.7)
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
