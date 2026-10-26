@@ -1,6 +1,6 @@
 ---
 name: chaski
-description: Chaski, email, web push, APNs and in-app notifications that run inside a Cloudflare Worker (npm package `chaski`). Use to set up Chaski in a Worker or its frontend, to audit the notifications a codebase sends and plan moving them onto Chaski, to write code that sends or schedules with it, or to fix a Chaski setup that fails (config errors, migrations, bindings, sign-in, CSP).
+description: Chaski, email, web push, APNs and in-app notifications that run inside a Cloudflare Worker (npm package `chaskijs`). Use to set up Chaski in a Worker or its frontend, to audit the notifications a codebase sends and plan moving them onto Chaski, to write code that sends or schedules with it, or to fix a Chaski setup that fails (config errors, migrations, bindings, sign-in, CSP).
 license: MIT
 ---
 
@@ -39,8 +39,8 @@ Read the one that matches the task, and only that one until it sends you to anot
   **template** with content per **channel** (`email`, `in_app`, `push`). One notification going out
   on one channel is a **delivery**. The person receiving it is the **contact** (`recipient` in
   code), their choices are **preferences**, and the in-app list is their **feed**.
-- **The types are the truth.** Once `chaski` is installed, its declarations answer any question
-  about an option or a field: `node_modules/chaski/dist/server/config.d.ts` (the config),
+- **The types are the truth.** Once `chaskijs` is installed, its declarations answer any question
+  about an option or a field: `node_modules/chaskijs/dist/server/config.d.ts` (the config),
   `dist/contract/contract.d.ts` (requests and results) and `dist/contract/api.d.ts` (the API). When
   they and this skill disagree, follow the declarations. Before it’s installed, as in an audit,
   use https://chaski.sh/docs, and list what neither settles as something to check after install.

@@ -35,24 +35,24 @@ through another module, by the main module.
 
 ## Migrations
 
-`Chaski: the database is missing migrations <files>. Apply them with wrangler d1 migrations apply <database>, with migrations_dir set to node_modules/chaski/migrations.`
+`Chaski: the database is missing migrations <files>. Apply them with wrangler d1 migrations apply <database>, with migrations_dir set to node_modules/chaskijs/migrations.`
 
 - Local and remote are different databases: `--local` for `wrangler dev`, `--remote` for the
   deployed Worker (with the user’s go-ahead).
 - A new `database_id` means a new, empty local database; apply again.
-- After a Chaski upgrade, new files arrive in `node_modules/chaski/migrations`; apply again.
+- After a Chaski upgrade, new files arrive in `node_modules/chaskijs/migrations`; apply again.
 - `wrangler d1 migrations apply` reports nothing to apply while Chaski still complains: the
   binding’s `migrations_dir` points somewhere other than the package’s folder (the host’s own
   migrations, a path that doesn’t resolve in a monorepo), or Chaski shares a database with the
   host. Chaski needs a database of its own, with `migrations_dir` reaching
-  `chaski/migrations` from the Wrangler config’s folder.
+  `chaskijs/migrations` from the Wrangler config’s folder.
 - A custom `migrations_table` on the D1 binding needs the same name in `migrationsTable`.
 
 ## Build and deploy
 
 | Wrangler says | Fix |
 | --- | --- |
-| `Your Worker depends on the following Durable Objects, which are not exported in your entrypoint file: ChaskiFeed.` | Export `ChaskiFeed` (and `ChaskiEvents`) from the main module: `export { ChaskiEvents, ChaskiFeed } from 'chaski';`. |
+| `Your Worker depends on the following Durable Objects, which are not exported in your entrypoint file: ChaskiFeed.` | Export `ChaskiFeed` (and `ChaskiEvents`) from the main module: `export { ChaskiEvents, ChaskiFeed } from 'chaskijs';`. |
 | `Your Worker depends on the following Workflows, which are not exported in your entrypoint file: ChaskiScheduler.` | Export `ChaskiScheduler` from the main module. |
 | An error about a Durable Object migration tag | Chaski’s `migrations` entry goes after the Worker’s existing ones with a tag of its own; entries already deployed never change. |
 

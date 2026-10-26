@@ -3,7 +3,7 @@
 What the host’s code calls once Chaski is set up. The full guides: https://chaski.sh/docs/sending,
 https://chaski.sh/docs/scheduling, https://chaski.sh/docs/templates and
 https://chaski.sh/docs/preferences. Every request and result type is in
-`node_modules/chaski/dist/contract/contract.d.ts`.
+`node_modules/chaskijs/dist/contract/contract.d.ts`.
 
 ## Types and templates
 

@@ -6,9 +6,9 @@ package run in the browser, and none imports server code:
 
 | Entry | Gives |
 | --- | --- |
-| `chaski/client` | `createChaskiClient`: the feed, unread count, live updates, push and preferences |
-| `chaski/sw` | `handlePushEvents`, which shows web push from the service worker |
-| `chaski/react` | `ChaskiProvider`, `useFeed`, `useUnreadCount`, `usePush`, `usePreferences`, `useFeedConnection` (React 18 or 19) |
+| `chaskijs/client` | `createChaskiClient`: the feed, unread count, live updates, push and preferences |
+| `chaskijs/sw` | `handlePushEvents`, which shows web push from the service worker |
+| `chaskijs/react` | `ChaskiProvider`, `useFeed`, `useUnreadCount`, `usePush`, `usePreferences`, `useFeedConnection` (React 18 or 19) |
 
 The guide for people: https://chaski.sh/docs/browser-clients.
 
@@ -33,7 +33,7 @@ Create it once and share it:
 
 ```ts
 // src/lib/chaski.ts
-import { createChaskiClient } from 'chaski/client';
+import { createChaskiClient } from 'chaskijs/client';
 
 export const chaskiClient = createChaskiClient({ baseUrl: '/me/notifications' });
 ```
@@ -75,7 +75,7 @@ export const chaskiClient = createChaskiClient({ baseUrl: '/me/notifications' })
 With React, wrap the app once, near the root, and use the hooks anywhere below:
 
 ```tsx
-import { ChaskiProvider, useFeed, useUnreadCount } from 'chaski/react';
+import { ChaskiProvider, useFeed, useUnreadCount } from 'chaskijs/react';
 import { chaskiClient } from './lib/chaski';
 
 const Bell = () => {
@@ -100,7 +100,7 @@ stops listening. When the socket keeps failing, the client falls back to checkin
 **With a query cache**, keep Chaski’s data there instead of in the hooks:
 
 ```ts
-import { CHASKI_QUERY_KEY, chaskiQueries } from 'chaski/client';
+import { CHASKI_QUERY_KEY, chaskiQueries } from 'chaskijs/client';
 
 const queries = chaskiQueries(chaskiClient);
 const unread = useQuery(queries.unreadCount());
@@ -120,7 +120,7 @@ client registers by default:
 
 ```ts
 // src/sw.ts
-import { handlePushEvents } from 'chaski/sw';
+import { handlePushEvents } from 'chaskijs/sw';
 
 declare const self: ServiceWorkerGlobalScope;
 
@@ -138,14 +138,14 @@ registering a second one on the same scope, and pass its path to the client:
 `createChaskiClient({ baseUrl, push: { serviceWorkerPath: '/service-worker.js' } })`. Its own
 `push` and `notificationclick` listeners would show every push a second time: keep them only for
 pushes an old path still sends, and have them skip Chaski’s. A worker written as a plain script
-needs the bundling step above once it imports `chaski/sw`. A `firebase-messaging-sw.js` lives on a
+needs the bundling step above once it imports `chaskijs/sw`. A `firebase-messaging-sw.js` lives on a
 scope of its own and can stay while the project moves off FCM.
 
 Then a toggle. Call `enable()` from a click: some browsers ask for permission only after a user
 gesture.
 
 ```tsx
-import { usePush } from 'chaski/react';
+import { usePush } from 'chaskijs/react';
 
 const PushToggle = () => {
   const { state, isPending, error, enable, disable } = usePush();
@@ -174,7 +174,7 @@ signed-in user shows a `push` delivery that isn’t skipped with `no_device_toke
 ## 5. Preferences
 
 ```tsx
-import { usePreferences } from 'chaski/react';
+import { usePreferences } from 'chaskijs/react';
 
 const NotificationSettings = () => {
   const { preferences, topics, update } = usePreferences();

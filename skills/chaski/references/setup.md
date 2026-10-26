@@ -38,29 +38,30 @@ Stop and tell the user before going further when:
 ## 2. Install the package
 
 ```sh
-npm view chaski version
+npm view chaskijs version
 ```
 
-- **It prints a version:** add `chaski`, and `hono` too when it’s missing or older than 4.8, with
-  the project’s package manager (`pnpm add chaski hono`, `npm install chaski hono`, …).
-- **It answers 404:** Chaski isn’t on npm yet. Build it from source (Node 24 and pnpm 12), copy the
-  tarball into the project so the lockfile doesn’t point at a temporary folder, and install that:
+- **It prints 0.1.0 or later:** add `chaskijs`, and `hono` too when it’s missing or older than 4.8,
+  with the project’s package manager (`pnpm add chaskijs hono`, `npm install chaskijs hono`, …).
+- **It prints 0.0.1:** that version only holds the name and has no code, so Chaski isn’t on npm
+  yet. Build it from source (Node 24 and pnpm 12), copy the tarball into the project so the
+  lockfile doesn’t point at a temporary folder, and install that:
 
   ```sh
   SRC="$(mktemp -d)/chaski"
   git clone --depth 1 https://github.com/chrisllontop/chaski.git "$SRC"
   (cd "$SRC" && pnpm install && pnpm build && pnpm pack)
-  mkdir -p vendor && cp "$SRC"/chaski-*.tgz vendor/
-  npm install ./vendor/chaski-<version>.tgz   # or pnpm add / yarn add / bun add
+  mkdir -p vendor && cp "$SRC"/chaskijs-*.tgz vendor/
+  npm install ./vendor/chaskijs-<version>.tgz   # or pnpm add / yarn add / bun add
   ```
 
   Add `hono` the same way when it’s missing or older than 4.8. Tell the user the dependency points
   at a file in `vendor/` until Chaski is on npm.
 
-**Done when** `node_modules/chaski/dist/index.d.ts` and
-`node_modules/chaski/migrations/0000_init.sql` exist next to the Worker. In a monorepo the package
+**Done when** `node_modules/chaskijs/dist/index.d.ts` and
+`node_modules/chaskijs/migrations/0000_init.sql` exist next to the Worker. In a monorepo the package
 may sit in the root `node_modules` instead; note the path from the Wrangler config’s folder to
-`chaski/migrations`, since step 3 needs it.
+`chaskijs/migrations`, since step 3 needs it.
 
 ## 3. Declare the bindings
 
@@ -91,7 +92,7 @@ Everything, in `wrangler.jsonc`:
       "database_name": "my-app-chaski",
       "database_id": "<id printed by wrangler d1 create>",
       // Relative to this file; Chaski's tables come from the package.
-      "migrations_dir": "node_modules/chaski/migrations"
+      "migrations_dir": "node_modules/chaskijs/migrations"
     }
   ],
   "queues": {
@@ -133,7 +134,7 @@ VAPID_PUBLIC_KEY = "<public key from step 6>"
 binding = "CHASKI_DB"
 database_name = "my-app-chaski"
 database_id = "<id printed by wrangler d1 create>"
-migrations_dir = "node_modules/chaski/migrations"
+migrations_dir = "node_modules/chaskijs/migrations"
 
 [[queues.producers]]
 binding = "CHASKI_QUEUE"
@@ -175,7 +176,7 @@ Merge these into the existing config; every entry the Worker already has stays a
 
 - **D1.** Chaski gets a database of its own: a D1 binding takes its migrations from one folder,
   and that folder is the package’s. In a monorepo, point `migrations_dir` at wherever step 2 found
-  the package, such as `../../node_modules/chaski/migrations`.
+  the package, such as `../../node_modules/chaskijs/migrations`.
 - **Durable Object migrations.** When the config already has `migrations`, add Chaski’s entry
   after the last one with a tag of its own, and list only the Chaski classes you bind. With
   neither `ChaskiFeed` nor `ChaskiEvents` bound, add no entry.
@@ -207,7 +208,7 @@ Add `-c <path>` when the config isn’t in the current folder. Run it again afte
 upgrade: Chaski refuses to run against a database that misses one of its migrations.
 
 **Done when** the command lists `0000_init.sql` and every later file in
-`node_modules/chaski/migrations` as applied, or reports nothing left to apply.
+`node_modules/chaskijs/migrations` as applied, or reports nothing left to apply.
 
 ## 5. Mount Chaski
 
@@ -226,7 +227,7 @@ import {
   type DeliveryMessage,
   type ScheduleParams,
   type SendEmailBinding,
-} from 'chaski';
+} from 'chaskijs';
 
 export type Env = {
   CHASKI_PUBLIC_URL: string;
@@ -277,7 +278,7 @@ export const chaski = createChaski((env: Env) => ({
 When the project already has an `Env` type, from `wrangler types` or by hand, add the fields to it
 and use it here instead. An `Env` declared in the main module moves into `src/chaski.ts` (or a
 `src/env.ts` both import), since importing it from the main module here would be circular. Every option is in
-`node_modules/chaski/dist/server/config.d.ts`; `email.from` must be an address on the domain
+`node_modules/chaskijs/dist/server/config.d.ts`; `email.from` must be an address on the domain
 onboarded to Email Service.
 
 ### Sign-in to the dashboard
@@ -354,7 +355,7 @@ import { chaski, type Env } from './chaski';
 import type { User } from './session'; // the app's own
 
 // The bindings find Chaski's classes through the main module's exports; export the ones you bind.
-export { ChaskiEvents, ChaskiFeed, ChaskiScheduler } from 'chaski';
+export { ChaskiEvents, ChaskiFeed, ChaskiScheduler } from 'chaskijs';
 
 // The app's own Hono env: Variables holds what its session middleware sets.
 type AppEnv = { Bindings: Env; Variables: { user: User | null } };
