@@ -55,6 +55,8 @@ export const deliveries = sqliteTable(
     errorCode: text('error_code'),
     providerMessageId: text('provider_message_id'),
     sentAt: timestamp('sent_at'),
+    // How long the channel's provider took on the latest attempt, whatever it ended in.
+    providerMs: integer('provider_ms'),
     // Email open tracking via pixel: openedAt freezes the first open. Opens are a
     // read receipt, not a delivery state — status stays 'sent' and the UI surfaces
     // openedAt as a separate "seen" indicator.
@@ -66,6 +68,7 @@ export const deliveries = sqliteTable(
     index('idx_deliveries_status').on(t.status, t.updatedAt),
     index('idx_deliveries_updated').on(t.updatedAt),
     index('idx_deliveries_opened').on(t.openedAt).where(sql`opened_at IS NOT NULL`),
+    index('idx_deliveries_sent').on(t.sentAt).where(sql`sent_at IS NOT NULL`),
   ],
 );
 

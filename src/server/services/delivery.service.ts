@@ -64,6 +64,8 @@ export class DeliveryService extends BaseService {
     // Every call to the channel is an attempt, whatever it ends in; the
     // failures above never reached one.
     const attempts = delivery.attempts + 1;
+    // workerd advances the clock only across I/O, which the provider call is.
+    const startedAt = Date.now();
     try {
       const result = await definition.deliver({ delivery, notification });
       await DeliveryService.client.deliveries.update({
@@ -71,6 +73,7 @@ export class DeliveryService extends BaseService {
         data: {
           status: 'sent',
           attempts,
+          providerMs: Date.now() - startedAt,
           providerMessageId: result.providerMessageId ?? null,
           sentAt: new Date(),
           lastError: null,
@@ -79,20 +82,20 @@ export class DeliveryService extends BaseService {
       });
       return { status: 'sent' };
     } catch (error) {
+      const providerMs = Date.now() - startedAt;
       const classified = DeliveryService.classify(error);
       if (classified.permanent) {
-        await DeliveryService.markFailed(
-          delivery.id,
-          classified.code,
-          classified.message,
+        await DeliveryService.markFailed(delivery.id, classified.code, classified.message, {
           attempts,
-        );
+          providerMs,
+        });
         return { status: 'failed' };
       }
       await DeliveryService.client.deliveries.update({
         where: { id: delivery.id },
         data: {
           attempts,
+          providerMs,
           lastError: classified.message,
           errorCode: classified.code,
         },
@@ -127,11 +130,11 @@ export class DeliveryService extends BaseService {
     deliveryId: string,
     errorCode: string,
     message: string,
-    attempts?: number,
+    attempt?: { attempts: number; providerMs: number },
   ): Promise<void> => {
     await DeliveryService.client.deliveries.update({
       where: { id: deliveryId },
-      data: { status: 'failed', errorCode, lastError: message, ...(attempts ? { attempts } : {}) },
+      data: { status: 'failed', errorCode, lastError: message, ...attempt },
     });
   };
 
