@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { ArrowRight, TrendingDown, TrendingUp } from 'lucide-react';
 import { useState } from 'react';
-import { Bar, BarChart, CartesianGrid, XAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts';
 import { ChannelLabel } from '~/components/app/delivery-bits';
 import { ErrorAlert, PageHeader } from '~/components/app/page';
 import { SiteHeader } from '~/components/app/site-header';
@@ -42,12 +42,13 @@ import {
 import { api } from '~/lib/api';
 import {
   formatChange,
+  formatDuration,
   formatNumber,
   formatPercent,
   formatUtcDay,
   formatUtcRange,
 } from '~/lib/format';
-import type { Overview, Period, Timeseries, TypeOutcome } from '~/lib/types';
+import type { Latency, Overview, Period, Timeseries, TypeOutcome } from '~/lib/types';
 
 const PERIODS: Record<Period, { label: string; days: number }> = {
   '7d': { label: 'Last 7 days', days: 7 },
@@ -226,6 +227,137 @@ const DailyChart = ({ overview, timeseries }: { overview: Overview; timeseries: 
   );
 };
 
+// ─── Latency ───
+
+const LATENCY_SERIES = {
+  p50: { label: 'p50', color: 'var(--chart-2)' },
+  p95: { label: 'p95', color: 'var(--chart-1)' },
+} satisfies ChartConfig;
+
+const LatencyFigure = ({ label, value }: { label: string; value: number | null }) => (
+  <div className="flex flex-1 flex-col justify-center gap-1 border-t px-6 py-4 even:border-l sm:border-t-0 sm:border-l sm:px-8 sm:py-6">
+    <span className="whitespace-nowrap text-muted-foreground text-xs">{label}</span>
+    <span className="whitespace-nowrap font-bold text-lg leading-none tabular-nums sm:text-3xl">
+      {formatDuration(value)}
+    </span>
+  </div>
+);
+
+const LatencyCard = ({ latency }: { latency: Latency }) => (
+  <Card className="py-0">
+    <CardHeader className="flex flex-col items-stretch border-b p-0! sm:flex-row">
+      <div className="flex flex-1 flex-col justify-center gap-1 px-6 pt-4 pb-3 sm:py-6">
+        <CardTitle>Latency</CardTitle>
+        <CardDescription>
+          Time to deliver runs from the send to the provider accepting it, retries included
+        </CardDescription>
+      </div>
+      <div className="flex">
+        <LatencyFigure label="To deliver · p50" value={latency.overall.toDeliver.p50} />
+        <LatencyFigure label="To deliver · p95" value={latency.overall.toDeliver.p95} />
+        <LatencyFigure label="Provider · p95" value={latency.overall.provider.p95} />
+      </div>
+    </CardHeader>
+    <CardContent className="flex flex-col gap-6 px-2 py-6 sm:px-6">
+      <ChartContainer config={LATENCY_SERIES} className="aspect-auto h-[220px] w-full">
+        <LineChart data={latency.series} margin={{ left: 4, right: 12 }}>
+          <CartesianGrid vertical={false} />
+          <XAxis
+            dataKey="date"
+            tickLine={false}
+            axisLine={false}
+            tickMargin={8}
+            minTickGap={32}
+            tickFormatter={(value: string) => formatUtcDay(value)}
+          />
+          <YAxis
+            tickLine={false}
+            axisLine={false}
+            width={64}
+            tickFormatter={(value: number) => formatDuration(value)}
+          />
+          <ChartTooltip
+            content={
+              <ChartTooltipContent
+                className="w-[160px]"
+                labelFormatter={(value) => formatUtcDay(String(value))}
+                formatter={(value, name, item) => (
+                  <div className="flex w-full items-center justify-between gap-2">
+                    <span className="flex items-center gap-2 text-muted-foreground">
+                      <span
+                        className="size-2.5 shrink-0 rounded-[2px]"
+                        style={{ backgroundColor: item.color }}
+                      />
+                      {name}
+                    </span>
+                    <span className="font-medium font-mono text-foreground tabular-nums">
+                      {formatDuration(Number(value))}
+                    </span>
+                  </div>
+                )}
+              />
+            }
+          />
+          {(['p50', 'p95'] as const).map((key) => (
+            <Line
+              key={key}
+              dataKey={key}
+              type="monotone"
+              stroke={`var(--color-${key})`}
+              strokeWidth={2}
+              // Days without sends are gaps, so a lone day still shows as a point.
+              dot={{ r: 2.5, strokeWidth: 0, fill: `var(--color-${key})` }}
+              connectNulls
+            />
+          ))}
+        </LineChart>
+      </ChartContainer>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Channel</TableHead>
+            <TableHead className="text-right">Sent</TableHead>
+            <TableHead className="text-right">To deliver · p50</TableHead>
+            <TableHead className="text-right">To deliver · p95</TableHead>
+            <TableHead className="text-right">Provider · p50</TableHead>
+            <TableHead className="text-right">Provider · p95</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {latency.channels.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                Nothing was sent in this period.
+              </TableCell>
+            </TableRow>
+          ) : (
+            latency.channels.map((row) => (
+              <TableRow key={row.channel}>
+                <TableCell>
+                  <ChannelLabel channel={row.channel} />
+                </TableCell>
+                <TableCell className="text-right tabular-nums">{formatNumber(row.count)}</TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {formatDuration(row.toDeliver.p50)}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {formatDuration(row.toDeliver.p95)}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {formatDuration(row.provider.p50)}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {formatDuration(row.provider.p95)}
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    </CardContent>
+  </Card>
+);
+
 // ─── By type and channel ───
 
 const TypeTable = ({ types }: { types: TypeOutcome[] }) => (
@@ -325,7 +457,8 @@ export const OverviewPage = () => {
   const overview = usePeriodQuery<Overview>('overview', period);
   const timeseries = usePeriodQuery<Timeseries>('timeseries', period);
   const types = usePeriodQuery<{ types: TypeOutcome[] }>('types', period);
-  const error = overview.error ?? timeseries.error ?? types.error;
+  const latency = usePeriodQuery<Latency>('latency', period);
+  const error = overview.error ?? timeseries.error ?? types.error ?? latency.error;
 
   return (
     <>
@@ -350,10 +483,11 @@ export const OverviewPage = () => {
           }
         />
         {error ? <ErrorAlert error={error} /> : null}
-        {overview.data && timeseries.data && types.data ? (
+        {overview.data && timeseries.data && types.data && latency.data ? (
           <>
             <MetricCards overview={overview.data} days={PERIODS[period].days} />
             <DailyChart overview={overview.data} timeseries={timeseries.data} />
+            <LatencyCard latency={latency.data} />
             <TypeTable types={types.data.types} />
             <div className="grid gap-4 md:grid-cols-3">
               <CountList

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { query } from '../../src/dashboard/lib/api';
 import {
   formatChange,
+  formatDuration,
   formatPercent,
   formatRelative,
   formatUtcRange,
@@ -21,6 +22,15 @@ describe('dashboard formats', () => {
     expect(formatPercent(99.83)).toBe('99.8%');
     expect(formatPercent(100)).toBe('100%');
     expect(formatPercent(null)).toBe('–');
+  });
+
+  it('shows durations in the largest readable unit', () => {
+    expect(formatDuration(840)).toBe('840 ms');
+    expect(formatDuration(1430)).toBe('1.4 s');
+    expect(formatDuration(12_400)).toBe('12 s');
+    expect(formatDuration(150_000)).toBe('2.5 min');
+    expect(formatDuration(9_000_000)).toBe('2.5 h');
+    expect(formatDuration(null)).toBe('–');
   });
 
   it('signs changes, in percent or in points', () => {

@@ -18,6 +18,7 @@ export type Delivery = {
   errorCode: string | null;
   providerMessageId: string | null;
   sentAt: string | null;
+  providerMs: number | null;
   openedAt: string | null;
   updatedAt: string;
   createdAt: string;
@@ -162,4 +163,14 @@ export type ChannelsOverview = {
       ios: { bundleId: string; environment: 'sandbox' | 'production' } | null;
     },
   ];
+};
+
+export type Percentiles = { p50: number | null; p95: number | null };
+export type LatencyStats = { count: number; toDeliver: Percentiles; provider: Percentiles };
+export type Latency = {
+  period: Period;
+  from: string;
+  overall: LatencyStats;
+  channels: Array<LatencyStats & { channel: Channel }>;
+  series: Array<{ date: string; count: number; p50: number | null; p95: number | null }>;
 };

@@ -40,7 +40,7 @@ import {
 } from '~/components/ui/table';
 import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs';
 import { api, query } from '~/lib/api';
-import { CHANNEL_LABELS, formatDateTime, formatNumber } from '~/lib/format';
+import { CHANNEL_LABELS, formatDateTime, formatDuration, formatNumber } from '~/lib/format';
 import type { Channel, Delivery, DeliveryPage, DeliveryStatus, TemplateSummary } from '~/lib/types';
 
 const STATUSES: DeliveryStatus[] = ['pending', 'sent', 'failed', 'dead', 'skipped'];
@@ -142,6 +142,16 @@ const DeliverySheet = ({
               ) : null}
               <Field label="Created">{formatDateTime(delivery.createdAt)}</Field>
               <Field label="Sent">{formatDateTime(delivery.sentAt)}</Field>
+              {delivery.sentAt ? (
+                <Field label="Time to deliver">
+                  {formatDuration(
+                    new Date(delivery.sentAt).getTime() - new Date(delivery.createdAt).getTime(),
+                  )}
+                </Field>
+              ) : null}
+              {delivery.providerMs !== null ? (
+                <Field label="Provider time">{formatDuration(delivery.providerMs)}</Field>
+              ) : null}
               {delivery.channel === 'email' ? (
                 <Field label="Opened">{formatDateTime(delivery.openedAt)}</Field>
               ) : null}
