@@ -1,6 +1,8 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "chaski-site",
+  // Workers Builds deploys to the Worker of this name, so it must match the one connected to the
+  // repository.
+  "name": "chaski",
   "compatibility_date": "2026-10-15",
   // No main module: every page is prerendered at build time and served as a static asset. The Vite
   // plugin writes the deploy config next to the build output, so `wrangler deploy` uploads dist/client.
@@ -8,5 +10,9 @@
     "not_found_handling": "404-page"
   },
   "routes": [{ "pattern": "chaski.sh", "custom_domain": true }],
-  "workers_dev": false
+  "workers_dev": false,
+  // Each pull request's preview gets a workers.dev URL, which Cloudflare marks noindex.
+  "preview_urls": true,
+  // `wrangler preview` refuses to run without this block; the site has nothing to set in it.
+  "previews": {}
 }
