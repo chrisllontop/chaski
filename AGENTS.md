@@ -25,7 +25,7 @@ for the page, the service worker and React.
   (`test/fixture/seed.ts`), so the dashboard has something to show.
 - `pnpm build:dashboard` (Vite) writes `src/generated/dashboard.ts`, which the server code imports.
   It is generated and gitignored; run it once before typechecking or testing on a fresh clone.
-- `pnpm typecheck` (tsc, six projects), `pnpm lint` (Biome), `pnpm format` (Biome with fixes),
+- `pnpm typecheck` (tsc, seven projects), `pnpm lint` (Biome), `pnpm format` (Biome with fixes),
   `pnpm test` (Vitest in workerd), `pnpm build` (dashboard, tsdown, then the declarations).
 - `pnpm drizzle-kit generate --name <name>` writes a migration into `migrations/` after a schema
   change; `.cursor/rules/database.mdc` says what else a migration needs.
@@ -108,8 +108,9 @@ with the code they govern.
 - Each runtime has its own types: `tsconfig.json` (the Worker side of `src`, Workers types),
   `tsconfig.browser.json` (the browser entries and the contract, DOM types),
   `src/dashboard/tsconfig.json` (DOM and JSX), `test/tsconfig.json` (Workers plus the Vitest
-  plugin), `test/browser/tsconfig.json` (the browser tests) and `tsconfig.node.json` (the config
-  files and scripts).
+  plugin), `test/browser/tsconfig.json` (the browser tests), `test/sw/tsconfig.json` (a real service
+  worker scope against `chaski/sw`, WebWorker types) and `tsconfig.node.json` (the config files
+  and scripts).
 - tsdown bundles the JavaScript and TypeScript 7's compiler emits the declarations
   (`pnpm build:types`), so exported Drizzle tables and zod schemas keep their inferred types.
   `scripts/fix-declaration-imports.ts` then gives their relative imports the file extensions that
