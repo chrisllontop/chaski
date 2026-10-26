@@ -1,0 +1,14 @@
+node_modules
+dist
+coverage
+test-results
+playwright-report
+*.tsbuildinfo
+.DS_Store
+.env
+.env.*
+.dev.vars*
+.wrangler
+.t3
+.plans
+*.tgz

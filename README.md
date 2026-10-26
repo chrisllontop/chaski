@@ -1,1 +1,28 @@
 # chaski
+
+Embeddable notification infrastructure for Cloudflare Workers, dashboard included.
+
+**Status: pre-release.** chaski isn’t usable yet. This repository holds the project’s base, and the
+engine comes next.
+
+## What it will be
+
+chaski lives inside your Worker. You mount it on a route, the way you’d mount Swagger UI or Bull
+Board, and it runs on your own Cloudflare resources. It deploys with your Worker, and your data stays
+in your account.
+
+- **Email, push, and in-app.** Send email, web push, and notifications to an in-app feed.
+- **Templates** for the content of every notification.
+- **Scheduling** for notifications that go out later.
+- **Retries** for deliveries that fail along the way.
+- **A dashboard**, served from the same route.
+
+## The name
+
+The chaskis were the relay messengers of the Inca Empire. They ran the Qhapaq Ñan, the Inca road
+network, each one covering a short stretch before handing the message to the next runner. That’s how
+news crossed the Andes in days.
+
+## License
+
+[MIT](LICENSE)

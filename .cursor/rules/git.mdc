@@ -1,0 +1,41 @@
+---
+description: Git commit and pull request conventions
+---
+
+## Git commits
+
+- Use imperative mood and sentence case (e.g. `Add user billing flags`, `Fix sidebar layout on mobile`).
+- Do **not** use Conventional Commits prefixes (`feat:`, `fix:`, `chore:`). The history uses plain subject lines.
+- Do **not** put issue-tracker identifiers in commit messages. Link the work from the pull request description instead.
+- Keep the first line under ~72 characters; use the body for extra detail if needed.
+
+## Pull requests
+
+- Write the PR **title** and **description** in **English**.
+- Do **not** put issue identifiers or tracking links in the PR **title**. Reference them inline in the description if needed.
+- **Title:** same tone as commits — imperative mood, sentence case, short (under ~72 characters), no Conventional-Commits prefixes.
+- **Description** — use only these three sections. Skip preambles and keep prose brief.
+  - **Summary** — the smallest view that makes the key point clear: a short paragraph plus, when it helps, a file tree, call tree, pseudocode, `diff` sketch, or Mermaid diagram. Keep only the files, calls, states, and boundaries a reviewer needs.
+  - **Evidence** — concrete proof that the change works, as a before and after. Screenshots for visual changes; otherwise command output or the test that failed before and passes now. Say what was not verified.
+  - **Merge Danger** — **Door:** one-way (hard to reverse: destructive actions, published releases, D1 migrations) or two-way (cheap to roll back). **Blast Radius:** one word for the scope of impact, then the possible ramifications of merging, if any.
+
+```markdown
+## Summary
+
+<paragraph, plus a tree, pseudocode, diff sketch, or diagram>
+
+## Evidence
+
+- **Before:** <output, failing test, or screenshot>
+  **After:** <output, passing test, or screenshot>
+
+## Merge Danger
+
+**Door:** <one-way or two-way>
+
+**Blast Radius:** <one word>
+
+<optional: ramifications of merging>
+```
+
+- Run **`pnpm check`** from the repository root before every push, including a push to an open pull request. Fix failures first.
