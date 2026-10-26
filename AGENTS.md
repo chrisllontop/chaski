@@ -159,7 +159,6 @@ with the code they govern.
 
 - Commit small and often on your branch, following `.cursor/rules/git.mdc` (imperative, sentence
   case, no Conventional Commits prefixes). Run `pnpm check` and `pnpm build` before every push.
-  **Do not push and do not open pull requests unless asked.**
 - Stay inside the files your task owns. If you need a change in a shared file (root config, rules,
   CI), make the smallest additive edit, or report it back.
 - npm releases go through the Release workflow. Do not run `npm publish` yourself.
