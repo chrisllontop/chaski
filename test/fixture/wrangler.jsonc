@@ -2,5 +2,41 @@
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "chaski-fixture-host",
   "main": "worker.ts",
-  "compatibility_date": "2026-10-15"
+  "compatibility_date": "2026-10-15",
+  "vars": {
+    "CHASKI_PUBLIC_URL": "http://localhost:8787/chaski",
+    "CHASKI_DRY_RUN": "false"
+  },
+  "d1_databases": [
+    {
+      "binding": "CHASKI_DB",
+      "database_name": "chaski-fixture",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "../../migrations"
+    }
+  ],
+  "queues": {
+    "producers": [{ "binding": "CHASKI_QUEUE", "queue": "chaski-deliveries" }],
+    "consumers": [
+      {
+        "queue": "chaski-deliveries",
+        "max_batch_size": 10,
+        "max_batch_timeout": 1,
+        "max_retries": 5,
+        "dead_letter_queue": "chaski-deliveries-dlq"
+      }
+    ]
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "CHASKI_FEED", "class_name": "ChaskiFeed" },
+      { "name": "CHASKI_EVENTS", "class_name": "ChaskiEvents" }
+    ]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ChaskiFeed", "ChaskiEvents"] }],
+  "workflows": [
+    { "name": "chaski-scheduler", "binding": "CHASKI_SCHEDULER", "class_name": "ChaskiScheduler" }
+  ],
+  "r2_buckets": [{ "binding": "CHASKI_ATTACHMENTS", "bucket_name": "chaski-attachments" }],
+  "send_email": [{ "name": "CHASKI_EMAIL" }]
 }

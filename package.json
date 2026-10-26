@@ -35,7 +35,8 @@
     "./package.json": "./package.json"
   },
   "files": [
-    "dist"
+    "dist",
+    "migrations/*.sql"
   ],
   "publishConfig": {
     "access": "public"
@@ -52,9 +53,10 @@
     }
   },
   "scripts": {
-    "dev": "pnpm build:dashboard && wrangler dev -c test/fixture/wrangler.jsonc",
+    "dev": "pnpm build:dashboard && wrangler dev -c test/fixture/wrangler.jsonc --var CHASKI_DRY_RUN:true",
     "build:dashboard": "vite build",
-    "build": "pnpm build:dashboard && tsdown",
+    "build:types": "tsc -p tsconfig.json --noEmit false --declaration --emitDeclarationOnly --outDir dist --rootDir src && node scripts/fix-declaration-imports.ts dist",
+    "build": "pnpm build:dashboard && tsdown && pnpm build:types",
     "typecheck": "tsc -p tsconfig.json && tsc -p src/dashboard/tsconfig.json && tsc -p test/tsconfig.json && tsc -p tsconfig.node.json",
     "lint": "biome check .",
     "format": "biome check --write .",
@@ -71,6 +73,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
+    "drizzle-kit": "^0.31.11",
     "hono": "^4.13.13",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
@@ -80,5 +83,11 @@
     "vite": "^8.3.5",
     "vitest": "^5.0.5",
     "wrangler": "^4.152.0"
+  },
+  "dependencies": {
+    "better-drizzle": "^0.2.0",
+    "drizzle-orm": "^0.45.4",
+    "liquidjs": "^10.30.0",
+    "zod": "^4.6.7"
   }
 }

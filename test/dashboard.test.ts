@@ -72,18 +72,18 @@ describe('dashboard assets', () => {
 });
 
 describe('authorize', () => {
-  it('blocks the shell when it returns false', async () => {
+  it('blocks the shell when it returns null', async () => {
     const response = await get('/chaski/templates/welcome', 'deny');
 
     expect(response.status).toBe(403);
     expect(response.headers.get('content-type')).not.toContain('text/html');
   });
 
-  it('blocks the API with a JSON error when it returns false', async () => {
+  it('blocks the API with a JSON error when it returns null', async () => {
     const response = await get('/chaski/api/templates', 'deny');
 
     expect(response.status).toBe(403);
-    expect(await response.json()).toEqual({ error: 'forbidden' });
+    expect(await response.json()).toEqual({ error: 'forbidden', message: 'not allowed' });
   });
 
   it('passes a returned response through untouched', async () => {
@@ -99,7 +99,7 @@ describe('API', () => {
     const response = await get('/chaski/api/whatever');
 
     expect(response.status).toBe(404);
-    expect(await response.json()).toEqual({ error: 'not_found' });
+    expect(await response.json()).toMatchObject({ error: 'not_found' });
   });
 });
 

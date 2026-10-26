@@ -25,6 +25,6 @@
   },
   "files": {
     "maxSize": 2000000,
-    "includes": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.json"]
+    "includes": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.json", "!migrations/meta"]
   }
 }
