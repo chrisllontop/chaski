@@ -23,43 +23,22 @@ A channel goes out only when the template has it `enabled`. A template can also 
 `description`, a `topic` that groups it on the user’s preferences screen, and `sampleData`, a
 string of JSON the dashboard previews it with.
 
-Templates live in Chaski’s database, not in the host’s code. They’re written in the dashboard
-under **Templates**, or brought in as a file through **Templates**, **Import**. A file is the way
-to hand the user templates written from code:
+Templates live in Chaski’s database, not in the host’s code: the user writes them in the
+dashboard under **Templates**, **New template**, with a live preview. When a template comes from
+code, hand the user its fields to paste, channel by channel:
 
-```json
-{
-  "format": "chaski.templates",
-  "version": 1,
-  "templates": [
-    {
-      "type": "payment_received",
-      "description": "A payment cleared",
-      "topic": "billing",
-      "sampleData": "{\"amount\": \"$15.00\", \"recipient\": {\"name\": \"Ana\"}}",
-      "channels": [
-        {
-          "channel": "email",
-          "enabled": true,
-          "subject": "We received {{ amount }}",
-          "body": "<p>Thanks, {{ recipient.name | escape }}. We received {{ amount }}.</p>",
-          "textBody": "Thanks, {{ recipient.name }}. We received {{ amount }}."
-        },
-        {
-          "channel": "in_app",
-          "enabled": true,
-          "subject": "Payment received",
-          "body": "We received {{ amount }}.",
-          "textBody": "/payments"
-        }
-      ]
-    }
-  ]
-}
+```text
+Type         payment_received
+Topic        billing
+Sample data  {"amount": "$15.00", "recipient": {"name": "Ana"}}
+
+email    subject   We received {{ amount }}
+         body      <p>Thanks, {{ recipient.name }}. We received {{ amount }}.</p>
+         textBody  Thanks, {{ recipient.name }}. We received {{ amount }}.
+in_app   subject   Payment received
+         body      We received {{ amount }}.
+         textBody  /payments
 ```
-
-Importing is keyed by type: the same file twice changes nothing, the dashboard shows what it will
-create and update before applying, and channels the file leaves out are never touched.
 
 ### Liquid
 
@@ -67,8 +46,9 @@ Templates are [Liquid](https://liquidjs.com). They see the send’s `payload` at
 `recipient` (`id`, and `email`, `name`, `phone`, `timezone`, `locale` when the send gave them).
 
 - A missing key renders empty instead of failing the delivery.
-- Output isn’t HTML-escaped. In an email `body`, pipe values a user typed through `escape`:
-  `{{ recipient.name | escape }}`.
+- An email `body` escapes every value for HTML on its own. A value that holds HTML on purpose
+  goes through `raw`: `{{ summary_html | raw }}`. The subject, the text body, in-app and push
+  are plain text and stay as written.
 - Loops and conditions: `{% for item in items %}…{% endfor %}`, `{% if overdue %}…{% endif %}`.
   Only `nil` and `false` are false: test a list with `{% if items.size > 0 %}` and a string with
   `{% if name != blank %}`.

@@ -3,8 +3,8 @@
 The audit reads the project and writes an **inventory**: every flow that sends email, push or
 in-app notifications, what it sends, when, to whom, on which channel and with which template.
 [plan.md](plan.md) then turns the inventory into a plan for moving those flows onto Chaski. The
-audit changes no code. It writes the finder’s output to a temporary file, then `chaski-plan.md`
-and `chaski-templates.json` in the project.
+audit changes no code. It writes the finder’s output to a temporary file, then `chaski-plan.md` in
+the project.
 
 ## 1. Map the project
 

@@ -60,9 +60,6 @@ through another module, by the main module.
 
 Type errors:
 
-- `Context<…>` isn’t assignable to `Context<Env…>` where `authorize` calls `basicAuth()` or
-  `cloudflareAccess()`: call `chaski.routes()` without a type argument and type the context as
-  Hono’s `Context`, casting `c.env` to the Worker’s `Env` ([setup.md](setup.md), step 5).
 - A build error that `hono/route` can’t be resolved: `hono` is older than 4.8, the first version
   with that module.
 - Errors from another Worker over RPC arrive without their `code`: both Workers need a
@@ -72,7 +69,7 @@ Type errors:
 
 | The send throws | Fix |
 | --- | --- |
-| `unknown notification type '<type>': register a template for it before sending` | Create the template, or import it ([sending.md](sending.md)). |
+| `unknown notification type '<type>': register a template for it before sending` | Have the user create the template in the dashboard ([sending.md](sending.md)). |
 | `channels not configured: <channels>` | The send’s `channels` lists a channel the config doesn’t turn on. |
 | `scheduledAt must be ISO 8601 with an explicit offset (Z or ±hh:mm)` | Add the offset: `2026-11-01T09:00:00-05:00` or `…Z`. |
 | `scheduledAt is in the past` | The time passed more than five minutes ago. |
@@ -103,8 +100,8 @@ the dashboard. Keep `max_retries` on the queue consumer equal to `maxRetries` (5
 rows can stay `pending` after the queue gave up on them.
 
 **Nothing arrives, yet deliveries show `sent`.** `dryRun` is on: in dry run Chaski records email
-and push without handing them to a provider. Check `GET <mount>/api/channels`, or the dashboard’s
-**Channels** page, for `"dryRun"`. In-app items reach the feed in dry run too.
+and push without handing them to a provider. The dashboard’s **Channels** page says
+whether dry run is on. In-app items reach the feed in dry run too.
 
 **Web push stopped reaching browsers after a key change.** A subscription belongs to the VAPID key
 it was made with. Put the earlier pair back, or have users turn push on again.
@@ -132,10 +129,9 @@ it was made with. Put the earlier pair back, or have users turn push on again.
 
 ## Dashboard
 
-- **The header says live updates are off, and the browser console shows failed WebSocket
-  connections to `<mount>/api/events`.** The `ChaskiEvents` Durable Object isn’t bound as
-  `events`. The dashboard keeps trying the socket, and still works: it refreshes when its tab
-  comes back into focus or reloads. Bind `events` for live updates.
+- **The header says live updates are off.** The `ChaskiEvents` Durable Object isn’t bound as
+  `events`, so the dashboard opens no socket. It still works: it refreshes when its tab comes
+  back into focus or reloads. Bind `events` for live updates.
 
 ## Content-Security-Policy
 

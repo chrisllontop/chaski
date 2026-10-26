@@ -313,23 +313,18 @@ clear:
     audience: '<Access application AUD tag>',
   });
 
-  authorize: (c: Context) =>
-    (c.env as Env).CHASKI_LOCAL_ADMIN === 'true' ? { id: 'local' } : access(c),
+  authorize: (c) => (c.env.CHASKI_LOCAL_ADMIN === 'true' ? { id: 'local' } : access(c)),
   ```
 
 - **Neither:** `basicAuth({ username, password })`, with both kept as secrets. Build it inside
   `authorize`, so the secrets come from the request’s env:
 
   ```ts
-  authorize: (c: Context) => {
-    const { ADMIN_USER = '', ADMIN_PASSWORD = '' } = c.env as Env;
-    return basicAuth({ username: ADMIN_USER, password: ADMIN_PASSWORD })(c);
-  },
+  authorize: (c) =>
+    basicAuth({ username: c.env.ADMIN_USER ?? '', password: c.env.ADMIN_PASSWORD ?? '' })(c),
   ```
 
-`basicAuth()` and `cloudflareAccess()` return an `Authorize` for Hono’s default `Env`. With either
-of them, call `chaski.routes()` without a type argument and type the context as Hono’s `Context`,
-as above: passing a typed context into them fails to compile.
+Both helpers take the app’s Hono env, so they work under `chaski.routes<AppEnv>()` as written.
 
 ### The user routes
 
@@ -479,26 +474,15 @@ CHASKI_PUBLIC_URL=http://localhost:8787/admin/notifications
 Match `CHASKI_PUBLIC_URL` to the address `wrangler dev` prints and the mount path. Start the
 project’s dev command, then check each of these, in order:
 
-1. **The dashboard answers.** Open the mount path, or
-   `curl -i http://localhost:8787/admin/notifications/` with the local sign-in: `200` and HTML.
-2. **Chaski read the config.** `GET <mount>/api/channels` returns `"dryRun": true` and the
-   channels the user picked with `"enabled": true`. The dashboard’s **Channels** page shows the
-   same.
-3. **A template exists.** Sending a type without one fails. Write a template file for a `welcome`
-   type with the channels the user picked ([sending.md](sending.md) has the format) to a
-   throwaway path such as `/tmp/chaski-templates.json`: once imported, the template lives in the
-   local database. Import it in the dashboard under **Templates**, **Import**, or from a terminal
-   through the dashboard’s own endpoint:
-
-   ```sh
-   curl -u "$ADMIN_USER:$ADMIN_PASSWORD" -H 'content-type: application/json' \
-     --data @/tmp/chaski-templates.json \
-     'http://localhost:8787/admin/notifications/api/templates/import?preview=true'
-   ```
-
-   `?preview=true` shows what it would create or update; drop it to apply. The sign-in is the
-   dashboard’s: `-u` for `basicAuth()`, the app’s session cookie (`-b 'session=…'`) for its own
-   sign-in, nothing with the local Access bypass. The other checks sign in the same way.
+1. **The dashboard answers.** `curl -i http://localhost:8787/admin/notifications/` with the local
+   sign-in answers `200` and HTML: `-u` for `basicAuth()`, the app’s session cookie
+   (`-b 'session=…'`) for its own sign-in, nothing with the local Access bypass.
+2. **Chaski read the config.** Ask the user to open the dashboard’s **Channels** page: it says dry
+   run is on and shows the channels they picked as enabled.
+3. **A template exists.** Sending a type without one fails, and templates are written in the
+   dashboard. Ask the user to create a `welcome` template under **Templates**, **New template**,
+   with the channels they picked. Give them a subject and a body to paste for each channel
+   ([sending.md](sending.md) says what each field holds), and wait until they confirm it’s saved.
 4. **A send goes through.** Add a temporary route that only answers in dry run, and call it:
 
    ```ts
@@ -517,13 +501,14 @@ project’s dev command, then check each of these, in order:
    The result’s `outcome` is `delivered`. Each delivery with `status: 'skipped'` carries a
    `reason`, and [troubleshooting.md](troubleshooting.md) says what each one means; `push` skips
    with `no_device_tokens` until a browser enables push.
-5. **The delivery moved.** The dashboard’s **Deliveries** page, or `GET <mount>/api/deliveries`,
-   shows each delivery `sent` once the local queue consumer ran, usually within seconds. A
-   delivery stuck at `pending` means the queue handler isn’t wired.
+5. **The delivery moved.** Ask the user to open the dashboard’s **Deliveries** page: each
+   delivery shows `sent` once the local queue consumer ran, usually within seconds. A delivery
+   stuck at `pending` means the queue handler isn’t wired.
 6. **A schedule fires**, when the user turned scheduling on. Have the temporary route call
    `chaski.schedule()` with the same send, an `idempotencyKey` and a `scheduledAt` 20 seconds
-   out (`new Date(Date.now() + 20_000).toISOString()`). `GET <mount>/api/schedules` lists it;
-   once the time passes, it leaves that list and its deliveries show up as in check 5.
+   out (`new Date(Date.now() + 20_000).toISOString()`), and return `chaski.schedules.list()`
+   after it: the schedule is listed. Once the time passes, it leaves that list and its deliveries
+   show up as in check 5.
 
 Take the temporary route out once the checks pass.
 

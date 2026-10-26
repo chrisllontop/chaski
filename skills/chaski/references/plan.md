@@ -71,25 +71,24 @@ Write these down per flow:
 
 ### Converting templates to Liquid
 
-Liquid doesn’t escape output. For the same HTML the old template produced, pipe every value
-through `escape` (`{{ name | escape }}`, links included) except the ones that hold HTML on purpose.
-Values the old code put into HTML through string interpolation get `escape` too.
+An email body escapes every value for HTML on its own, so a converted tag needs no `escape`. A
+value that holds HTML on purpose goes through `raw` instead.
 
 - **Handlebars and Mustache** (SendGrid dynamic templates, Postmark): `{{name}}` becomes
-  `{{ name | escape }}`, and `{{{html}}}` becomes `{{ html }}`.
+  `{{ name }}`, and `{{{html}}}` becomes `{{ html | raw }}`.
   `{{#each items}}{{this.title}}{{/each}}` becomes
-  `{% for item in items %}{{ item.title | escape }}{% endfor %}`. Helpers become Liquid filters, or
+  `{% for item in items %}{{ item.title }}{% endfor %}`. Helpers become Liquid filters, or
   values the host formats before sending.
 - **Conditions.** In Liquid only `nil` and `false` are false: `0`, `''` and an empty list are
   true. So `{{#if items.length}}` becomes `{% if items.size > 0 %}`, `{{#if name}}` becomes
   `{% if name != blank %}`, and a number is compared outright (`{% if count > 0 %}`).
 - **React Email.** Render the component once, with Liquid tags as its props, and keep the HTML:
-  `await render(<Receipt amount="{{ amount }}" name="{{ recipient.name | escape }}" />)`.
+  `await render(<Receipt amount="{{ amount }}" name="{{ recipient.name }}" />)`.
   - React escapes `&`, `<`, `>` and quotes in what it renders, so the tags passed as props hold
     only names and filters. Write conditions and quoted arguments into the output by hand.
-  - For a list, pass one placeholder item whose fields are tags (`{{ item.title | escape }}`),
-    then wrap the element it renders in `{% for item in items %}…{% endfor %}` by hand.
-  - For the text body, render again with props free of `escape`, and keep headings as written:
+  - For a list, pass one placeholder item whose fields are tags (`{{ item.title }}`), then wrap
+    the element it renders in `{% for item in items %}…{% endfor %}` by hand.
+  - For the text body, render again as plain text, and keep headings as written:
     `render(element, { plainText: true, htmlToTextOptions: { selectors: [{ selector: 'h1', options: { uppercase: false } }] } })`,
     with a selector for each heading level the email uses. By default plain text capitalizes
     headings, Liquid tags included, and Liquid then renders the capitalized names as empty.
@@ -101,9 +100,9 @@ Values the old code put into HTML through string interpolation get `escape` too.
 - **Provider-hosted templates**: ask the user to export them from the provider’s dashboard, then
   convert as above.
 
-Write every converted template into `chaski-templates.json` next to the plan, in the import format
-from [sending.md](sending.md), with `sampleData` for the preview. The user imports it in the
-dashboard under **Templates**, **Import**.
+Write every converted template into the plan, field by field as [sending.md](sending.md) shows,
+with sample data for the preview. The user creates each one in the dashboard under
+**Templates**, **New template**, and checks it in the preview before its type moves.
 
 ### State to bring over
 
@@ -147,8 +146,8 @@ over or a reason it stays.
 Write the stages into the plan in this order:
 
 1. **Chaski in dry run.** Set it up on a branch ([setup.md](setup.md)) with the bindings the
-   moving flows need, import `chaski-templates.json`, and check every template in the dashboard’s
-   preview. Before the first email type, the user onboards the sending domain to Email Service, a
+   moving flows need. The user creates the converted templates in the dashboard and checks each
+   one in its preview. Before the first email type, the user onboards the sending domain to Email Service, a
    DNS change on their side.
 2. **Backfills**, before the types that depend on them: preferences before any type that respects
    them, devices before any push type, with the double writes above from the same deploy.
