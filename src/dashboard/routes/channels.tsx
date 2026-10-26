@@ -1,11 +1,11 @@
 import { Activity, Bell, Mail, Smartphone } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useChannelsOverview } from '~/components/app/live-status';
 import { ErrorAlert, PageHeader } from '~/components/app/page';
 import { Panel } from '~/components/app/panel';
 import { Pill } from '~/components/app/pill';
 import { SiteHeader } from '~/components/app/site-header';
 import { Skeleton } from '~/components/ui/skeleton';
+import { useChannelsOverview } from '~/lib/channels';
 
 const Row = ({ label, children }: { label: string; children: ReactNode }) => (
   <div className="grid grid-cols-[8rem_1fr] gap-3 px-4 py-2.5 text-[13px]">
