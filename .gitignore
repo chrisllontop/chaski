@@ -12,3 +12,4 @@ playwright-report
 .t3
 .plans
 *.tgz
+src/generated
