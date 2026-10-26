@@ -1,5 +1,5 @@
 {
-  "name": "chaski",
+  "name": "chaskijs",
   "version": "0.0.1",
   "description": "Embeddable notification infrastructure for Cloudflare Workers, dashboard included.",
   "keywords": [

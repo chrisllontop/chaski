@@ -12,7 +12,7 @@ Embeddable notification infrastructure for Cloudflare Workers, dashboard include
 ![Status: pre-release](https://img.shields.io/badge/status-pre--release-404040?style=flat-square)
 
 **Status: pre-release.** The engine, the browser clients and the dashboard are in place, and the
-guide below sets them up. Chaski isn’t on npm yet: `npm install chaski` works from its first
+guide below sets them up. Chaski isn’t on npm yet: `npm install chaskijs` works from its first
 release.
 
 ## What it does
@@ -46,7 +46,7 @@ fixed.
 ### 1. Add the package
 
 ```sh
-npm install chaski hono
+npm install chaskijs hono
 ```
 
 ### 2. Create the resources
@@ -80,7 +80,7 @@ In `wrangler.jsonc`:
       "database_name": "my-app-chaski",
       "database_id": "<id printed by wrangler d1 create>",
       // Chaski's tables come from the package.
-      "migrations_dir": "node_modules/chaski/migrations"
+      "migrations_dir": "node_modules/chaskijs/migrations"
     }
   ],
   "queues": {
@@ -148,11 +148,11 @@ import {
   type DeliveryMessage,
   type ScheduleParams,
   type SendEmailBinding,
-} from 'chaski';
+} from 'chaskijs';
 import { currentUserId } from './session'; // your app’s own sign-in
 
 // The bindings find Chaski's classes through the main module's exports.
-export { ChaskiEvents, ChaskiFeed, ChaskiScheduler } from 'chaski';
+export { ChaskiEvents, ChaskiFeed, ChaskiScheduler } from 'chaskijs';
 
 type Env = {
   CHASKI_PUBLIC_URL: string;
@@ -332,7 +332,7 @@ over RPC, through a service binding. Export the entrypoint from the host’s mai
 other classes:
 
 ```ts
-export { ChaskiEntrypoint, ChaskiEvents, ChaskiFeed, ChaskiScheduler } from 'chaski';
+export { ChaskiEntrypoint, ChaskiEvents, ChaskiFeed, ChaskiScheduler } from 'chaskijs';
 ```
 
 Then bind to it from the other Worker’s `wrangler.jsonc`, with the host’s Worker name as `service`:
@@ -344,7 +344,7 @@ Then bind to it from the other Worker’s `wrangler.jsonc`, with the host’s Wo
 ```
 
 ```ts
-import type { ChaskiEntrypoint } from 'chaski';
+import type { ChaskiEntrypoint } from 'chaskijs';
 
 type Env = { CHASKI: Service<ChaskiEntrypoint> };
 
@@ -365,10 +365,10 @@ both Workers use a compatibility date on or after `2026-04-21`.
 
 ## In the browser
 
-`chaski/client` talks to the routes you mounted with `chaski.userRoutes()`:
+`chaskijs/client` talks to the routes you mounted with `chaski.userRoutes()`:
 
 ```ts
-import { createChaskiClient } from 'chaski/client';
+import { createChaskiClient } from 'chaskijs/client';
 
 const client = createChaskiClient({ baseUrl: '/me/notifications' });
 
@@ -384,17 +384,17 @@ Web push needs a service worker. Bundle one that hands pushes to Chaski and serv
 or pass its path to the client as `push.serviceWorkerPath`:
 
 ```ts
-import { handlePushEvents } from 'chaski/sw';
+import { handlePushEvents } from 'chaskijs/sw';
 
 declare const self: ServiceWorkerGlobalScope;
 
 handlePushEvents(self, { icon: '/icon-192.png' });
 ```
 
-With React, `chaski/react` wraps the client in hooks:
+With React, `chaskijs/react` wraps the client in hooks:
 
 ```tsx
-import { ChaskiProvider, useFeed, useUnreadCount } from 'chaski/react';
+import { ChaskiProvider, useFeed, useUnreadCount } from 'chaskijs/react';
 
 const Bell = () => {
   const { unread } = useUnreadCount();

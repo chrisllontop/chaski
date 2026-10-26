@@ -23,7 +23,7 @@ export const ensureMigrations = async (db: D1Database, table: string): Promise<v
       'config',
       `Chaski: the database is missing migrations ${missing.join(', ')}. Apply them with ` +
         '`wrangler d1 migrations apply <database>`, with migrations_dir set to ' +
-        'node_modules/chaski/migrations.',
+        'node_modules/chaskijs/migrations.',
     );
   }
   verified.set(db, table);
