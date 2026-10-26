@@ -26,10 +26,10 @@ npm install chaski hono
 Names are yours to choose. The rest of the guide uses these.
 
 ```bash
-npx wrangler d1 create acme-chaski
-npx wrangler queues create acme-deliveries
-npx wrangler queues create acme-deliveries-dlq
-npx wrangler r2 bucket create acme-attachments  # only for attachments
+npx wrangler d1 create my-app-chaski
+npx wrangler queues create my-app-deliveries
+npx wrangler queues create my-app-deliveries-dlq
+npx wrangler r2 bucket create my-app-attachments  # only for attachments
 ```
 
 <Callout title="Only the database and the queue are required.">
@@ -43,33 +43,33 @@ In `wrangler.jsonc`:
 
 ```jsonc title="wrangler.jsonc"
 {
-  "name": "acme",
+  "name": "my-app",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-15",
   "vars": {
     // The absolute URL where you mount the dashboard (step 5).
-    "CHASKI_PUBLIC_URL": "https://acme.dev/admin/notifications",
+    "CHASKI_PUBLIC_URL": "https://app.example.com/admin/notifications",
     "VAPID_PUBLIC_KEY": "<public key from step 6>"
   },
   "d1_databases": [
     {
       "binding": "CHASKI_DB",
-      "database_name": "acme-chaski",
+      "database_name": "my-app-chaski",
       "database_id": "<id printed by wrangler d1 create>",
       // Chaski's tables come from the package.
       "migrations_dir": "node_modules/chaski/migrations"
     }
   ],
   "queues": {
-    "producers": [{ "binding": "CHASKI_QUEUE", "queue": "acme-deliveries" }],
+    "producers": [{ "binding": "CHASKI_QUEUE", "queue": "my-app-deliveries" }],
     "consumers": [
       {
-        "queue": "acme-deliveries",
+        "queue": "my-app-deliveries",
         "max_batch_size": 10,
         "max_batch_timeout": 1,
         // Must match Chaski's maxRetries, which defaults to 5.
         "max_retries": 5,
-        "dead_letter_queue": "acme-deliveries-dlq"
+        "dead_letter_queue": "my-app-deliveries-dlq"
       }
     ]
   },
@@ -81,9 +81,9 @@ In `wrangler.jsonc`:
   },
   "migrations": [{ "tag": "chaski-v1", "new_sqlite_classes": ["ChaskiFeed", "ChaskiEvents"] }],
   "workflows": [
-    { "name": "acme-scheduler", "binding": "CHASKI_SCHEDULER", "class_name": "ChaskiScheduler" }
+    { "name": "my-app-scheduler", "binding": "CHASKI_SCHEDULER", "class_name": "ChaskiScheduler" }
   ],
-  "r2_buckets": [{ "binding": "CHASKI_ATTACHMENTS", "bucket_name": "acme-attachments" }],
+  "r2_buckets": [{ "binding": "CHASKI_ATTACHMENTS", "bucket_name": "my-app-attachments" }],
   "send_email": [{ "name": "CHASKI_EMAIL" }]
 }
 ```
@@ -158,11 +158,11 @@ export const chaski = createChaski((env: Env) => ({
   },
   // A channel is on when it has an entry here.
   channels: {
-    email: { from: 'notifications@acme.dev', fromName: 'Acme' },
+    email: { from: 'notifications@example.com', fromName: 'My App' },
     in_app: {},
     push: {
       vapid: {
-        subject: 'mailto:ops@acme.dev',
+        subject: 'mailto:ops@example.com',
         publicKey: env.VAPID_PUBLIC_KEY,
         privateKey: env.VAPID_PRIVATE_KEY,
       },
@@ -177,7 +177,7 @@ const app = new Hono<{ Bindings: Env }>()
     chaski.routes({
       dashboard: {
         authorize: cloudflareAccess({
-          teamDomain: 'acme.cloudflareaccess.com',
+          teamDomain: 'example.cloudflareaccess.com',
           audience: '<Access application AUD tag>',
         }),
       },
@@ -222,7 +222,7 @@ push: {
   apns: {
     teamId: '<Apple team id>',
     keyId: '<APNs key id>',
-    bundleId: 'dev.acme.app',
+    bundleId: 'com.example.app',
     environment: 'production', // 'sandbox' for development builds
     privateKey: env.APNS_PRIVATE_KEY, // the contents of the .p8 file
   },
@@ -239,5 +239,5 @@ npx wrangler secret put APNS_PRIVATE_KEY < AuthKey_XXXXXXXXXX.p8
 npx wrangler deploy
 ```
 
-Then open `https://acme.dev/admin/notifications`. The **Channels** page shows what Chaski picked up
+Then open `https://app.example.com/admin/notifications`. The **Channels** page shows what Chaski picked up
 from your config, and [Templates](/docs/templates) is where your first notification type begins.

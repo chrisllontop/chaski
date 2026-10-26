@@ -6,12 +6,12 @@ export const sendSample = `await chaski.send({
 
 export const wranglerSample = `{
   "vars": {
-    "CHASKI_PUBLIC_URL": "https://acme.dev/admin/notifications"
+    "CHASKI_PUBLIC_URL": "https://app.example.com/admin/notifications"
   },
   "d1_databases": [
     {
       "binding": "CHASKI_DB",
-      "database_name": "acme-chaski",
+      "database_name": "my-app-chaski",
       "database_id": "<printed by wrangler d1 create>",
       // Chaski's tables come from the package.
       "migrations_dir": "node_modules/chaski/migrations"
@@ -19,13 +19,13 @@ export const wranglerSample = `{
   ],
   "queues": {
     "producers": [
-      { "binding": "CHASKI_QUEUE", "queue": "acme-deliveries" }
+      { "binding": "CHASKI_QUEUE", "queue": "my-app-deliveries" }
     ],
     "consumers": [
       {
-        "queue": "acme-deliveries",
+        "queue": "my-app-deliveries",
         "max_retries": 5,
-        "dead_letter_queue": "acme-deliveries-dlq"
+        "dead_letter_queue": "my-app-deliveries-dlq"
       }
     ]
   },
@@ -41,7 +41,7 @@ export const chaski = createChaski((env: Env) => ({
     queue: env.CHASKI_QUEUE,
     email: env.CHASKI_EMAIL,
   },
-  channels: { email: { from: 'hi@acme.dev' } },
+  channels: { email: { from: 'notifications@example.com' } },
 }));
 
 // The dashboard, for your team.

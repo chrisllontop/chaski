@@ -15,9 +15,9 @@ Email goes out through Cloudflare Email Service, from a domain you onboarded to 
 ```ts
 channels: {
   email: {
-    from: 'notifications@acme.dev',
-    fromName: 'Acme',
-    replyTo: 'support@acme.dev',
+    from: 'notifications@example.com',
+    fromName: 'My App',
+    replyTo: 'support@example.com',
   },
 },
 ```
@@ -52,14 +52,14 @@ Push reaches browsers through web push and Apple devices through APNs. Configure
 channels: {
   push: {
     vapid: {
-      subject: 'mailto:ops@acme.dev',
+      subject: 'mailto:ops@example.com',
       publicKey: env.VAPID_PUBLIC_KEY,
       privateKey: env.VAPID_PRIVATE_KEY,
     },
     apns: {
       teamId: '<Apple team id>',
       keyId: '<APNs key id>',
-      bundleId: 'dev.acme.app',
+      bundleId: 'com.example.app',
       environment: 'production',
       privateKey: env.APNS_PRIVATE_KEY,
     },

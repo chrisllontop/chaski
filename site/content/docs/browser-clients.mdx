@@ -57,7 +57,7 @@ cookie goes along:
 
 ```ts
 const client = createChaskiClient({
-  baseUrl: 'https://acme.dev/me/notifications',
+  baseUrl: 'https://app.example.com/me/notifications',
   fetch: (input, init) => fetch(input, { ...init, credentials: 'include' }),
 });
 ```

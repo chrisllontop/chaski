@@ -32,7 +32,7 @@ const BellMock = () => (
   >
     <div className="flex h-[60px] items-center justify-between border-b border-border px-5">
       <div className="flex items-center gap-6">
-        <span className="text-[15px] leading-5 font-semibold tracking-[-0.01em]">acme</span>
+        <span className="text-[15px] leading-5 font-semibold tracking-[-0.01em]">My App</span>
         <span className="text-[13px] leading-[18px] text-muted-foreground max-sm:hidden">
           Projects
         </span>
