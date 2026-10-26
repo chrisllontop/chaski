@@ -108,6 +108,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
+    "better-drizzle": "^0.2.0",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.5.0",
     "drizzle-kit": "^0.31.11",
@@ -129,7 +130,6 @@
     "wrangler": "^4.152.0"
   },
   "dependencies": {
-    "better-drizzle": "^0.2.0",
     "drizzle-orm": "^0.45.4",
     "liquidjs": "^10.30.0",
     "zod": "^4.6.7"

@@ -58,7 +58,8 @@ the endpoints the host's frontend calls for the signed-in user, which `chaskijs/
   tsdown bundles `src/index.ts` into `dist` and TypeScript emits the declarations next to it; only
   `dist` and `migrations/*.sql` ship, along with `README.md` and `LICENSE`. Hono is a peer
   dependency; React and the rest of the dashboard stack are dev dependencies, because they ship
-  already built inside `dist`.
+  already built inside `dist`. So is `better-drizzle`, which tsdown bundles into `dist` (its peer
+  range would make npm install a second `drizzle-orm`); keep it out of `dependencies`.
 - Four entries, one per runtime: `chaskijs` (the Worker), `chaskijs/client` (the page),
   `chaskijs/sw` (the service worker) and `chaskijs/react` (hooks over the client). React is an
   optional peer dependency, and no browser entry may import server code.
