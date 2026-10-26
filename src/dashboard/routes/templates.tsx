@@ -16,8 +16,8 @@ import {
 } from '~/components/app/data-table';
 import { CHANNEL_ICONS, HealthBadge } from '~/components/app/delivery-bits';
 import { ErrorAlert, PageHeader } from '~/components/app/page';
+import { Pill, type Tone } from '~/components/app/pill';
 import { SiteHeader } from '~/components/app/site-header';
-import { Badge } from '~/components/ui/badge';
 import { Button } from '~/components/ui/button';
 import {
   Dialog,
@@ -201,13 +201,10 @@ const NewTemplateDialog = ({
 
 // ─── Import ───
 
-const CHANGE_BADGE: Record<
-  TemplateChange['change'],
-  { label: string; variant: 'default' | 'secondary' | 'outline' }
-> = {
-  create: { label: 'Create', variant: 'default' },
-  update: { label: 'Update', variant: 'secondary' },
-  unchanged: { label: 'Unchanged', variant: 'outline' },
+const CHANGE: Record<TemplateChange['change'], { label: string; tone: Tone }> = {
+  create: { label: 'Create', tone: 'success' },
+  update: { label: 'Update', tone: 'info' },
+  unchanged: { label: 'Unchanged', tone: 'neutral' },
 };
 
 const ImportDialog = ({
@@ -245,20 +242,18 @@ const ImportDialog = ({
           </DialogDescription>
         </DialogHeader>
         {preview.error ? <ErrorAlert error={preview.error} /> : null}
-        <ul className="max-h-80 divide-y overflow-y-auto rounded-md border text-sm">
+        <ul className="max-h-80 divide-y overflow-y-auto rounded-md border text-[13px]">
           {changes.map((change) => (
-            <li key={change.type} className="flex items-start justify-between gap-3 px-3 py-2">
+            <li key={change.type} className="flex items-center justify-between gap-3 px-3 py-2.5">
               <div className="min-w-0">
-                <div className="font-mono">{change.type}</div>
+                <div className="font-mono text-xs">{change.type}</div>
                 {change.fields.length > 0 ? (
                   <div className="text-muted-foreground text-xs">
                     Overwrites {change.fields.join(', ')}
                   </div>
                 ) : null}
               </div>
-              <Badge variant={CHANGE_BADGE[change.change].variant}>
-                {CHANGE_BADGE[change.change].label}
-              </Badge>
+              <Pill tone={CHANGE[change.change].tone}>{CHANGE[change.change].label}</Pill>
             </li>
           ))}
         </ul>
