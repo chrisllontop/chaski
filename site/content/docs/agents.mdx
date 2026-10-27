@@ -1,0 +1,63 @@
+---
+title: Set up with an agent
+description: Hand Chaski’s setup to your coding agent with one prompt, or add the Chaski skill to your repository.
+---
+
+A coding agent can set Chaski up in your Worker for you. One prompt points it at the Chaski skill,
+the steps of [Install](/docs/install) written for an agent, and it follows them in your project.
+
+## Paste the prompt
+
+Open your agent in the project that holds your Worker, and paste this:
+
+<SetupPrompt />
+
+The agent reads the skill from chaski.sh, so the prompt works with any agent that can read a URL
+and edit your files: Claude Code, Codex, Cursor and the others.
+
+## What the agent does
+
+It works through the same setup as [Install](/docs/install), and checks each step before it starts
+the next:
+
+1. Reads your project: the Worker and its Wrangler config, the Hono app, how the app knows who is
+   signed in, and the frontend.
+2. Adds `chaskijs` with your package manager.
+3. Declares a D1 database and a queue, plus the bindings for the features you pick.
+4. Applies Chaski’s migrations to the local database.
+5. Mounts the dashboard behind the sign-in you choose, and the routes your frontend calls for the
+   signed-in user.
+6. Adds the push keys, when you want push.
+7. Runs your Worker with `wrangler dev` in dry run, and sends a first notification you can open in
+   the dashboard.
+
+All of that happens on your machine. Creating resources in your Cloudflare account, applying the
+migrations with `--remote`, setting secrets and deploying act on production, so the agent asks you
+before each one, and deploys only when you tell it to.
+
+## Add the skill to your repository
+
+The prompt has your agent read the skill from chaski.sh. To keep it in your project instead, add it
+with the [`skills` CLI](https://github.com/vercel-labs/skills):
+
+```bash
+npx skills add chrisllontop/chaski
+```
+
+Your agent then picks the skill up whenever a task involves Chaski, with no prompt to paste, and
+reads it from disk, so it works offline. Beyond the setup, it covers:
+
+- **An audit** of the notifications your code already sends, and a plan for moving them onto
+  Chaski.
+- **Troubleshooting** for a setup that fails: config errors, migrations, bindings, sign-in and the
+  dashboard’s Content-Security-Policy.
+- **Sending**: sends, schedules, templates and preferences in your code.
+
+## Which agents
+
+- **The prompt** works with any agent that can read a URL and edit files.
+- **The installed skill** needs an agent that reads skills. The `skills` CLI installs it for Claude
+  Code, Codex, Cursor and the other agents that do.
+
+Every page of these docs is also available as Markdown, listed in [llms.txt](/llms.txt), for agents
+that read it.

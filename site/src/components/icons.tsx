@@ -55,6 +55,8 @@ export const CopyIcon = icon(
 
 export const CheckIcon = icon(<path d="M20 6 9 17l-5-5" />);
 
+export const TickIcon = icon(<path d="M5 12.5l4.5 4.5L19 7.5" />, { strokeWidth: 2.25 });
+
 export const MailIcon = icon(
   <>
     <rect x="2" y="4" width="20" height="16" rx="2" />

@@ -1,4 +1,4 @@
-import { DocsButton, InstallButton } from '../actions';
+import { DocsButton, InstallChip } from '../actions';
 import { Mark } from '../icons';
 
 export const Closing = () => (
@@ -15,12 +15,12 @@ export const Closing = () => (
       Mount it this afternoon.
     </h2>
     <p className="lede max-w-[520px]">
-      Free and open source under the MIT license. Install it, follow the guide, and your first
-      notification goes out from your own Worker.
+      Free and open source under the MIT license. Install it and follow the guide, or hand it to
+      your agent. Either way, your first notification goes out from your own Worker.
     </p>
     <div className="flex flex-wrap items-center justify-center gap-3 pt-5">
       <DocsButton />
-      <InstallButton />
+      <InstallChip initial="npm" />
     </div>
   </section>
 );

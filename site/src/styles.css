@@ -301,8 +301,13 @@
     }
 
     [data-play="armed"] .play-item,
-    [data-play="armed"] .play-drop {
+    [data-play="armed"] .play-drop,
+    [data-play="armed"] .play-row {
       opacity: 0;
+    }
+
+    [data-play="on"] .play-row {
+      animation: slide-in 450ms var(--ease-soft) both;
     }
 
     [data-play="on"] .play-line {

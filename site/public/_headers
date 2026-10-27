@@ -11,3 +11,17 @@
 
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
+
+# The asset server sends Markdown and text without a charset, which would read the curly quotes in
+# the docs and the skill as Latin-1.
+/docs/*.md
+  Content-Type: text/markdown; charset=utf-8
+
+/skill/*.md
+  Content-Type: text/markdown; charset=utf-8
+
+/skill/*.mjs
+  Content-Type: text/javascript; charset=utf-8
+
+/llms.txt
+  Content-Type: text/plain; charset=utf-8

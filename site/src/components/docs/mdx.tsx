@@ -11,6 +11,7 @@ import {
   useState,
 } from 'react';
 import { docParams } from '~/lib/docs';
+import { setupPrompt } from '~/lib/site';
 import { CopyStatus, useCopy } from '../copy';
 import { CheckIcon, CopyIcon, InfoIcon, TerminalIcon } from '../icons';
 
@@ -26,7 +27,7 @@ const LANGUAGES: Record<string, string> = {
   liquid: 'Liquid',
 };
 
-const CopyCode = ({ source }: { source: () => string }) => {
+const CopyCode = ({ source, label = 'Copy code' }: { source: () => string; label?: string }) => {
   const { copied, copy } = useCopy();
   return (
     <button
@@ -35,7 +36,7 @@ const CopyCode = ({ source }: { source: () => string }) => {
       className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground lg:size-7"
     >
       {copied ? <CheckIcon size={14} className="text-success" /> : <CopyIcon size={14} />}
-      <span className="sr-only">Copy code</span>
+      <span className="sr-only">{label}</span>
       <CopyStatus copied={copied} />
     </button>
   );
@@ -75,6 +76,17 @@ const Pre = ({
     </figure>
   );
 };
+
+// The prompt is prose to paste, so it wraps instead of scrolling like code.
+const SetupPrompt = () => (
+  <figure className="code-block">
+    <figcaption className="flex h-10 items-center justify-between border-b border-border pr-1.5 pl-3.5 lg:pr-2 lg:pl-4">
+      <span className="font-mono text-xs leading-4 text-muted-foreground">Setup prompt</span>
+      <CopyCode source={() => setupPrompt} label="Copy the setup prompt" />
+    </figcaption>
+    <pre className={`${codeClass} whitespace-pre-wrap`}>{setupPrompt}</pre>
+  </figure>
+);
 
 const TabsContext = createContext<{ value: string; select: (value: string) => void; id: string }>({
   value: '',
@@ -196,6 +208,7 @@ export const mdxComponents = {
   a: Anchor,
   pre: Pre,
   Callout,
+  SetupPrompt,
   CodeBlockTabs,
   CodeBlockTabsList,
   CodeBlockTabsTrigger,

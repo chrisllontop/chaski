@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
+import { setupPrompt } from '~/lib/site';
 import { source } from '~/lib/source';
 
 const quote = (text: string) =>
@@ -7,10 +8,12 @@ const quote = (text: string) =>
     .map((line) => `> ${line.trim()}`.trimEnd())
     .join('\n');
 
-// The processed Markdown keeps MDX's own marks: heading anchors, step markers and callouts.
+// The processed Markdown keeps MDX's own marks: heading anchors, step markers, callouts and the
+// components the site fills in.
 const toMarkdown = (processed: string) =>
   processed
     .replace(/(?: \[(?:#[\w-]+|step)\])+$/gm, '')
+    .replace(/<SetupPrompt\s*\/>/g, () => `\`\`\`text\n${setupPrompt}\n\`\`\``)
     .replace(
       /<Callout title="([^"]*)">\s*([\s\S]*?)\s*<\/Callout>/g,
       (_, title: string, body: string) => quote(`**${title}**\n\n${body}`),

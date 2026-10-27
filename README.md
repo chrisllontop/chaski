@@ -9,11 +9,7 @@ Embeddable notification infrastructure for Cloudflare Workers, dashboard include
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-404040?style=flat-square)](LICENSE)
 ![Runs on Cloudflare Workers](https://img.shields.io/badge/runs_on-Cloudflare_Workers-404040?style=flat-square)
-![Status: pre-release](https://img.shields.io/badge/status-pre--release-404040?style=flat-square)
-
-**Status: pre-release.** The engine, the browser clients and the dashboard are in place, and the
-guide below sets them up. Chaski isn’t on npm yet: `npm install chaskijs` works from its first
-release.
+[![npm](https://img.shields.io/npm/v/chaskijs?color=404040&style=flat-square)](https://www.npmjs.com/package/chaskijs)
 
 ## What it does
 
@@ -422,6 +418,30 @@ npx wrangler d1 migrations apply CHASKI_DB --local
 
 Set `dryRun: true` in the config while you develop: Chaski renders and records email and push
 deliveries, and shows them in the dashboard, without handing them to a provider.
+
+## Use Chaski with a coding agent
+
+Paste this prompt into your coding agent, in the project that holds your Worker:
+
+```text
+Set up Chaski, notifications for Cloudflare Workers, in this project. Follow https://chaski.sh/skill/SKILL.md step by step, and ask me before anything that touches my Cloudflare account.
+```
+
+The agent reads Chaski’s [agent skill](skills/chaski/SKILL.md) from chaski.sh and sets Chaski up
+in your Worker, asking before anything that acts on your account. Any agent that can read a URL
+works.
+
+To keep the skill in your project instead, add it with the
+[`skills` CLI](https://github.com/vercel-labs/skills), which installs it for Claude Code, Codex,
+Cursor and the other agents that read skills:
+
+```sh
+npx skills add chrisllontop/chaski
+```
+
+Your agent then reads it from disk for any Chaski task: setting Chaski up in your Worker and your
+frontend, auditing the notifications your code already sends and planning the move onto Chaski,
+and working through a setup that fails.
 
 ## Contributing
 
