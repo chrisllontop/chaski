@@ -25,7 +25,10 @@ export type FeedListQuery = {
   unreadOnly?: boolean;
 };
 
-/** Called when the feed changes: with the socket event, or without one when polling noticed. */
+/**
+ * Called when the feed changes: with the socket event (an item created, or items read in another
+ * tab or device), or without one when polling noticed.
+ */
 export type FeedListener = (event?: FeedSocketEvent) => void;
 
 export type FeedClient = {
@@ -39,7 +42,7 @@ export type FeedClient = {
   status(): FeedConnectionStatus;
 };
 
-const KNOWN_EVENTS = new Set<string>(['feed_item.created']);
+const KNOWN_EVENTS = new Set<string>(['feed_item.created', 'feed_item.read']);
 
 // Events of a type this client doesn't know are dropped, so the server can
 // add new ones without breaking older bundles.

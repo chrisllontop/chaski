@@ -1,9 +1,11 @@
 import { and, desc, eq, inArray, isNull, lt, lte, or, sql } from 'drizzle-orm';
-import type { FeedItem, FeedPage } from '../../contract/contract';
+import type { FeedItem, FeedPage, FeedSocketEvent } from '../../contract/contract';
 import { listFeedQuerySchema, markFeedReadSchema } from '../../contract/contract';
 import { ChaskiError } from '../../contract/errors';
 import { feedItems, notifications } from '../db/schema';
+import { feedStub } from '../durable/feed';
 import { parseJson } from '../lib/json';
+import { reportError } from '../lib/report-error';
 import { parseInput } from '../lib/validate';
 import { BaseService } from './base.service';
 
@@ -93,10 +95,30 @@ export class FeedService extends BaseService {
     if (input.ids) conditions.push(inArray(feedItems.id, input.ids));
     if (input.before) conditions.push(lte(feedItems.createdAt, new Date(input.before)));
 
+    const readAt = new Date();
     const result = await FeedService.db
       .update(feedItems)
-      .set({ readAt: new Date() })
+      .set({ readAt })
       .where(and(...conditions));
+    if (result.meta.changes > 0) {
+      await FeedService.signalRead(input.recipientId, {
+        type: 'feed_item.read',
+        ids: input.ids,
+        before: input.before ?? (input.ids ? undefined : readAt.toISOString()),
+      });
+    }
     return { marked: result.meta.changes };
+  };
+
+  // The reads are stored; a lost signal only leaves the recipient's other tabs and devices
+  // counting them until their next refetch, so it must not fail the request.
+  private static signalRead = async (recipientId: string, event: FeedSocketEvent) => {
+    if (!FeedService.bindings.feed) return;
+    try {
+      await feedStub(recipientId).publish(event);
+    } catch (error) {
+      reportError(error, { source: 'feed' });
+      FeedService.log.error('feed read signal failed', error, { recipientId });
+    }
   };
 }

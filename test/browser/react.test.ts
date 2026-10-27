@@ -55,6 +55,9 @@ const server = (initial: FeedItem[]) => {
     add: (next: FeedItem) => {
       items = [next, ...items];
     },
+    readElsewhere: (ids: string[]) => {
+      items = items.map((i) => (ids.includes(i.id) ? { ...i, readAt: 'now' } : i));
+    },
   };
 };
 
@@ -87,6 +90,26 @@ describe('useFeed', () => {
 
     expect(result.current.feed.items.find((i) => i.id === 'f2')?.readAt).not.toBeNull();
     await waitFor(() => expect(result.current.count.unread).toBe(1));
+  });
+
+  it('applies a read made in another tab when the socket signals it', async () => {
+    const feed = server([item('f2'), item('f1')]);
+    const { result } = renderHook(() => ({ feed: useFeed(), count: useUnreadCount() }), {
+      wrapper: feed.wrapper,
+    });
+    await waitFor(() => expect(result.current.count.unread).toBe(2));
+
+    feed.readElsewhere(['f1']);
+    act(() => {
+      feed.sockets[0]?.open();
+      feed.sockets[0]?.receive(JSON.stringify({ type: 'feed_item.read', ids: ['f1'] }));
+    });
+
+    await waitFor(() => expect(result.current.count.unread).toBe(1));
+    expect(result.current.feed.items.map((i) => [i.id, i.readAt !== null])).toEqual([
+      ['f2', false],
+      ['f1', true],
+    ]);
   });
 
   it('waits to load while disabled', () => {
