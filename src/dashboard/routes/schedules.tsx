@@ -14,6 +14,7 @@ import {
 } from '~/components/app/data-table';
 import { ErrorAlert, PageHeader } from '~/components/app/page';
 import { Pager } from '~/components/app/pager';
+import { Pill } from '~/components/app/pill';
 import { SiteHeader } from '~/components/app/site-header';
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
@@ -21,6 +22,7 @@ import { Skeleton } from '~/components/ui/skeleton';
 import { api, query } from '~/lib/api';
 import { useDebounced } from '~/lib/debounce';
 import { formatDateTime, formatRelative } from '~/lib/format';
+import { isOverdue } from '~/lib/schedules';
 import type { ScheduledItem, SchedulePage } from '~/lib/types';
 
 export const SchedulesPage = () => {
@@ -95,7 +97,10 @@ export const SchedulesPage = () => {
               list.data.schedules.map((item) => (
                 <DataRow key={item.id}>
                   <DataCell>
-                    <div className="font-medium">{formatRelative(item.scheduledAt)}</div>
+                    <div className="flex items-center gap-2 font-medium">
+                      {formatRelative(item.scheduledAt)}
+                      {isOverdue(item.scheduledAt) ? <Pill tone="warning">Overdue</Pill> : null}
+                    </div>
                     <div className="text-muted-foreground text-xs tabular-nums">
                       {formatDateTime(item.scheduledAt)}
                     </div>

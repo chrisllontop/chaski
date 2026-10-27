@@ -115,6 +115,19 @@ whether dry run is on. In-app items reach the feed in dry run too.
 **Web push stopped reaching browsers after a key change.** A subscription belongs to the VAPID key
 it was made with. Put the earlier pair back, or have users turn push on again.
 
+**Schedules don’t fire locally after a restart.** Under `wrangler dev`, a schedule made before the
+dev server restarted stays `pending` past its time, and the dashboard marks it overdue. Its
+Workflow instance is still listed as running, but the local Workflows engine doesn’t wake an
+instance that was asleep when the server stopped (seen with Wrangler 4.152); schedules made after
+the restart fire on time, and deployed Workflows aren’t affected. Wake one of two ways:
+
+- Call `chaski.schedule()` again with the same `idempotencyKey` and `scheduledAt`: it restarts the
+  instance.
+- Restart the instance, whose id is the schedule’s (`scheduledId` from `chaski.schedule()`, `id`
+  from `chaski.schedules.list()`): from the local explorer at `/cdn-cgi/local/explorer`, which
+  lists the instances by that id, or
+  `npx wrangler workflows instances restart <workflow name> <schedule id> --local`.
+
 ## Sign-in
 
 - **Dashboard answers 403 under `wrangler dev` with `cloudflareAccess()`.** Access doesn’t sit in

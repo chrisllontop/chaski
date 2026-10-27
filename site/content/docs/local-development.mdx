@@ -62,6 +62,17 @@ as the script does. With `--remote` in place of `--local`, the same two steps lo
 the deployed database from a deploy job. A dashboard already open shows the change once you reload
 it.
 
+## Schedules across restarts
+
+`wrangler dev` keeps your schedules when it restarts, but its local Workflows engine doesn’t wake
+an instance that was asleep when the server stopped: a schedule made before the restart stays
+pending past its time, and **Schedules** in the dashboard marks it overdue. Schedules made after
+the restart fire on time, and deployed Workflows don’t have this limitation. To wake one, call
+`chaski.schedule()` again with the same `idempotencyKey`, which restarts its instance, or restart
+the instance from the local explorer or with
+`npx wrangler workflows instances restart <workflow name> <schedule id> --local`. The instance id
+is the schedule’s: `scheduledId` from `chaski.schedule()`, `id` from `chaski.schedules.list()`.
+
 ## Read the emails
 
 Without `dryRun`, `wrangler dev` stands in for Email Service: each email Chaski sends lands on

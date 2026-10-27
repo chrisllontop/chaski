@@ -11,6 +11,7 @@ import {
 } from '../../src/dashboard/lib/format';
 import { healthByType } from '../../src/dashboard/lib/health';
 import { liquidNamesAt, liquidReference } from '../../src/dashboard/lib/liquid';
+import { isOverdue } from '../../src/dashboard/lib/schedules';
 
 describe('dashboard query strings', () => {
   it('keeps only the filters that have a value', () => {
@@ -133,5 +134,15 @@ describe('liquid references', () => {
     expect(liquidReference('<p>plain text')).toBeNull();
     expect(liquidReference('{% i')).toBeNull();
     expect(liquidReference('{{ amount | upc')).toBeNull();
+  });
+});
+
+describe('overdue schedules', () => {
+  const now = Date.parse('2026-10-27T06:00:00Z');
+
+  it('flags a pending schedule a minute past its time, not one firing now', () => {
+    expect(isOverdue('2026-10-27T05:58:30Z', now)).toBe(true);
+    expect(isOverdue('2026-10-27T05:59:30Z', now)).toBe(false);
+    expect(isOverdue('2026-10-27T06:30:00Z', now)).toBe(false);
   });
 });
