@@ -1,10 +1,14 @@
 import { and, eq, isNotNull, sql } from 'drizzle-orm';
 import type { Channel } from '../../contract/contract';
 import { ChaskiError } from '../../contract/errors';
-import type {
-  TemplateChange,
-  TemplateImportResult,
-  TemplateRecord,
+import {
+  TEMPLATE_FILE_FORMAT,
+  TEMPLATE_FILE_VERSION,
+  type TemplateChange,
+  type TemplateFile,
+  type TemplateImportResult,
+  type TemplateRecord,
+  templateFileSchema,
 } from '../../contract/template-file';
 import { notifications, templates } from '../db/schema';
 import { publishAdminEvents } from '../lib/admin-events';
@@ -12,6 +16,7 @@ import { DeliveryError } from '../lib/errors';
 import { newId } from '../lib/ids';
 import { parseJson } from '../lib/json';
 import { assertTemplates, renderHtml, renderTemplate } from '../lib/render';
+import { parseInput } from '../lib/validate';
 import { BaseService } from './base.service';
 import { EmailSenderService, senderAddress } from './email-sender.service';
 
@@ -257,6 +262,21 @@ export class TemplateService extends BaseService {
           textBody: channel.textBody,
         })),
     }));
+  };
+
+  /** The template file the dashboard downloads and `chaski.templates.import()` takes. */
+  static exportFile = async (): Promise<TemplateFile> => ({
+    format: TEMPLATE_FILE_FORMAT,
+    version: TEMPLATE_FILE_VERSION,
+    templates: await TemplateService.exportTemplates(),
+  });
+
+  static importFile = async (
+    rawFile: unknown,
+    options: { preview?: boolean } = {},
+  ): Promise<TemplateImportResult> => {
+    const file = parseInput(templateFileSchema, rawFile);
+    return TemplateService.importTemplates(file.templates, { preview: options.preview ?? false });
   };
 
   /**

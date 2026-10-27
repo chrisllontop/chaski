@@ -13,6 +13,7 @@ import type {
   SendResult,
   UnregisterPushSubscriptionQuery,
 } from './contract';
+import type { TemplateFile, TemplateImportResult } from './template-file';
 
 export interface ChaskiSchedulesApi {
   /** Pending schedules, soonest first. */
@@ -35,6 +36,13 @@ export interface ChaskiPreferencesApi {
   topics(): Promise<Array<{ topic: string | null; types: string[] }>>;
 }
 
+export interface ChaskiTemplatesApi {
+  /** Creates or overwrites templates by type from a template file; `preview` only reports. */
+  import(file: TemplateFile, options?: { preview?: boolean }): Promise<TemplateImportResult>;
+  /** Every live template, as the file `import` takes and the dashboard exports. */
+  export(): Promise<TemplateFile>;
+}
+
 export interface ChaskiFeedApi {
   list(query: ListFeedQuery): Promise<FeedPage>;
   unreadCount(recipientId: string): Promise<{ unread: number }>;
@@ -50,4 +58,5 @@ export interface ChaskiApi {
   readonly push: ChaskiPushApi;
   readonly preferences: ChaskiPreferencesApi;
   readonly feed: ChaskiFeedApi;
+  readonly templates: ChaskiTemplatesApi;
 }

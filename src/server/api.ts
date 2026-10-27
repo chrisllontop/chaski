@@ -6,6 +6,7 @@ import { NotificationService } from './services/notification.service';
 import { PreferenceService } from './services/preference.service';
 import { PushSubscriptionService } from './services/push-subscription.service';
 import { ScheduleService } from './services/schedule.service';
+import { TemplateService } from './services/template.service';
 
 const run =
   <A extends unknown[], R>(fn: (...args: A) => Promise<R>) =>
@@ -38,5 +39,9 @@ export const api: ChaskiApi = {
     list: run((query) => FeedService.list(query)),
     unreadCount: run((recipientId) => FeedService.unreadCount(recipientId)),
     markRead: run((input) => FeedService.markRead(input)),
+  },
+  templates: {
+    import: run((file, options) => TemplateService.importFile(file, options)),
+    export: run(() => TemplateService.exportFile()),
   },
 };

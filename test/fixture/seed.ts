@@ -1,8 +1,8 @@
 import type { Chaski, TemplateFile } from '../../src';
 
 // Sample data for `pnpm dev`, so the dashboard has something to show. It goes
-// in through the same doors a host uses: the admin API for templates, the
-// in-process API for sends and schedules.
+// in through the doors a host uses: the in-process API for templates, sends
+// and schedules.
 
 const TEMPLATES: TemplateFile = {
   format: 'chaski.templates',
@@ -71,11 +71,8 @@ const TEMPLATES: TemplateFile = {
 const NAMES = ['Ana', 'Luis', 'Marta', 'Jo', 'Sam', 'Noor', 'Kim', 'Leo'];
 const TYPES = ['payment_received', 'invoice_due', 'welcome'] as const;
 
-export const seed = async (
-  chaski: Chaski,
-  importTemplates: (file: TemplateFile) => Response | Promise<Response>,
-) => {
-  await importTemplates(TEMPLATES);
+export const seed = async (chaski: Chaski) => {
+  await chaski.templates.import(TEMPLATES);
   let sent = 0;
   for (let i = 0; i < 40; i++) {
     const name = NAMES[i % NAMES.length] ?? 'Ana';

@@ -74,20 +74,7 @@ const app = new Hono<{ Bindings: FixtureEnv }>()
   .post('/dev/seed', async (c) => {
     if (c.env.CHASKI_DRY_RUN !== 'true')
       return c.json({ error: 'not_found', message: 'no such endpoint' }, 404);
-    const origin = new URL(c.req.url).origin;
-    const result = await seed(chaski, (file) =>
-      app.request(
-        '/chaski/api/templates/import',
-        {
-          method: 'POST',
-          body: JSON.stringify(file),
-          headers: { 'content-type': 'application/json', origin },
-        },
-        c.env,
-        c.executionCtx,
-      ),
-    );
-    return c.json(result);
+    return c.json(await seed(chaski));
   })
   .route('/me/notifications', notifications)
   .route('/chaski', dashboard)

@@ -2,11 +2,6 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { channelSchema, OFFSET_TIMESTAMP_REGEX } from '../../contract/contract';
 import { ChaskiError, isChaskiError } from '../../contract/errors';
-import {
-  TEMPLATE_FILE_FORMAT,
-  TEMPLATE_FILE_VERSION,
-  templateFileSchema,
-} from '../../contract/template-file';
 import { actorOf } from '../auth';
 import { DELIVERY_STATUS } from '../db/schema';
 import { eventsStub } from '../durable/events';
@@ -114,17 +109,12 @@ admin.get('/templates', async (c) => c.json({ templates: await TemplateService.l
 
 admin.get('/templates/export', async (c) => {
   c.header('content-disposition', 'attachment; filename="chaski-templates.json"');
-  return c.json({
-    format: TEMPLATE_FILE_FORMAT,
-    version: TEMPLATE_FILE_VERSION,
-    templates: await TemplateService.exportTemplates(),
-  });
+  return c.json(await TemplateService.exportFile());
 });
 
 admin.post('/templates/import', async (c) => {
   const { preview } = parseInput(importQuerySchema, c.req.query());
-  const file = parseInput(templateFileSchema, await c.req.json());
-  return c.json(await TemplateService.importTemplates(file.templates, { preview }));
+  return c.json(await TemplateService.importFile(await c.req.json(), { preview }));
 });
 
 admin.get('/templates/deleted', async (c) =>

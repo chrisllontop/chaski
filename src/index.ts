@@ -5,6 +5,7 @@ export type {
   ChaskiPreferencesApi,
   ChaskiPushApi,
   ChaskiSchedulesApi,
+  ChaskiTemplatesApi,
 } from './contract/api';
 export type {
   AttachmentInput,
