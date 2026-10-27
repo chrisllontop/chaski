@@ -37,8 +37,11 @@ export interface ChaskiPreferencesApi {
 }
 
 export interface ChaskiTemplatesApi {
-  /** Creates or overwrites templates by type from a template file; `preview` only reports. */
-  import(file: TemplateFile, options?: { preview?: boolean }): Promise<TemplateImportResult>;
+  /**
+   * Creates or overwrites templates by type from a template file; `preview` only reports. The
+   * file is validated here, so a JSON import whose fields TypeScript widens to strings fits.
+   */
+  import(file: unknown, options?: { preview?: boolean }): Promise<TemplateImportResult>;
   /** Every live template, as the file `import` takes and the dashboard exports. */
   export(): Promise<TemplateFile>;
 }

@@ -17,7 +17,6 @@ import type {
   SendRequest,
   UnregisterPushSubscriptionQuery,
 } from '../contract/contract';
-import type { TemplateFile } from '../contract/template-file';
 import { api } from './api';
 
 class Schedules extends RpcTarget implements ChaskiSchedulesApi {
@@ -66,7 +65,7 @@ class Feed extends RpcTarget implements ChaskiFeedApi {
 }
 
 class Templates extends RpcTarget implements ChaskiTemplatesApi {
-  import(file: TemplateFile, options?: { preview?: boolean }) {
+  import(file: unknown, options?: { preview?: boolean }) {
     return api.templates.import(file, options);
   }
   export() {
