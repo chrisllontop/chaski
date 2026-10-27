@@ -335,6 +335,10 @@ chaski.userRoutes<AppEnv>({ identify: (c) => c.get('user')?.id ?? null });
 Skip the user routes when the project has no signed-in users or no frontend that shows
 notifications.
 
+A second inbox for the same user, such as one their team shares, is a second mount on another
+path whose `identify` names another contact (`team:<id>`), with `push: false`: a browser belongs
+to one contact, so registering it on that mount would take it from the user’s own inbox.
+
 ### The main module
 
 ```ts

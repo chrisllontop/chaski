@@ -104,3 +104,7 @@ onError: (error, context) => {
 | --- | --- |
 | `identify` | Required. Returns the signed-in user’s id, `null` to answer 401, or a `Response`. |
 | `allowedOrigins` | Origins of your frontend when it’s served from another origin than these routes. Your app answers CORS for them: see [Browser clients](/docs/browser-clients). |
+| `push` | `false` leaves out the push routes, for a second mount whose contact has no devices of its own, such as a team inbox `identify` names `team:<id>`. A browser belongs to one contact, so registering it there would take it from the user’s own inbox. |
+
+Mount `userRoutes()` once per inbox: each mount’s `identify` names its contact, with a feed, a
+socket and an unread count of its own.

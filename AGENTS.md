@@ -16,11 +16,12 @@ the endpoints the host's frontend calls for the signed-in user, which `chaskijs/
 ## Run it
 
 - `pnpm i` installs the dependencies (Node 24 and pnpm 12). `devEngines` holds contributors to
-  Node 24 without putting that constraint on the people who install `chaski`.
+  Node 24 without putting that constraint on the people who install `chaskijs`.
 - `pnpm dev` builds the dashboard and runs the fixture host (`test/fixture`) with Wrangler, in
   dry run so no email or push leaves the machine. It mounts the dashboard at `/chaski` and
-  `/admin/notifications` and the user routes at `/me/notifications`; there is no hot reload, so
-  rerun it after a dashboard change. Apply the migrations to the local D1 first:
+  `/admin/notifications`, the user routes at `/me/notifications` and a shared inbox at
+  `/me/team-notifications`; there is no hot reload, so rerun it after a dashboard change. Apply
+  the migrations to the local D1 first:
   `pnpm wrangler d1 migrations apply CHASKI_DB --local -c test/fixture/wrangler.jsonc`.
   `curl -X POST localhost:8787/dev/seed` then fills it with sample templates, sends and schedules
   (`test/fixture/seed.ts`), so the dashboard has something to show.
