@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { DocsButton, InstallButton } from '../actions';
+import { DocsButton, InstallChip } from '../actions';
 import { BellIcon, MailIcon, PhoneIcon } from '../icons';
 import { Code } from './code';
 import { sendSample } from './samples';
@@ -121,7 +121,7 @@ export const Hero = () => (
       </p>
       <div className="hero-in flex flex-wrap items-center gap-3 pt-2 [animation-delay:240ms]">
         <DocsButton />
-        <InstallButton />
+        <InstallChip initial="agent" />
       </div>
     </div>
     <RelayCard />
