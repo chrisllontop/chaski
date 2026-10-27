@@ -29,6 +29,12 @@ export type UserRoutesOptions<E extends Env = Env> = {
    * these routes; writes and socket upgrades from any other origin are refused.
    */
   allowedOrigins?: string[];
+  /**
+   * false leaves out the push routes, for a mount whose contact has no devices of its own,
+   * such as a shared inbox: a browser belongs to one contact, so registering it there would
+   * take it away from the user's own inbox.
+   */
+  push?: boolean;
 };
 
 const recipients = new WeakMap<Request, string>();
@@ -64,6 +70,7 @@ const jsonBody = async (c: Context): Promise<unknown> => {
 export const mountUserRoutes = <E extends Env = Env>({
   identify,
   allowedOrigins,
+  push = true,
 }: UserRoutesOptions<E>): Hono<E> => {
   const app = new Hono<E>();
   app.onError(handleError);
@@ -71,28 +78,30 @@ export const mountUserRoutes = <E extends Env = Env>({
   app.use(identified(identify));
   app.use(requireReady);
 
-  app.get('/push/vapid-public-key', (c) =>
-    c.json({ publicKey: resolveConfig().channels.push?.vapid?.publicKey ?? null }),
-  );
-
-  app.post('/push/subscriptions', async (c) => {
-    const device = parseInput(deviceSubscriptionSchema, await jsonBody(c));
-    const recipient = { id: recipientOf(c) };
-    const userAgent = c.req.header('user-agent')?.slice(0, 512);
-    const request =
-      'deviceToken' in device
-        ? { recipient, platform: device.platform, deviceToken: device.deviceToken, userAgent }
-        : { recipient, subscription: device, userAgent };
-    return c.json(await PushSubscriptionService.register(request), 201);
-  });
-
-  // Scoped to the signed-in recipient, so nobody can drop another's device.
-  app.delete('/push/subscriptions', async (c) => {
-    const device = parseInput(deviceUnsubscriptionSchema, await jsonBody(c));
-    return c.json(
-      await PushSubscriptionService.unregister({ ...device, recipientId: recipientOf(c) }),
+  if (push) {
+    app.get('/push/vapid-public-key', (c) =>
+      c.json({ publicKey: resolveConfig().channels.push?.vapid?.publicKey ?? null }),
     );
-  });
+
+    app.post('/push/subscriptions', async (c) => {
+      const device = parseInput(deviceSubscriptionSchema, await jsonBody(c));
+      const recipient = { id: recipientOf(c) };
+      const userAgent = c.req.header('user-agent')?.slice(0, 512);
+      const request =
+        'deviceToken' in device
+          ? { recipient, platform: device.platform, deviceToken: device.deviceToken, userAgent }
+          : { recipient, subscription: device, userAgent };
+      return c.json(await PushSubscriptionService.register(request), 201);
+    });
+
+    // Scoped to the signed-in recipient, so nobody can drop another's device.
+    app.delete('/push/subscriptions', async (c) => {
+      const device = parseInput(deviceUnsubscriptionSchema, await jsonBody(c));
+      return c.json(
+        await PushSubscriptionService.unregister({ ...device, recipientId: recipientOf(c) }),
+      );
+    });
+  }
 
   app.get('/feed', async (c) => {
     const params = parseInput(feedListParamsSchema, c.req.query());

@@ -68,6 +68,16 @@ const notifications = chaski.userRoutes({
   allowedOrigins: ['https://frontend.host.test'],
 });
 
+// A second inbox for the same signed-in user, shared with their team: its own contact, so its own
+// feed, socket and count, and no devices, so a browser can't leave the user's own inbox for it.
+const teamNotifications = chaski.userRoutes({
+  identify: (c) => {
+    const user = c.req.header('x-fixture-user');
+    return user ? `team:${user}` : null;
+  },
+  push: false,
+});
+
 const app = new Hono<{ Bindings: FixtureEnv }>()
   .get('/', (c) => c.text('Host home'))
   // Fills the local database for `pnpm dev`; only in dry run, so nothing reaches a provider.
@@ -77,6 +87,7 @@ const app = new Hono<{ Bindings: FixtureEnv }>()
     return c.json(await seed(chaski));
   })
   .route('/me/notifications', notifications)
+  .route('/me/team-notifications', teamNotifications)
   .route('/chaski', dashboard)
   .route('/admin', new Hono().route('/notifications', dashboard));
 

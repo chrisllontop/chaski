@@ -201,3 +201,65 @@ describe('routes', () => {
     expect(await response.json()).toMatchObject({ error: 'not_found' });
   });
 });
+
+describe('a second mount for a shared inbox', () => {
+  const team = (path: string, init: RequestInit = {}) =>
+    exports.default.fetch(`${ORIGIN}/me/team-notifications${path}`, {
+      ...init,
+      headers: {
+        'content-type': 'application/json',
+        origin: ORIGIN,
+        'x-fixture-user': 'user_1',
+        ...init.headers,
+      },
+    });
+
+  it('keeps its own feed and count for the same signed-in user', async () => {
+    await seedTemplate('payment_received', 'in_app');
+    await sendInApp('team:user_1');
+    await sendInApp('team:user_1');
+    await sendInApp('user_1');
+
+    expect(await json(await team('/feed/unread-count'))).toEqual({ unread: 2 });
+    expect(await json(await me('/feed/unread-count'))).toEqual({ unread: 1 });
+    expect((await json<FeedPage>(await team('/feed'))).items).toHaveLength(2);
+    await team('/feed/read', { method: 'POST', body: '{}' });
+    expect(await json(await team('/feed/unread-count'))).toEqual({ unread: 0 });
+    expect(await json(await me('/feed/unread-count'))).toEqual({ unread: 1 });
+  });
+
+  it('signals its own socket only', async () => {
+    await seedTemplate('payment_received', 'in_app');
+    const open = async (fetcher: typeof me) => {
+      const socket = (await fetcher('/feed/socket', { headers: { upgrade: 'websocket' } }))
+        .webSocket;
+      if (!socket) throw new Error('no upgrade');
+      socket.accept();
+      const received: unknown[] = [];
+      socket.addEventListener('message', (event) => received.push(event.data));
+      return { socket, received };
+    };
+    const personal = await open(me);
+    const shared = await open(team);
+
+    await sendInApp('user_1');
+
+    await vi.waitFor(() => expect(personal.received).toHaveLength(1));
+    expect(shared.received).toEqual([]);
+    personal.socket.close();
+    shared.socket.close();
+  });
+
+  // One browser belongs to one contact: registering it here would take it from the user's own inbox.
+  it('serves no push routes with push: false', async () => {
+    const register = await team('/push/subscriptions', {
+      method: 'POST',
+      body: JSON.stringify(SUBSCRIPTION),
+    });
+    const key = await team('/push/vapid-public-key');
+
+    expect(register.status).toBe(404);
+    expect(key.status).toBe(404);
+    expect(await getClient().deviceTokens.count({ where: {} })).toBe(0);
+  });
+});
