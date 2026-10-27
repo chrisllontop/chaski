@@ -8,6 +8,8 @@ https://chaski.sh/docs/errors.
 ## Config errors
 
 Chaski checks the config on every call. The message starts with `Chaski config:`.
+`await chaski.ready()` runs the same checks, and the migrations’, without sending anything: call it
+from a temporary route, or the project’s health route, to see the error.
 
 | Message | Fix |
 | --- | --- |

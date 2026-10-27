@@ -17,6 +17,10 @@ const run =
 
 /** The in-process API, shared by createChaski() and the ChaskiEntrypoint RPC surface. */
 export const api: ChaskiApi = {
+  ready: async () => {
+    const config = await ready({ fresh: true });
+    return { channels: config.enabledChannels, dryRun: config.dryRun };
+  },
   send: run((request) => NotificationService.send(request)),
   schedule: run((request) => ScheduleService.schedule(request)),
   schedules: {

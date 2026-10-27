@@ -4,6 +4,7 @@ export type {
   ChaskiFeedApi,
   ChaskiPreferencesApi,
   ChaskiPushApi,
+  ChaskiReadiness,
   ChaskiSchedulesApi,
   ChaskiTemplatesApi,
 } from './contract/api';

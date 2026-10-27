@@ -10,6 +10,7 @@ description: The in-process API your Worker calls, the routes Chaski mounts and 
 
 | Call | Returns | |
 | --- | --- | --- |
+| `ready()` | `{ channels, dryRun }` | Checks the config and the applied migrations, changing nothing; throws the `config` error a send would. |
 | `send(request)` | `SendResult` | Sends now; see [Sending](/docs/sending). |
 | `schedule(request)` | `ScheduleResult` | Sends at `scheduledAt`; see [Scheduling](/docs/scheduling). |
 | `schedules.list({ recipientId? })` | `ScheduledItem[]` | Pending schedules, soonest first. |
@@ -25,6 +26,19 @@ description: The in-process API your Worker calls, the routes Chaski mounts and 
 | `push.vapidPublicKey()` | `{ publicKey }` | The key for `pushManager.subscribe()`, or `null`. |
 | `templates.import(file, { preview? })` | `TemplateImportResult` | Creates or updates templates by type from a [template file](/docs/templates#move-templates-between-environments); `preview` only reports. |
 | `templates.export()` | `TemplateFile` | Every template, as the file the dashboard exports. |
+
+`ready()` suits a health route: it asks the database each time, so a database that doesn’t answer
+fails it too.
+
+```ts
+app.get('/health', async (c) => {
+  try {
+    return c.json({ chaski: await chaski.ready() });
+  } catch (error) {
+    return c.json({ chaski: String(error) }, 503);
+  }
+});
+```
 
 It also mounts and consumes:
 

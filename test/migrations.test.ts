@@ -1,9 +1,10 @@
-import { env } from 'cloudflare:workers';
+import { env, exports } from 'cloudflare:workers';
 import { Hono } from 'hono';
 import { describe, expect, it } from 'vitest';
 import { createChaski } from '../src';
 import { ensureMigrations, MIGRATIONS } from '../src/server/migrations';
 import { fixtureConfig } from './fixture/worker';
+import { useConfig } from './helpers';
 
 describe('migrations', () => {
   it('lists every file the package ships in migrations/', () => {
@@ -40,5 +41,46 @@ describe('migrations', () => {
       error: 'config',
       message: expect.stringContaining('missing migrations 0000_init.sql'),
     });
+  });
+});
+
+// A host's health check asks Chaski whether it can run, without sending anything.
+describe('chaski.ready()', () => {
+  it('reports the channels and dry run, in process and over RPC', async () => {
+    const chaski = useConfig();
+
+    expect(await chaski.ready()).toEqual({ channels: ['email', 'in_app'], dryRun: false });
+    expect(await exports.ChaskiEntrypoint.ready()).toEqual({
+      channels: ['email', 'in_app'],
+      dryRun: false,
+    });
+  });
+
+  it('throws the config error a send would', async () => {
+    await expect(
+      useConfig({ migrationsTable: 'missing_migrations' }).ready(),
+    ).rejects.toMatchObject({
+      code: 'config',
+      message: expect.stringContaining('missing migrations 0000_init.sql'),
+    });
+    await expect(useConfig({ publicUrl: '/relative' }).ready()).rejects.toMatchObject({
+      code: 'config',
+      message: expect.stringContaining('publicUrl must be the absolute http(s) URL'),
+    });
+  });
+
+  // A database that doesn't answer is down, not missing migrations.
+  it('passes on a database failure as it is', async () => {
+    const broken = {
+      prepare: () => ({
+        all: async () => {
+          throw new Error('D1_ERROR: Network connection lost.');
+        },
+      }),
+    } as unknown as D1Database;
+    const config = fixtureConfig(env);
+    const chaski = useConfig({ bindings: { ...config.bindings, db: broken } });
+
+    await expect(chaski.ready()).rejects.toThrowError('Network connection lost');
   });
 });

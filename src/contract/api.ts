@@ -1,5 +1,6 @@
 import type {
   CancelScheduledQuery,
+  Channel,
   ChaskiPreferences,
   FeedPage,
   ListFeedQuery,
@@ -52,8 +53,16 @@ export interface ChaskiFeedApi {
   markRead(input: MarkFeedReadInput): Promise<{ marked: number }>;
 }
 
+/** What `ready()` found: the channels the config turns on, and whether it's a dry run. */
+export type ChaskiReadiness = { channels: Channel[]; dryRun: boolean };
+
 /** Chaski's in-process API: the host's Worker calls it directly, with no HTTP in between. */
 export interface ChaskiApi {
+  /**
+   * Checks the config and asks the database for the applied migrations, changing nothing;
+   * throws the `config` error a send would, for a health check.
+   */
+  ready(): Promise<ChaskiReadiness>;
   send(request: SendRequest): Promise<SendResult>;
   /** Sends later, at scheduledAt; needs the ChaskiScheduler Workflow binding. */
   schedule(request: ScheduleRequest): Promise<ScheduleResult>;

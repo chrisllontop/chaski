@@ -80,8 +80,12 @@ class Templates extends RpcTarget implements ChaskiTemplatesApi {
  */
 export class ChaskiEntrypoint
   extends WorkerEntrypoint
-  implements Pick<ChaskiApi, 'send' | 'schedule'>
+  implements Pick<ChaskiApi, 'ready' | 'send' | 'schedule'>
 {
+  ready() {
+    return api.ready();
+  }
+
   send(request: SendRequest) {
     return api.send(request);
   }
