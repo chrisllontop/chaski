@@ -33,6 +33,12 @@ export const SiteFooter = () => (
             <Link to="/docs/$" params={{ _splat: 'browser-clients' }} className={linkClass}>
               Browser clients
             </Link>
+            <Link to="/docs/$" params={{ _splat: 'agents' }} className={linkClass}>
+              Agent skill
+            </Link>
+            <a href="/llms.txt" className={linkClass}>
+              llms.txt
+            </a>
           </Column>
           <Column title="Project">
             <a href={site.repo} className={linkClass}>
