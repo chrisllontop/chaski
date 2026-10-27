@@ -116,8 +116,9 @@ with sample data for the preview. The user creates each one in the dashboard und
   that same pair, and register each one with
   `chaski.push.register({ recipient: { id }, subscription: { endpoint, keys: { p256dh, auth } } })`.
   Browsers keep their subscription, and `client.push.enable()` reuses it. Subscriptions made with
-  another pair, or FCM web tokens, can’t come over: those users turn push on again once the
-  frontend has Chaski’s toggle. Chaski’s pushes carry `{ title, body, href, tag }`; while the old
+  another pair, or FCM web tokens, can’t come over: `client.push.state()` reports those browsers
+  as not subscribed, so Chaski’s toggle offers push again, and where permission is already
+  `granted`, `enable()` replaces the subscription without asking. Chaski’s pushes carry `{ title, body, href, tag }`; while the old
   path still sends pushes of another shape, the service worker has to show both.
 - **APNs device tokens**: `chaski.push.register({ recipient: { id }, platform: 'ios', deviceToken })`,
   with the same bundle id and environment in `channels.push.apns`.

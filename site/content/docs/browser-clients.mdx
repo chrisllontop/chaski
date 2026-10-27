@@ -86,7 +86,11 @@ A request Chaski refuses throws a `ChaskiRequestError`, with the HTTP `status` a
 ## Web push
 
 `client.push.enable()` asks for permission, subscribes this browser and registers it for the
-signed-in user; `disable()` undoes it, and `state()` tells you where it stands.
+signed-in user; `disable()` undoes it, and `state()` tells you where it stands. A subscription
+made with another VAPID key, such as one an earlier push provider left, reads as not subscribed,
+since it can’t receive your pushes: `enable()` replaces it, without a prompt when permission is
+already granted. When your server refuses the browser (see `allowPush` in
+[Configuration](/docs/configuration)), `enable()` throws and drops the subscription it made.
 
 ```ts
 if (client.push.isSupported()) {

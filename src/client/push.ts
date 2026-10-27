@@ -10,6 +10,7 @@ export type PushOptions = {
 };
 
 export type PushState = {
+  /** Whether this browser gets the server's pushes: a subscription made with another key doesn't. */
   subscribed: boolean;
   permission: NotificationPermission | 'unsupported';
 };
@@ -47,6 +48,19 @@ const sameKey = (key: ArrayBuffer | null | undefined, expected: Uint8Array) => {
 export const createPushClient = (request: Request, options: PushOptions = {}): PushClient => {
   const scope = options.serviceWorkerScope ?? '/';
 
+  // The server's key, asked for once; a failed request is asked again next time.
+  let serverKey: Promise<Uint8Array<ArrayBuffer> | null> | null = null;
+  const vapidKey = () => {
+    serverKey ??= request<{ publicKey: string | null }>('GET', '/push/vapid-public-key').then(
+      ({ publicKey }) => (publicKey ? keyBytes(publicKey) : null),
+      (error: unknown) => {
+        serverKey = null;
+        throw error;
+      },
+    );
+    return serverKey;
+  };
+
   const currentSubscription = async () => {
     const registration = await navigator.serviceWorker.getRegistration(scope);
     return (await registration?.pushManager.getSubscription()) ?? null;
@@ -56,9 +70,17 @@ export const createPushClient = (request: Request, options: PushOptions = {}): P
     isSupported: isPushSupported,
     state: async () => {
       if (!isPushSupported()) return { subscribed: false, permission: 'unsupported' };
+      const permission = Notification.permission;
+      const subscription = await currentSubscription();
+      if (!subscription) return { subscribed: false, permission };
+      // A subscription another push provider made with its own key never gets this server's
+      // pushes, so it reads as not subscribed and enable() replaces it. Without an answer from
+      // the server, the browser's own view stands.
+      const key = await vapidKey().catch(() => undefined);
+      if (key === undefined) return { subscribed: true, permission };
       return {
-        subscribed: Boolean(await currentSubscription()),
-        permission: Notification.permission,
+        subscribed: key !== null && sameKey(subscription.options.applicationServerKey, key),
+        permission,
       };
     },
     enable: async () => {
@@ -66,17 +88,13 @@ export const createPushClient = (request: Request, options: PushOptions = {}): P
       const permission = await Notification.requestPermission();
       if (permission !== 'granted') throw new Error('notification permission was not granted');
 
-      const { publicKey } = await request<{ publicKey: string | null }>(
-        'GET',
-        '/push/vapid-public-key',
-      );
-      if (!publicKey) throw new Error('web push is not configured on the server');
+      const applicationServerKey = await vapidKey();
+      if (!applicationServerKey) throw new Error('web push is not configured on the server');
 
       const registration = await navigator.serviceWorker.register(
         options.serviceWorkerPath ?? '/sw.js',
         { scope, type: options.serviceWorkerType },
       );
-      const applicationServerKey = keyBytes(publicKey);
       let subscription = await registration.pushManager.getSubscription();
       // A subscription made with another key can never receive this server's pushes.
       if (
@@ -86,6 +104,7 @@ export const createPushClient = (request: Request, options: PushOptions = {}): P
         await subscription.unsubscribe();
         subscription = null;
       }
+      const created = !subscription;
       subscription ??= await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey,
@@ -95,10 +114,17 @@ export const createPushClient = (request: Request, options: PushOptions = {}): P
       if (!endpoint || !keys?.p256dh || !keys.auth) {
         throw new Error('the browser returned an incomplete push subscription');
       }
-      await request('POST', '/push/subscriptions', {
-        endpoint,
-        keys: { p256dh: keys.p256dh, auth: keys.auth },
-      });
+      try {
+        await request('POST', '/push/subscriptions', {
+          endpoint,
+          keys: { p256dh: keys.p256dh, auth: keys.auth },
+        });
+      } catch (error) {
+        // The server refused this browser (allowPush, say): a subscription it made just now
+        // would only read as subscribed while nothing reaches it.
+        if (created) await subscription.unsubscribe().catch(() => false);
+        throw error;
+      }
     },
     disable: async () => {
       if (!isPushSupported()) return;

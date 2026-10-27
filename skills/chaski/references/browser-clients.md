@@ -160,7 +160,9 @@ const PushToggle = () => {
 ```
 
 Without React: `chaskiClient.push.isSupported()`, `state()`, `enable()` and `disable()`.
-`enable()` throws when permission is denied or the server has no VAPID key. On iPhone and iPad,
+`enable()` throws when permission is denied, the server has no VAPID key or the user routes refuse
+the browser (`allowPush`). `state()` reads a subscription made with another VAPID key, such as the
+one the project’s earlier push provider left, as not subscribed, and `enable()` replaces it. On iPhone and iPad,
 web push reaches only a site the user added to the home screen.
 
 A click on a push takes an open window to the push’s link and focuses it, or opens the link in a
