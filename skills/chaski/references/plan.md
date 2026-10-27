@@ -99,6 +99,10 @@ value that holds HTML on purpose goes through `raw` instead.
   keep the output.
 - **Provider-hosted templates**: ask the user to export them from the provider’s dashboard, then
   convert as above.
+- **Entities in plain text.** Content written for HTML, or exported from a provider, often carries
+  `&middot;`, `&#8217;` or `&amp;` into subjects and push text, where Chaski shows them as typed.
+  Write the characters themselves in every field but the email body; an import of the converted
+  file lists any left under `warnings`.
 
 Write every converted template into the plan, field by field as [sending.md](sending.md) shows,
 with sample data for the preview. The user creates each one in the dashboard under

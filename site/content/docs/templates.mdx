@@ -44,6 +44,9 @@ a tag with `raw` to output HTML you built yourself:
 `raw` applies to the whole value, so escape text from people before adding markup to it:
 `{{ comment | escape | newline_to_br | raw }}`. The subject, the text body, and in-app and push
 content are plain text and come out as written, so show in-app items as text in your frontend.
+An HTML entity there, such as `&middot;` or `&#8217;` from content written for an HTML tool,
+reaches people as typed: type the character itself. The editor points one out under its field,
+and an import lists each one it finds, in its preview too, without changing the content.
 
 A template Liquid can’t parse is the author’s to fix: the dashboard names the field when you save
 it, and a delivery that hits one fails at once instead of retrying.
@@ -67,7 +70,7 @@ from a seed route, your tests or another Worker, without signing in to the dashb
 ```ts title="src/seed.ts"
 import templates from '../chaski-templates.json';
 
-// { applied: true, changes: [{ type, change: 'create' | 'update' | 'unchanged', fields }] }
+// { applied: true, changes: [{ type, change: 'create' | 'update' | 'unchanged', fields, warnings }] }
 const result = await chaski.templates.import(templates);
 ```
 

@@ -126,10 +126,18 @@ export type TemplateDetail = {
 
 export type RenderedPreview = { subject: string; html: string; text?: string };
 
+export type TemplateWarning = {
+  field: string;
+  code: 'html_entities';
+  entities: string[];
+  message: string;
+};
+
 export type TemplateChange = {
   type: string;
   change: 'create' | 'update' | 'unchanged';
   fields: string[];
+  warnings: TemplateWarning[];
 };
 
 export type ScheduledItem = {

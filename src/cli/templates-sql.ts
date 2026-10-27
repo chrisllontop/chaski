@@ -1,5 +1,5 @@
 import { ChaskiError } from '../contract/errors';
-import { templateFileSchema } from '../contract/template-file';
+import { templateFileSchema, templateWarnings } from '../contract/template-file';
 import { newId } from '../server/lib/ids';
 import { assertTemplates } from '../server/lib/render';
 import { parseInput } from '../server/lib/validate';
@@ -20,11 +20,15 @@ const text = (value: string | null | undefined): string => {
  * `wrangler d1 execute --file`: templates upsert by type among the live ones, absent fields store
  * null, channels the file leaves out keep their content, and a row whose content already matches
  * isn't written, so running the file twice changes nothing. They follow the schema of the
- * migrations this package ships, so the database needs them applied first.
+ * migrations this package ships, so the database needs them applied first. The warnings are the
+ * import's: content worth a look, written as it is.
  */
-export const templatesToSql = (rawFile: unknown): string[] => {
+export const templatesToSql = (rawFile: unknown): { statements: string[]; warnings: string[] } => {
   const file = parseInput(templateFileSchema, rawFile);
   const statements: string[] = [];
+  const warnings = file.templates.flatMap((record) =>
+    templateWarnings(record).map((warning) => `${record.type}: ${warning.message}`),
+  );
   for (const record of file.templates) {
     for (const content of record.channels) {
       const at = `${record.type} ${content.channel}`;
@@ -70,5 +74,5 @@ export const templatesToSql = (rawFile: unknown): string[] => {
       statements.push(statement);
     }
   }
-  return statements;
+  return { statements, warnings };
 };

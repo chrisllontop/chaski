@@ -252,6 +252,12 @@ const ImportDialog = ({
                     Overwrites {change.fields.join(', ')}
                   </div>
                 ) : null}
+                {change.warnings.map((warning) => (
+                  <div key={warning.field} className="text-warning text-xs">
+                    {warning.field} is plain text: {warning.entities.join(', ')} will appear as
+                    typed
+                  </div>
+                ))}
               </div>
               <Pill tone={CHANGE[change.change].tone}>{CHANGE[change.change].label}</Pill>
             </li>

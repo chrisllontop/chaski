@@ -9,6 +9,7 @@ import {
   type TemplateImportResult,
   type TemplateRecord,
   templateFileSchema,
+  templateWarnings,
 } from '../../contract/template-file';
 import { notifications, templates } from '../db/schema';
 import { publishAdminEvents } from '../lib/admin-events';
@@ -58,7 +59,8 @@ const diffTemplate = (
   existing: TemplateRecord | undefined,
   incoming: TemplateRecord,
 ): TemplateChange => {
-  if (!existing) return { type: incoming.type, change: 'create', fields: [] };
+  const warnings = templateWarnings(incoming);
+  if (!existing) return { type: incoming.type, change: 'create', fields: [], warnings };
   const fields: string[] = TEMPLATE_FIELDS.filter(
     (field) => (existing[field] ?? null) !== (incoming[field] ?? null),
   );
@@ -74,7 +76,12 @@ const diffTemplate = (
       }
     }
   }
-  return { type: incoming.type, change: fields.length > 0 ? 'update' : 'unchanged', fields };
+  return {
+    type: incoming.type,
+    change: fields.length > 0 ? 'update' : 'unchanged',
+    fields,
+    warnings,
+  };
 };
 
 export class TemplateService extends BaseService {

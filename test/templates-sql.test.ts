@@ -71,7 +71,7 @@ const prepare = async () => {
 
 const runSql = async (file: unknown) => {
   const db = env.CHASKI_DB;
-  await db.batch(templatesToSql(file).map((statement) => db.prepare(statement)));
+  await db.batch(templatesToSql(file).statements.map((statement) => db.prepare(statement)));
 };
 
 const rows = async () => ({
@@ -151,6 +151,23 @@ describe('templates as SQL', () => {
 
     expect(await rows()).toEqual(first);
     expect(first.templates.find((r) => r.type === 'welcome')).toEqual(welcome);
+  });
+
+  it('passes on the import warnings without changing the content', () => {
+    const { statements, warnings } = templatesToSql({
+      ...NEXT,
+      templates: [
+        {
+          type: 'x',
+          channels: [{ channel: 'push', enabled: true, subject: 'A &middot; B', body: 'b' }],
+        },
+      ],
+    });
+
+    expect(warnings).toEqual([
+      'x: channels.push.subject is plain text and shows &middot; as typed',
+    ]);
+    expect(statements.join('\n')).toContain("'A &middot; B'");
   });
 
   it('refuses the files and the Liquid templates.import() refuses', () => {

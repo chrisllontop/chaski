@@ -56,8 +56,8 @@ describe('template export and import', () => {
       body: {
         applied: true,
         changes: [
-          { type: 'payment_received', change: 'create', fields: [] },
-          { type: 'welcome', change: 'create', fields: [] },
+          { type: 'payment_received', change: 'create', fields: [], warnings: [] },
+          { type: 'welcome', change: 'create', fields: [], warnings: [] },
         ],
       },
     });
@@ -72,8 +72,8 @@ describe('template export and import', () => {
     const again = await importTemplates(FILE);
 
     expect(again.body.changes).toEqual([
-      { type: 'payment_received', change: 'unchanged', fields: [] },
-      { type: 'welcome', change: 'unchanged', fields: [] },
+      { type: 'payment_received', change: 'unchanged', fields: [], warnings: [] },
+      { type: 'welcome', change: 'unchanged', fields: [], warnings: [] },
     ]);
     expect(await getClient().templates.count({ where: {} })).toBe(2);
     expect(await getClient().templateChannels.count({ where: {} })).toBe(2);
@@ -112,9 +112,10 @@ describe('template export and import', () => {
             type: 'payment_received',
             change: 'update',
             fields: ['topic', 'channels.email.subject', 'channels.push'],
+            warnings: [],
           },
-          { type: 'welcome', change: 'unchanged', fields: [] },
-          { type: 'invoice_due', change: 'create', fields: [] },
+          { type: 'welcome', change: 'unchanged', fields: [], warnings: [] },
+          { type: 'invoice_due', change: 'create', fields: [], warnings: [] },
         ],
       },
     });
@@ -178,8 +179,8 @@ describe('templates from the server', () => {
     expect(preview).toEqual({
       applied: false,
       changes: [
-        { type: 'payment_received', change: 'create', fields: [] },
-        { type: 'welcome', change: 'create', fields: [] },
+        { type: 'payment_received', change: 'create', fields: [], warnings: [] },
+        { type: 'welcome', change: 'create', fields: [], warnings: [] },
       ],
     });
     expect(await getClient().templates.count({ where: {} })).toBe(0);
@@ -217,5 +218,49 @@ describe('templates from the server', () => {
       code: 'validation',
       message: expect.stringMatching(/^templates\.0\.type: /),
     });
+  });
+});
+
+// Content written for HTML often brings entities into fields people read as plain text.
+describe('import warnings', () => {
+  const ENTITIES: TemplateFile = {
+    format: 'chaski.templates',
+    version: 1,
+    templates: [
+      {
+        type: 'booking_confirmed',
+        channels: [
+          {
+            channel: 'email',
+            enabled: true,
+            subject: 'Booked &middot; {{ when }}',
+            body: '<p>You&#8217;re booked &amp; set</p>',
+            textBody: 'AT&T and Q&A stay quiet',
+          },
+          { channel: 'push', enabled: true, subject: 'You&#x2019;re booked', body: 'See you' },
+        ],
+      },
+    ],
+  };
+
+  it('names each plain-text field that holds HTML entities, and writes it as it is', async () => {
+    const preview = await chaski.templates.import(ENTITIES, { preview: true });
+    const applied = await chaski.templates.import(ENTITIES);
+
+    const warnings = [
+      {
+        field: 'channels.email.subject',
+        code: 'html_entities',
+        entities: ['&middot;'],
+        message: 'channels.email.subject is plain text and shows &middot; as typed',
+      },
+      expect.objectContaining({ field: 'channels.push.subject', entities: ['&#x2019;'] }),
+    ];
+    expect(preview.changes[0]?.warnings).toEqual(warnings);
+    expect(applied.changes[0]?.warnings).toEqual(warnings);
+    const [stored] = (await chaski.templates.export()).templates;
+    expect(stored?.channels?.find((c) => c.channel === 'email')?.subject).toBe(
+      'Booked &middot; {{ when }}',
+    );
   });
 });

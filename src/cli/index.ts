@@ -16,7 +16,8 @@ if (group !== 'templates' || command !== 'sql' || !path) {
 }
 
 try {
-  const statements = templatesToSql(JSON.parse(readFileSync(path, 'utf8')));
+  const { statements, warnings } = templatesToSql(JSON.parse(readFileSync(path, 'utf8')));
+  for (const warning of warnings) console.error(`warning: ${warning}`);
   process.stdout.write(
     `-- chaski templates from ${path}; run it after Chaski's migrations.\n` +
       statements.map((statement) => `${statement};\n`).join(''),

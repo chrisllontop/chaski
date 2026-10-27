@@ -26,10 +26,29 @@ import { ApiError, api } from '~/lib/api';
 import { useDebounced } from '~/lib/debounce';
 import { CHANNEL_LABELS } from '~/lib/format';
 import type { Channel, RenderedPreview, TemplateChannelContent, TemplateDetail } from '~/lib/types';
+import { htmlEntities, isPlainTextField } from '../../contract/html-entities';
 
 type Draft = { enabled: boolean; subject: string; body: string; textBody: string };
 
 const EMPTY_DRAFT: Draft = { enabled: false, subject: '', body: '', textBody: '' };
+
+// Chaski sends plain text as written, so an entity pasted from an HTML tool reaches the inbox as
+// typed. The editor points it out and leaves the decision to the author.
+const PlainTextNotice = ({
+  channel,
+  field,
+  value,
+}: {
+  channel: Channel;
+  field: 'subject' | 'body' | 'textBody';
+  value: string;
+}) => {
+  const entities = isPlainTextField(channel, field) ? htmlEntities(value) : [];
+  if (entities.length === 0) return null;
+  return (
+    <p className="text-warning text-xs">Plain text: {entities.join(', ')} will appear as typed.</p>
+  );
+};
 
 // In-app and push keep the title in subject, the message in body and the link
 // the notification opens in textBody, the same fields the server renders.
@@ -366,6 +385,7 @@ export const TemplateEditorPage = () => {
                         value={draft.subject}
                         onChange={(event) => update({ subject: event.target.value })}
                       />
+                      <PlainTextNotice channel={channel} field="subject" value={draft.subject} />
                     </div>
                     <div className="grid gap-2">
                       <Label
@@ -391,6 +411,7 @@ export const TemplateEditorPage = () => {
                           className="min-h-24"
                         />
                       )}
+                      <PlainTextNotice channel={channel} field="body" value={draft.body} />
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="field-text">{labels.textBody}</Label>
@@ -410,6 +431,7 @@ export const TemplateEditorPage = () => {
                           className="font-mono"
                         />
                       )}
+                      <PlainTextNotice channel={channel} field="textBody" value={draft.textBody} />
                     </div>
                     {saveChannel.error ? <ErrorAlert error={saveChannel.error} /> : null}
                   </div>

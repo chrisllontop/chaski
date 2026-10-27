@@ -54,7 +54,9 @@ Templates are [Liquid](https://liquidjs.com). They see the send’s `payload` at
 - A missing key renders empty instead of failing the delivery.
 - An email `body` escapes every value for HTML on its own. A value that holds HTML on purpose
   goes through `raw`: `{{ summary_html | raw }}`. The subject, the text body, in-app and push
-  are plain text and stay as written.
+  are plain text and stay as written, HTML entities included: `&middot;` reaches the inbox as
+  typed. The import's result lists them per field under `warnings` (the dashboard and
+  `chaskijs templates sql` show them too); write the characters themselves.
 - Loops and conditions: `{% for item in items %}…{% endfor %}`, `{% if overdue %}…{% endif %}`.
   Only `nil` and `false` are false: test a list with `{% if items.size > 0 %}` and a string with
   `{% if name != blank %}`.
