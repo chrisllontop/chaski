@@ -11,9 +11,11 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as R404RouteImport } from './routes/404'
+import { Route as LlmsDottxtRouteImport } from './routes/llms[.]txt'
 import { Route as SearchDotjsonRouteImport } from './routes/search[.]json'
 import { Route as DocsSplatRouteImport } from './routes/docs/$'
 import { Route as DocsChar123Char125DotmdRouteImport } from './routes/docs/{$}[.]md'
+import { Route as SkillSplatRouteImport } from './routes/skill/$'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -23,6 +25,11 @@ const IndexRoute = IndexRouteImport.update({
 const R404Route = R404RouteImport.update({
   id: '/404',
   path: '/404',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LlmsDottxtRoute = LlmsDottxtRouteImport.update({
+  id: '/llms.txt',
+  path: '/llms.txt',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SearchDotjsonRoute = SearchDotjsonRouteImport.update({
@@ -40,43 +47,78 @@ const DocsChar123Char125DotmdRoute = DocsChar123Char125DotmdRouteImport.update({
   path: '/docs/{$}.md',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SkillSplatRoute = SkillSplatRouteImport.update({
+  id: '/skill/$',
+  path: '/skill/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/404': typeof R404Route
+  '/llms.txt': typeof LlmsDottxtRoute
   '/search.json': typeof SearchDotjsonRoute
   '/docs/$': typeof DocsSplatRoute
   '/docs/{$}.md': typeof DocsChar123Char125DotmdRoute
+  '/skill/$': typeof SkillSplatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/404': typeof R404Route
+  '/llms.txt': typeof LlmsDottxtRoute
   '/search.json': typeof SearchDotjsonRoute
   '/docs/$': typeof DocsSplatRoute
   '/docs/{$}.md': typeof DocsChar123Char125DotmdRoute
+  '/skill/$': typeof SkillSplatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/404': typeof R404Route
+  '/llms.txt': typeof LlmsDottxtRoute
   '/search.json': typeof SearchDotjsonRoute
   '/docs/$': typeof DocsSplatRoute
   '/docs/{$}.md': typeof DocsChar123Char125DotmdRoute
+  '/skill/$': typeof SkillSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/404' | '/search.json' | '/docs/$' | '/docs/{$}.md'
+  fullPaths:
+    | '/'
+    | '/404'
+    | '/llms.txt'
+    | '/search.json'
+    | '/docs/$'
+    | '/docs/{$}.md'
+    | '/skill/$'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/404' | '/search.json' | '/docs/$' | '/docs/{$}.md'
-  id: '__root__' | '/' | '/404' | '/search.json' | '/docs/$' | '/docs/{$}.md'
+  to:
+    | '/'
+    | '/404'
+    | '/llms.txt'
+    | '/search.json'
+    | '/docs/$'
+    | '/docs/{$}.md'
+    | '/skill/$'
+  id:
+    | '__root__'
+    | '/'
+    | '/404'
+    | '/llms.txt'
+    | '/search.json'
+    | '/docs/$'
+    | '/docs/{$}.md'
+    | '/skill/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   R404Route: typeof R404Route
+  LlmsDottxtRoute: typeof LlmsDottxtRoute
   SearchDotjsonRoute: typeof SearchDotjsonRoute
   DocsSplatRoute: typeof DocsSplatRoute
   DocsChar123Char125DotmdRoute: typeof DocsChar123Char125DotmdRoute
+  SkillSplatRoute: typeof SkillSplatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -93,6 +135,13 @@ declare module '@tanstack/react-router' {
       path: '/404'
       fullPath: '/404'
       preLoaderRoute: typeof R404RouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/llms.txt': {
+      id: '/llms.txt'
+      path: '/llms.txt'
+      fullPath: '/llms.txt'
+      preLoaderRoute: typeof LlmsDottxtRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/search.json': {
@@ -116,15 +165,24 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DocsChar123Char125DotmdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/skill/$': {
+      id: '/skill/$'
+      path: '/skill/$'
+      fullPath: '/skill/$'
+      preLoaderRoute: typeof SkillSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   R404Route: R404Route,
+  LlmsDottxtRoute: LlmsDottxtRoute,
   SearchDotjsonRoute: SearchDotjsonRoute,
   DocsSplatRoute: DocsSplatRoute,
   DocsChar123Char125DotmdRoute: DocsChar123Char125DotmdRoute,
+  SkillSplatRoute: SkillSplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

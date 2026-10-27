@@ -104,7 +104,8 @@ the endpoints the host's frontend calls for the signed-in user, which `chaskijs/
   Start and Fumadocs, prerendered at build time and served as a Worker's static assets
   (`site/wrangler.jsonc` declares no Worker). `src/routes` holds the landing and the docs,
   `content/docs` the MDX pages and their order (`meta.json`), and `src/routeTree.gen.ts` is
-  generated and committed. The pages hydrate from inline scripts, so `scripts/headers.ts` writes
+  generated and committed. The build also writes `/llms.txt` from the docs and serves
+  `skills/chaski` at `/skill/`, so the setup prompt can point agents at it. The pages hydrate from inline scripts, so `scripts/headers.ts` writes
   each page's Content-Security-Policy, with those scripts by hash, into `_headers` after the build.
   It doesn't ship in the package either.
 - `skills/chaski` is the agent skill hosts install with `npx skills add chrisllontop/chaski`:

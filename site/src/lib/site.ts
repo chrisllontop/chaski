@@ -12,3 +12,5 @@ export const site = {
 };
 
 export const editUrl = (path: string) => `${repo}/blob/main/site/content/docs/${path}`;
+
+export const skillUrl = `${site.url}/skill/SKILL.md`;

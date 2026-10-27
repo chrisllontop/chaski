@@ -1,4 +1,5 @@
 import { readdirSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import { cloudflare } from '@cloudflare/vite-plugin';
 import tailwindcss from '@tailwindcss/vite';
 import { tanstackStart } from '@tanstack/react-start/plugin/vite';
@@ -6,14 +7,24 @@ import react from '@vitejs/plugin-react';
 import { fumadocsMdx } from 'fumadocs-mdx/vite';
 import { defineConfig } from 'vite';
 
-// The crawler finds every page through its links; these files have none pointing at them.
+// The crawler finds every page through its links; these files have none pointing at them, or
+// stay out of the sitemap.
 const unlinked = [
   { path: '/404', sitemap: { exclude: true } },
   { path: '/search.json', sitemap: { exclude: true } },
+  { path: '/llms.txt', sitemap: { exclude: true } },
   ...readdirSync('content/docs')
     .filter((file) => file.endsWith('.mdx'))
     .map((file) => ({
       path: `/docs/${file.replace(/\.mdx$/, '.md')}`,
+      sitemap: { exclude: true },
+    })),
+  // The agent skill, served from the repository's skills/chaski at /skill. A file type the route
+  // has no content type for fails the build instead of going missing.
+  ...readdirSync('../skills/chaski', { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile() && !entry.name.startsWith('.'))
+    .map((entry) => ({
+      path: `/skill/${relative('../skills/chaski', join(entry.parentPath, entry.name))}`,
       sitemap: { exclude: true },
     })),
 ];
