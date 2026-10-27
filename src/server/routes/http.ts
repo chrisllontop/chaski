@@ -13,6 +13,7 @@ const ERROR_STATUS: Record<ChaskiErrorCode, ContentfulStatusCode> = {
   forbidden: 403,
   not_found: 404,
   conflict: 409,
+  delivery_failed: 502,
   internal: 500,
 };
 

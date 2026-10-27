@@ -1,9 +1,10 @@
 import { and, eq, sql } from 'drizzle-orm';
-import { isChaskiError, isRetryableChaskiError } from '../../contract/errors';
+import { ChaskiError, isChaskiError, isRetryableChaskiError } from '../../contract/errors';
 import { deliveries } from '../db/schema';
 import { DeliveryError } from '../lib/errors';
 import type { DeliveryMessage } from '../types';
 import { CHANNEL_DEFS } from './adapters/registry';
+import type { DeliveryRow } from './adapters/types';
 import { BaseService } from './base.service';
 
 export type ProcessOutcome =
@@ -103,6 +104,24 @@ export class DeliveryService extends BaseService {
       });
       return { status: 'retry', delaySeconds: backoffSeconds(attempts) };
     }
+  };
+
+  /** Delivers now, for a caller waiting on the result, and returns the delivery as it ends. */
+  static deliverInline = async (message: DeliveryMessage): Promise<DeliveryRow> => {
+    const outcome = await DeliveryService.process(message);
+    // No queue message stands behind it, and the person waiting decides whether to try again,
+    // so a failure the queue would retry is final here; the dashboard can still replay it.
+    if (outcome.status === 'retry') {
+      await DeliveryService.client.deliveries.update({
+        where: { id: message.deliveryId },
+        data: { status: 'failed' },
+      });
+    }
+    const delivery = await DeliveryService.client.deliveries.findFirst({
+      where: { id: message.deliveryId },
+    });
+    if (!delivery) throw new ChaskiError('internal', `delivery '${message.deliveryId}' vanished`);
+    return delivery;
   };
 
   // Fired by the public tracking pixel. Unknown ids are a silent no-op (the

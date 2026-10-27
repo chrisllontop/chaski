@@ -53,13 +53,16 @@ export const sendRequestSchema = z.object({
   transactional: z.boolean().default(false),
   email: emailOptionsSchema.optional(),
   idempotencyKey: z.string().min(1).max(512).optional(),
+  // Delivers the email within the call instead of through the queue, so a provider failure
+  // reaches the caller; only for one transactional email (see NotificationService.send).
+  inline: z.boolean().default(false),
 });
 export type SendRequest = z.input<typeof sendRequestSchema>;
 
 // A schedule with an idempotencyKey is upserted by it: declaring it again with
 // another scheduledAt moves the pending schedule instead of adding one, so the
 // key must not be derived from the time.
-export const scheduleRequestSchema = sendRequestSchema.extend({
+export const scheduleRequestSchema = sendRequestSchema.omit({ inline: true }).extend({
   scheduledAt: z.string().regex(OFFSET_TIMESTAMP_REGEX, {
     message: 'scheduledAt must be ISO 8601 with an explicit offset (Z or ±hh:mm)',
   }),

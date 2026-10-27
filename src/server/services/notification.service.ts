@@ -1,3 +1,4 @@
+import { and, eq, inArray } from 'drizzle-orm';
 import type {
   AttachmentInput,
   Channel,
@@ -14,11 +15,13 @@ import { resolveChannels } from '../lib/resolve-channels';
 import { parseInput } from '../lib/validate';
 import type { DeliveryMessage } from '../types';
 import { loadCapabilities } from './adapters/registry';
+import type { DeliveryRow } from './adapters/types';
 import type { StoredAttachment } from './attachment.service';
 import { AttachmentService } from './attachment.service';
 import { BaseService } from './base.service';
 import type { ContactSnapshot } from './contact.service';
 import { ContactService } from './contact.service';
+import { DeliveryService } from './delivery.service';
 import { PreferenceService } from './preference.service';
 import { TemplateService } from './template.service';
 
@@ -59,6 +62,28 @@ export const assertKnownType = async (type: string): Promise<void> => {
   }
 };
 
+// An inline send answers to someone waiting on one email, such as a password reset: preferences
+// can't skip it, and with a single channel it either went out or the caller hears why not.
+const assertInline = (request: { transactional: boolean; channels?: Channel[] }): void => {
+  if (!request.transactional || request.channels?.length !== 1 || request.channels[0] !== 'email') {
+    throw new ChaskiError(
+      'validation',
+      "an inline send delivers one email: it needs transactional: true and channels: ['email']",
+    );
+  }
+};
+
+// A template Liquid can't render is the caller's to fix, as at ingest; anything else is the
+// provider's answer, with the code the adapter classified it under.
+const deliveryFailed = (delivery: DeliveryRow): ChaskiError =>
+  delivery.errorCode === 'validation'
+    ? new ChaskiError('validation', delivery.lastError ?? 'the email template failed to render')
+    : new ChaskiError(
+        'delivery_failed',
+        `the email didn't go out: ${delivery.lastError ?? 'the provider refused it'} ` +
+          `(${delivery.errorCode ?? 'unknown'}, delivery ${delivery.id})`,
+      );
+
 export const splitEmailOptions = (
   email: { fromName?: string; replyTo?: string; attachments?: AttachmentInput[] } | undefined,
 ): {
@@ -82,6 +107,7 @@ export type DispatchInput = {
   emailOverrides: { fromName?: string; replyTo?: string } | null;
   storedAttachments: StoredAttachment[];
   idempotencyKey: string | null;
+  inline?: boolean;
 };
 
 export class NotificationService extends BaseService {
@@ -89,12 +115,13 @@ export class NotificationService extends BaseService {
 
   static send = async (rawRequest: unknown): Promise<SendResult> => {
     const request = parseInput(sendRequestSchema, rawRequest);
+    if (request.inline) assertInline(request);
     assertChannelsConfigured(NotificationService.config.enabledChannels, request.channels);
     await assertKnownType(request.type);
 
     if (request.idempotencyKey) {
       const existing = await NotificationService.findByIdempotencyKey(request.idempotencyKey);
-      if (existing) return existing;
+      if (existing) return request.inline ? NotificationService.retryInline(existing) : existing;
     }
 
     const snapshot = await ContactService.upsertFromRecipient(request.recipient);
@@ -111,6 +138,7 @@ export class NotificationService extends BaseService {
       emailOverrides: overrides,
       storedAttachments,
       idempotencyKey: request.idempotencyKey ?? null,
+      inline: request.inline,
     });
   };
 
@@ -133,6 +161,14 @@ export class NotificationService extends BaseService {
       capabilities,
       templatesByChannel: templateFlags,
     });
+    // Checked before anything is stored: an inline email that would be skipped is the caller's to fix.
+    const skipped = input.inline ? resolutions.find((r) => r.skipReason) : undefined;
+    if (skipped) {
+      throw new ChaskiError(
+        'validation',
+        `the inline email would be skipped: ${skipped.skipReason}`,
+      );
+    }
 
     const notificationId = newId('n');
     const now = new Date();
@@ -187,15 +223,22 @@ export class NotificationService extends BaseService {
         recipientId: input.recipientId,
       }));
 
-    // Every send delivers through the queue; `transactional` only decides whether
+    // A send delivers through the queue unless it's inline; `transactional` only decides whether
     // recipient preferences apply (see resolveChannels).
-    await NotificationService.enqueue(pendingMessages);
-    await publishAdminEvents(['deliveries', 'metrics']);
+    const inlineMessage = input.inline ? pendingMessages[0] : undefined;
+    if (inlineMessage) {
+      const delivered = await DeliveryService.deliverInline(inlineMessage);
+      await publishAdminEvents(['deliveries', 'metrics']);
+      if (delivered.status !== 'sent') throw deliveryFailed(delivered);
+    } else {
+      await NotificationService.enqueue(pendingMessages);
+      await publishAdminEvents(['deliveries', 'metrics']);
+    }
 
     const results: DeliveryResult[] = deliveryRows.map((row) => ({
       id: row.id,
       channel: row.channel as Channel,
-      status: row.status === 'skipped' ? 'skipped' : 'pending',
+      status: row.status === 'skipped' ? 'skipped' : inlineMessage ? 'sent' : 'pending',
       reason: row.skipReason ?? undefined,
     }));
 
@@ -211,6 +254,38 @@ export class NotificationService extends BaseService {
     if (messages.length > 0) {
       await NotificationService.bindings.queue.sendBatch(messages.map((body) => ({ body })));
     }
+  };
+
+  // The same key tries a failed inline email again, so a person who asks once more gets another
+  // attempt, and claiming the row first keeps two retries from both sending. An email that went
+  // out, or is going out, replays as it stands: a key never sends twice.
+  private static retryInline = async (existing: SendResult): Promise<SendResult> => {
+    const email = existing.deliveries.find((d) => d.channel === 'email');
+    if (!email?.id) return existing;
+    const claimed = await NotificationService.db
+      .update(deliveries)
+      .set({ status: 'pending', updatedAt: new Date() })
+      .where(and(eq(deliveries.id, email.id), inArray(deliveries.status, ['failed', 'dead'])));
+    if (claimed.meta.changes === 0) return existing;
+
+    const notification = await NotificationService.client.notifications.findFirst({
+      where: { id: existing.notificationId },
+    });
+    if (!notification) return existing;
+    const delivered = await DeliveryService.deliverInline({
+      kind: 'chaski.delivery',
+      deliveryId: email.id,
+      notificationId: notification.id,
+      channel: 'email',
+      type: notification.type,
+      recipientId: notification.recipientId,
+    });
+    await publishAdminEvents(['deliveries', 'metrics']);
+    if (delivered.status !== 'sent') throw deliveryFailed(delivered);
+    const results = existing.deliveries.map((d) =>
+      d.id === email.id ? { ...d, status: 'sent' as const } : d,
+    );
+    return { ...existing, outcome: outcomeOf(results), deliveries: results };
   };
 
   private static findByIdempotencyKey = async (
