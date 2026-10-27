@@ -195,11 +195,11 @@ describe('preferences', () => {
 });
 
 describe('routes', () => {
-  it('answers 404 in JSON for anything else', async () => {
-    const response = await me('/whatever');
+  it('leaves a path it does not serve to the host, without asking identify', async () => {
+    const response = await me('/whatever', { user: null });
 
     expect(response.status).toBe(404);
-    expect(await response.json()).toMatchObject({ error: 'not_found' });
+    expect(response.headers.get('cache-control')).toBeNull();
   });
 });
 
@@ -296,5 +296,38 @@ describe('allowPush', () => {
     });
     expect(accepted.status).toBe(201);
     expect((await call('guest_1', 'DELETE')).status).toBe(200);
+  });
+});
+
+// A mount must not answer for paths it doesn't serve, so mounts nested under its path work in
+// whichever order the host registers them, and its identify doesn't run for them.
+describe('nested mounts', () => {
+  const personal = () =>
+    chaski.userRoutes({ identify: (c) => c.req.header('x-user') ?? null, groups: ['feed'] });
+  const team = () => chaski.userRoutes({ identify: () => 'team:shared', groups: ['feed'] });
+
+  it.each([
+    [
+      'the outer mount first',
+      () => new Hono().route('/inbox', personal()).route('/inbox/team', team()),
+    ],
+    [
+      'the inner mount first',
+      () => new Hono().route('/inbox/team', team()).route('/inbox', personal()),
+    ],
+  ])('answers both with %s', async (_, build) => {
+    await seedTemplate('payment_received', 'in_app');
+    await sendInApp('team:shared');
+    const host = build();
+
+    const teamCount = await host.request('/inbox/team/feed/unread-count');
+    const personalCount = await host.request('/inbox/feed/unread-count', {
+      headers: { 'x-user': 'user_1' },
+    });
+
+    expect(teamCount.status).toBe(200);
+    expect(await teamCount.json()).toEqual({ unread: 1 });
+    expect(await personalCount.json()).toEqual({ unread: 0 });
+    expect((await host.request('/inbox/elsewhere')).status).toBe(404);
   });
 });

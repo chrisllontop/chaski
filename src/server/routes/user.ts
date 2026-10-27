@@ -81,9 +81,12 @@ export const mountUserRoutes = <E extends Env = Env>({
   const serves = new Set<UserRouteGroup>(groups);
   const app = new Hono<E>();
   app.onError(handleError);
-  app.use(sameOrigin(allowedOrigins));
-  app.use(identified(identify));
-  app.use(requireReady);
+  // Scoped to the groups this mount serves, with no catch-all after them: a mount nested under
+  // this one's path (/inbox/team under /inbox) never runs this identify, in whichever order the
+  // host registers them, and a path no mount serves reaches the host's own 404.
+  for (const group of serves) {
+    app.use(`/${group}/*`, sameOrigin(allowedOrigins), identified(identify), requireReady);
+  }
 
   if (serves.has('push')) {
     app.get('/push/vapid-public-key', (c) =>
@@ -150,6 +153,5 @@ export const mountUserRoutes = <E extends Env = Env>({
     app.get('/preferences/topics', async (c) => c.json(await PreferenceService.topics()));
   }
 
-  app.all('*', (c) => c.json({ error: 'not_found', message: 'no such endpoint' }, 404));
   return app;
 };

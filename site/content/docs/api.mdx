@@ -112,6 +112,12 @@ returns. `chaskijs/client` calls them for you.
 | `POST /push/subscriptions` | Registers this browser’s subscription, or an iOS device token. |
 | `DELETE /push/subscriptions` | Drops one, by `endpoint` or `deviceToken`. |
 
+A path the mount doesn’t serve, including those of a group left out of `groups`, reaches your
+app’s own 404, and `identify` doesn’t run for it. So a second mount can sit under the first
+one’s path (`/me/notifications/team` under `/me/notifications`) and both answer, in whichever
+order you register them. The dashboard’s mount is the exception: it’s a single-page app, so it
+answers every path under its own.
+
 Writes and socket upgrades from an origin other than the request’s own, `publicUrl`’s or one in
 `allowedOrigins` answer 403. Errors answer as `{ error, message }`, with the codes in
 [Errors](/docs/errors).
