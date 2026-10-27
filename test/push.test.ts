@@ -285,6 +285,36 @@ describe('APNs', () => {
     });
   });
 
+  it('sends the alert Apple expects, with the link and a collapse id', async () => {
+    await chaski.push.register({ recipient: recipient(), platform: 'ios', deviceToken: IOS_TOKEN });
+    const calls = stubFetch(() => new Response(null, { status: 200 }));
+
+    const delivery = await sendPush();
+
+    const call = calls[0];
+    expect(Object.fromEntries(call?.headers ?? [])).toMatchObject({
+      'apns-push-type': 'alert',
+      'apns-priority': '10',
+      'apns-collapse-id': delivery?.notificationId,
+      'content-type': 'application/json',
+    });
+    expect(JSON.parse(new TextDecoder().decode(call?.body))).toEqual({
+      aps: { alert: { title: 'Hello Ana', body: 'Amount: 1500' }, sound: 'default' },
+      href: '/payments/1500',
+      tag: delivery?.notificationId,
+    });
+    const { claims } = await verifyToken(call?.headers.get('authorization') ?? null);
+    expect(Math.abs(claims.iat - Date.now() / 1000)).toBeLessThan(60);
+  });
+
+  it('forgets a device Apple reports unregistered', async () => {
+    await chaski.push.register({ recipient: recipient(), platform: 'ios', deviceToken: IOS_TOKEN });
+    stubFetch(() => Response.json({ reason: 'Unregistered' }, { status: 410 }));
+
+    expect(await sendPush()).toMatchObject({ status: 'failed', errorCode: 'no_device_tokens' });
+    expect(await devices()).toEqual([]);
+  });
+
   it('signs a new provider token after Apple rejects the cached one', async () => {
     await chaski.push.register({ recipient: recipient(), platform: 'ios', deviceToken: IOS_TOKEN });
     let rejected = false;
