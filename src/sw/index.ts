@@ -4,7 +4,7 @@ import type { PushPayload } from '../contract/contract';
 // uses, so it compiles under the DOM lib without the WebWorker one.
 type WindowClientLike = {
   focus?: () => Promise<unknown>;
-  navigate?: (url: string) => Promise<unknown>;
+  navigate?: (url: string) => Promise<WindowClientLike | null>;
   postMessage: (message: unknown) => void;
 };
 
@@ -51,8 +51,8 @@ export const PUSH_MESSAGE_TYPE = 'chaski:push';
 
 /**
  * Shows Chaski's pushes and handles their clicks; call it from the host's
- * service worker: `handlePushEvents(self)`. A click focuses an open window
- * and takes it to the push's link, or opens one.
+ * service worker: `handlePushEvents(self)`. A click takes an open window to
+ * the push's link and focuses it, or opens the link in a new one.
  */
 export const handlePushEvents = (
   scope: ServiceWorkerScopeLike,
@@ -89,13 +89,20 @@ export const handlePushEvents = (
   scope.addEventListener('notificationclick', (event) => {
     event.notification.close();
     const href = event.notification.data?.href ?? defaultUrl;
+    // A window this worker doesn't control yet, such as the page that just turned push on, can't
+    // be navigated, and focusing it first would spend the click's one chance to open a window. So
+    // the link opens in the first window that navigates, or in a new one.
     event.waitUntil(
       (async () => {
         for (const client of await windows()) {
-          if (!client.focus) continue;
-          await client.focus();
-          await client.navigate?.(href);
-          client.postMessage({ type: messageType });
+          if (!client.focus || !client.navigate) continue;
+          const navigated = await client.navigate(href).then(
+            (next) => next ?? client,
+            () => null,
+          );
+          if (!navigated) continue;
+          await navigated.focus?.();
+          navigated.postMessage({ type: messageType });
           return;
         }
         await scope.clients.openWindow(href);

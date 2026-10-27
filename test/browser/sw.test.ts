@@ -1,12 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import { handlePushEvents, type ServiceWorkerScopeLike } from '../../src/sw';
 
-const scope = (windows: Array<{ focus?: () => Promise<unknown> }> = []) => {
+type FakeWindow = { focus?: () => Promise<unknown>; navigate?: (url: string) => Promise<null> };
+
+const scope = (windows: FakeWindow[] = []) => {
   const listeners: Record<string, (event: never) => void> = {};
   const clients = windows.map((w) => ({
-    ...w,
-    navigate: vi.fn(async () => {}),
     postMessage: vi.fn(),
+    ...w,
+    navigate: vi.fn(w.navigate ?? (async () => null)),
   }));
   const fake = {
     addEventListener: (type: string, listener: (event: never) => void) => {
@@ -69,6 +71,24 @@ describe('handlePushEvents', () => {
     expect(focus).toHaveBeenCalled();
     expect(clients[0]?.navigate).toHaveBeenCalledWith('/payments/1');
     expect(fake.clients.openWindow).not.toHaveBeenCalled();
+  });
+
+  // Browsers refuse to navigate a window the worker doesn't control, as the page that just turned
+  // push on is until it reloads.
+  it('opens the link in a new window when the open one is not under this worker', async () => {
+    const focus = vi.fn(async () => {});
+    const navigate = async () => {
+      throw new TypeError("This service worker is not the client's active service worker.");
+    };
+    const { fake, clients, dispatch } = scope([{ focus, navigate }]);
+
+    await dispatch('notificationclick', {
+      notification: { close: () => {}, data: { href: '/payments/1' } },
+    });
+
+    expect(clients[0]?.navigate).toHaveBeenCalledWith('/payments/1');
+    expect(focus).not.toHaveBeenCalled();
+    expect(fake.clients.openWindow).toHaveBeenCalledWith('/payments/1');
   });
 
   it('opens a window when none is open', async () => {
