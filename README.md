@@ -425,17 +425,27 @@ deliveries, and shows them in the dashboard, without handing them to a provider.
 
 ## Use Chaski with a coding agent
 
-This repository ships an [agent skill](skills/chaski/SKILL.md) for your coding agent. It sets
-Chaski up in your Worker and your frontend, audits the notifications your code already sends and
-plans moving them onto Chaski, and works through a setup that fails. Add it to your project with
-the [`skills` CLI](https://github.com/vercel-labs/skills), which installs it for Claude Code,
-Codex, Cursor and the other agents that read skills:
+Paste this prompt into your coding agent, in the project that holds your Worker:
+
+```text
+Set up Chaski, notifications for Cloudflare Workers, in this project. Follow https://chaski.sh/skill/SKILL.md step by step, and ask me before anything that touches my Cloudflare account.
+```
+
+The agent reads Chaski’s [agent skill](skills/chaski/SKILL.md) from chaski.sh and sets Chaski up
+in your Worker, asking before anything that acts on your account. Any agent that can read a URL
+works.
+
+To keep the skill in your project instead, add it with the
+[`skills` CLI](https://github.com/vercel-labs/skills), which installs it for Claude Code, Codex,
+Cursor and the other agents that read skills:
 
 ```sh
 npx skills add chrisllontop/chaski
 ```
 
-Then ask your agent to set up Chaski, or to audit the notifications your app sends.
+Your agent then reads it from disk for any Chaski task: setting Chaski up in your Worker and your
+frontend, auditing the notifications your code already sends and planning the move onto Chaski,
+and working through a setup that fails.
 
 ## Contributing
 
