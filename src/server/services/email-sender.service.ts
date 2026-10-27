@@ -1,6 +1,11 @@
 import { DeliveryError } from '../lib/errors';
-import type { SendEmailBinding } from '../types';
+import type { EmailAddress, SendEmailBinding } from '../types';
 import { BaseService } from './base.service';
+
+// A name pasted into the address string would reach the From header unquoted, and a comma in it
+// ("Billing, Acme") splits one sender into two addresses.
+export const senderAddress = (from: string, fromName?: string): string | EmailAddress =>
+  fromName ? { email: from, name: fromName } : from;
 
 // Email Service send() errors that cannot succeed on retry (structured `code`):
 // developers.cloudflare.com/email-service/api/send-emails/workers-api/#error-codes

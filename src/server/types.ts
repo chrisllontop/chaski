@@ -17,10 +17,14 @@ export interface EmailAttachment {
   contentId?: string;
 }
 
+// The address shape of the Email Service Workers API: a display name travels
+// next to the address, never inside the string, so the provider quotes it.
+export type EmailAddress = { email: string; name: string };
+
 export interface SendEmailBinding {
   send(message: {
     to: string;
-    from: string;
+    from: string | EmailAddress;
     replyTo?: string;
     subject: string;
     html: string;

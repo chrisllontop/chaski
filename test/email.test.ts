@@ -35,7 +35,7 @@ describe('email channel', () => {
     expect(sent).toEqual([
       expect.objectContaining({
         to: 'ana@example.com',
-        from: 'Fixture host <notifications@host.test>',
+        from: { email: 'notifications@host.test', name: 'Fixture host' },
         subject: 'Hello Ana',
         text: 'Amount: 1500',
       }),
@@ -107,12 +107,23 @@ describe('email channel', () => {
     await seedTemplate('payment_received', 'email');
     const sent = stubEmail();
 
-    await sendPayment({ email: { fromName: 'Billing', replyTo: 'billing@host.test' } });
+    await sendPayment({ email: { fromName: 'Billing, Acme', replyTo: 'billing@host.test' } });
 
+    // The name stays out of the address, so its comma can't split the sender in two.
     expect(sent[0]).toMatchObject({
-      from: 'Billing <notifications@host.test>',
+      from: { email: 'notifications@host.test', name: 'Billing, Acme' },
       replyTo: 'billing@host.test',
     });
+  });
+
+  it('sends a bare address when no sender name is configured', async () => {
+    useConfig({ channels: { email: { from: 'notifications@host.test' }, in_app: {} } });
+    await seedTemplate('payment_received', 'email');
+    const sent = stubEmail();
+
+    await sendPayment();
+
+    expect(sent[0]?.from).toBe('notifications@host.test');
   });
 
   it('skips a contact without an email address', async () => {

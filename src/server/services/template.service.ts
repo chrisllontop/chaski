@@ -13,7 +13,7 @@ import { newId } from '../lib/ids';
 import { parseJson } from '../lib/json';
 import { assertTemplates, renderHtml, renderTemplate } from '../lib/render';
 import { BaseService } from './base.service';
-import { EmailSenderService } from './email-sender.service';
+import { EmailSenderService, senderAddress } from './email-sender.service';
 
 export type ChannelContentInput = {
   enabled?: boolean;
@@ -452,7 +452,7 @@ export class TemplateService extends BaseService {
     try {
       return await EmailSenderService.send({
         to: input.to,
-        from: email.fromName ? `${email.fromName} <${email.from}>` : email.from,
+        from: senderAddress(email.from, email.fromName),
         replyTo: email.replyTo,
         subject: `[test] ${rendered.subject}`,
         html: rendered.html,
