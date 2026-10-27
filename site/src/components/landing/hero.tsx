@@ -103,12 +103,6 @@ export const Hero = () => (
     aria-labelledby="hero-title"
   >
     <div className="flex flex-col gap-7">
-      <p className="hero-in flex h-7 w-max max-w-full items-center gap-2.5 rounded-full border border-border px-3 font-mono text-xs leading-4 text-muted-foreground">
-        <span className="size-1.5 shrink-0 rounded-full bg-signal" aria-hidden="true" />
-        <span>
-          Open source · MIT · <span className="max-sm:hidden">Built for </span>Cloudflare Workers
-        </span>
-      </p>
       <h1
         id="hero-title"
         className="hero-in text-[44px] leading-[46px] font-semibold tracking-[-0.045em] text-balance [animation-delay:80ms] sm:text-6xl sm:leading-[62px] lg:text-[74px] lg:leading-[76px]"
