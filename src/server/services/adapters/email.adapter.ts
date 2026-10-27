@@ -57,9 +57,8 @@ export class EmailAdapter extends BaseService {
     const from = senderAddress(emailConfig.from, overrides.fromName ?? emailConfig.fromName);
     const replyTo = overrides.replyTo ?? emailConfig.replyTo;
 
-    const attachments = await EmailAdapter.loadAttachments(
-      parseJson<StoredAttachment[]>(ctx.notification.attachments, []),
-    );
+    const stored = parseJson<StoredAttachment[]>(ctx.notification.attachments, []);
+    const attachments = await EmailAdapter.loadAttachments(stored);
 
     const { messageId } = await EmailSenderService.send({
       to: snapshot.email,
@@ -70,6 +69,8 @@ export class EmailAdapter extends BaseService {
       text,
       attachments: attachments.length > 0 ? attachments : undefined,
     });
+    // A sent email can't be replayed, so nothing reads its attachments again.
+    await AttachmentService.discard(stored, { deliveryId: ctx.delivery.id, channel: 'email' });
     return { providerMessageId: messageId };
   };
 

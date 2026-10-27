@@ -115,6 +115,14 @@ await chaski.send({
 });
 ```
 
+Chaski deletes the files under `att/` once their email goes out, and when a schedule that carries
+them is cancelled or replaced. A delivery that ends `failed` or `dead` keeps its files, so a replay
+can send them. To bound what those keep, add an
+[R2 lifecycle rule](https://developers.cloudflare.com/r2/buckets/object-lifecycles/) that deletes
+objects under `att/` after a number of days. Make it outlast your farthest `chaski.schedule()` with
+attachments plus the time you allow for a replay. When a schedule fires, or a replay sends, after
+the rule took its files, the delivery fails as `attachment_missing`.
+
 ## How a delivery moves
 
 A delivery starts `pending` on your queue, and the channels skipped at send time are recorded as

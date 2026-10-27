@@ -78,7 +78,7 @@ const result = await chaski.send({
 | `payload` | The values the template renders with. |
 | `channels` | Narrows the send to some of the template’s channels, such as `['email']`. A channel the config doesn’t turn on fails the send. |
 | `transactional` | `true` sends whatever the contact’s preferences say: receipts, password resets, security alerts. |
-| `email` | `fromName`, `replyTo`, and up to 10 `attachments` (`filename`, `contentType`, and base64 `content` or a `url`); attachments need the R2 binding. |
+| `email` | `fromName`, `replyTo`, and up to 10 `attachments` (`filename`, `contentType`, and base64 `content` or a `url`); attachments need the R2 binding. Chaski deletes them once the email goes out or its schedule is cancelled; a failed or dead delivery keeps them for a replay, so suggest an R2 lifecycle rule on `att/` that outlasts the farthest schedule with attachments. |
 | `idempotencyKey` | The same key returns the first send’s result (`replayed: true`) instead of sending again. |
 | `inline` | `true` delivers the email before `send()` returns, for someone waiting on it; needs `transactional: true` and `channels: ['email']`. |
 

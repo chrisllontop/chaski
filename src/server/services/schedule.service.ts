@@ -67,6 +67,11 @@ export class ScheduleService extends BaseService {
     const snapshot = await ContactService.upsertFromRecipient(request.recipient);
     const { attachments, overrides } = splitEmailOptions(request.email);
     const storedAttachments = await AttachmentService.store(scheduledId, attachments);
+    // The new files overwrite the ones under the same name; the rest of the old ones go.
+    const kept = new Set(storedAttachments.map((attachment) => attachment.r2Key));
+    const replaced = parseJson<StoredAttachment[]>(existing?.attachments ?? null, []).filter(
+      (attachment) => !kept.has(attachment.r2Key),
+    );
     const fields = {
       recipientId: request.recipient.id,
       type: request.type,
@@ -90,6 +95,7 @@ export class ScheduleService extends BaseService {
             eq(scheduledNotifications.status, 'pending'),
           ),
         );
+      await AttachmentService.discard(replaced, { scheduledId });
       await ScheduleService.wake(scheduler, existing.id);
       ScheduleService.log.info('notification rescheduled', { scheduledId });
       return { scheduledId, scheduledAt: scheduledAt.toISOString(), op: 'updated' };
@@ -194,11 +200,18 @@ export class ScheduleService extends BaseService {
     }
     if (query.groupKey) conditions.push(eq(scheduledNotifications.groupKey, query.groupKey));
 
-    const result = await ScheduleService.db
+    const cancelled = await ScheduleService.db
       .update(scheduledNotifications)
       .set({ status: 'cancelled', updatedAt: new Date() })
-      .where(and(...conditions));
-    return { cancelled: result.meta.changes };
+      .where(and(...conditions))
+      .returning({
+        id: scheduledNotifications.id,
+        attachments: scheduledNotifications.attachments,
+      });
+    for (const row of cancelled) {
+      await AttachmentService.discard(row.attachments, { scheduledId: row.id });
+    }
+    return { cancelled: cancelled.length };
   };
 
   /** Where the scheduler instance stands; null once there is nothing left to send. */
@@ -252,8 +265,8 @@ export class ScheduleService extends BaseService {
     return rows.find((row) => row.status !== 'cancelled');
   };
 
-  private static markCancelled = (scheduledId: string) =>
-    ScheduleService.db
+  private static markCancelled = async (scheduledId: string) => {
+    const cancelled = await ScheduleService.db
       .update(scheduledNotifications)
       .set({ status: 'cancelled', updatedAt: new Date() })
       .where(
@@ -261,7 +274,10 @@ export class ScheduleService extends BaseService {
           eq(scheduledNotifications.id, scheduledId),
           eq(scheduledNotifications.status, 'pending'),
         ),
-      );
+      )
+      .returning({ attachments: scheduledNotifications.attachments });
+    for (const row of cancelled) await AttachmentService.discard(row.attachments, { scheduledId });
+  };
 
   // A moved schedule restarts its instance so it sleeps until the new time; an
   // instance that no longer exists is created again.

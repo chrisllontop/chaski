@@ -104,6 +104,10 @@ with backoff until `maxRetries`, then the delivery is `dead`. Fix the cause, the
 the dashboard. Keep `max_retries` on the queue consumer equal to `maxRetries` (5 by default), or
 rows can stay `pending` after the queue gave up on them.
 
+`attachment_missing` means a file under `att/` in the attachments bucket was gone when the
+delivery read it: an R2 lifecycle rule deleted it before the schedule fired or the replay sent.
+Lengthen the rule, then send again.
+
 **Nothing arrives, yet deliveries show `sent`.** `dryRun` is on: in dry run Chaski records email
 and push without handing them to a provider. The dashboard’s **Channels** page says
 whether dry run is on. In-app items reach the feed in dry run too.
