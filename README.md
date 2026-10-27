@@ -9,11 +9,7 @@ Embeddable notification infrastructure for Cloudflare Workers, dashboard include
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-404040?style=flat-square)](LICENSE)
 ![Runs on Cloudflare Workers](https://img.shields.io/badge/runs_on-Cloudflare_Workers-404040?style=flat-square)
-![Status: pre-release](https://img.shields.io/badge/status-pre--release-404040?style=flat-square)
-
-**Status: pre-release.** The engine, the browser clients and the dashboard are in place, and the
-guide below sets them up. Chaski isn’t on npm yet: `npm install chaskijs` works from its first
-release.
+[![npm](https://img.shields.io/npm/v/chaskijs?color=404040&style=flat-square)](https://www.npmjs.com/package/chaskijs)
 
 ## What it does
 
