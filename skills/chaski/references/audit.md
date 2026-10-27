@@ -38,10 +38,14 @@ node "${TMPDIR:-/tmp}/chaski-skill/scripts/find-sends.mjs" <project root> \
 ```
 
 It prints counts, then each hit as `file:line: code`, under these headings: packages,
-credentials, template files, email, push, notification services, other sends, sms and chat,
-templates, jobs and schedules, preferences and devices, in-app feed. From `.env` and `.dev.vars`
-files it reads only the names of the settings, never their values. It matches patterns: it flags
-lines that send nothing, and it misses sends it has no pattern for. So go past it:
+credentials, other settings, template files, email, push, notification services, other sends, sms
+and chat, templates, jobs and schedules, preferences and devices, in-app feed. From `.env` and
+`.dev.vars` files it reads only the names of the settings, never their values. It matches
+patterns: it flags lines that send nothing, and it misses sends it has no pattern for. A provider
+missing from its lists shows up only as candidates: a package marked `unknown`, whose name sounds
+like a sender or matches a setting’s prefix, and the `*_API_KEY`, `*_SECRET`, `*_TOKEN` and
+`*_URL` settings under other settings. Zero hits under packages doesn’t mean nothing to move. So go
+past it:
 
 - **Wrappers.** For every module that imports a provider SDK, calls a provider’s API or writes to
   an in-app notifications table of the host’s own, list the functions it exports, then find every
@@ -50,7 +54,9 @@ lines that send nothing, and it misses sends it has no pattern for. So go past i
   configs and every job runner’s jobs to the end: digests and reminders hide there.
 - **Credentials.** Each name under the finder’s credentials heading (`RESEND_API_KEY`,
   `VAPID_PRIVATE_KEY`, `SLACK_WEBHOOK_URL`…) is a provider the code talks to, even when the call
-  itself matched no pattern. Follow every place that reads it to the send.
+  itself matched no pattern. Follow every place that reads it to the send. Do the same for each
+  name under other settings until you know what it reaches: most are the database, auth or
+  storage, and one may be a provider the finder doesn’t list.
 - **Outside the code.** Provider-hosted templates (SendGrid dynamic templates, Postmark templates)
   and workflows in a notification service (Knock, Novu, Courier, OneSignal) hold content and
   steps the code only names by id. Automations configured in a provider’s dashboard, such as an

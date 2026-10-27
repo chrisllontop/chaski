@@ -186,22 +186,69 @@ const PATTERNS = {
   ],
 };
 
-// Names of settings that hold a provider's key or address, such as RESEND_API_KEY.
-const CREDENTIAL =
-  /\b[A-Z0-9_]*(?:RESEND|SENDGRID|POSTMARK|MAILGUN|SES|SMTP|MAIL|VAPID|FCM|FIREBASE|APNS|ONESIGNAL|KNOCK|NOVU|COURIER|MAGICBELL|TWILIO|VONAGE|SLACK|DISCORD|WEBHOOK)[A-Z0-9_]*\b/g;
+// Settings are compared segment by segment (RESEND_API_KEY is RESEND, API, KEY), so a provider's
+// name inside another word, such as SES in JOB_STATUSES, never counts.
+const PROVIDER_WORDS = new Set(
+  'RESEND SENDGRID POSTMARK MAILGUN SES SMTP MAIL MAILER VAPID FCM FIREBASE APNS APN ONESIGNAL KNOCK NOVU COURIER MAGICBELL SUPRSEND TWILIO VONAGE PLIVO TELNYX MESSAGEBIRD SNS PINPOINT SLACK DISCORD WEBHOOK SPARKPOST MAILCHIMP MANDRILL BREVO SENDINBLUE MAILERSEND PLUNK LOOPS MAILTRAP EXPO'.split(
+    ' ',
+  ),
+);
+// Words that only say what a setting is about; they count where a name is a setting for sure.
+const TOPIC_WORDS = new Set(
+  'EMAIL EMAILS MAIL PUSH SMS NOTIFY NOTIFICATION NOTIFICATIONS'.split(' '),
+);
+const SETTING_WORDS = new Set(
+  'KEY SECRET TOKEN PASS PASSWORD USER USERNAME HOST PORT URL URI ENDPOINT DOMAIN FROM SENDER SID REGION DSN AUTH'.split(
+    ' ',
+  ),
+);
+// What a provider Chaski doesn't know usually leaves behind: ACME_API_KEY, ACME_URL.
+const GENERIC_SETTING = /_(?:API_?KEY|KEY|SECRET|TOKEN|URL)$/;
+
+const NAME = /\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/g;
+// Names a line reads from the environment: env.X, process.env.X, os.getenv('X') and the like.
+const ENV_READS = [
+  /\b(?:process\.env|import\.meta\.env|env)\.([A-Z][A-Z0-9_]*)/g,
+  /(?:getenv|environ(?:\.get)?|env\.get|ENV\.fetch|ENV)\s*[([]\s*['"]([A-Z][A-Z0-9_]*)['"]/g,
+];
+// Wrangler and Docker-style config files declare settings by name.
+const SETTINGS_FILE =
+  /^(?:wrangler\.(?:toml|json|jsonc)|docker-compose\.ya?ml|app\.ya?ml|fly\.toml)$/;
 
 // Env files hold secrets: only the names of their settings are read, never the values.
 const ENV_FILE = /^\.(?:env|dev\.vars)(?:\..+)?$/;
 
 const hits = new Map(Object.keys(PATTERNS).map((category) => [category, []]));
 const packages = [];
+const dependencies = new Map();
 const templateFiles = [];
 const credentials = new Map();
+const settings = new Map();
 
-const recordCredentials = (text, where) => {
-  for (const name of text.match(CREDENTIAL) ?? []) {
-    if (!/[A-Z0-9]_[A-Z0-9]/.test(name)) continue;
-    credentials.set(name, [...(credentials.get(name) ?? []), where]);
+const add = (map, name, where) => {
+  const places = map.get(name) ?? [];
+  if (!places.includes(where)) places.push(where);
+  map.set(name, places);
+};
+
+// A name is a setting for sure in an env or config file, or where code reads it from the
+// environment; elsewhere it needs a provider's name and a word like KEY or HOST to count.
+const recordName = (name, where, isSetting) => {
+  const words = name.split('_');
+  const provider = words.some((word) => PROVIDER_WORDS.has(word));
+  const topic = words.some((word) => TOPIC_WORDS.has(word));
+  const setting = words.some((word) => SETTING_WORDS.has(word));
+  if (provider && (isSetting || setting)) add(credentials, name, where);
+  else if (isSetting && topic) add(credentials, name, where);
+  else if (isSetting && GENERIC_SETTING.test(name)) add(settings, name, where);
+};
+
+const recordCredentials = (text, where, isSetting) => {
+  const read = new Set(
+    ENV_READS.flatMap((pattern) => [...text.matchAll(pattern)].map((m) => m[1])),
+  );
+  for (const name of new Set(text.match(NAME) ?? [])) {
+    recordName(name, where, isSetting || read.has(name));
   }
 };
 
@@ -223,6 +270,7 @@ const scanPackageJson = (path, text) => {
       for (const [name, version] of Object.entries(manifest[field] ?? {})) {
         const category = packageCategory(name);
         if (category) packages.push(`${path}: ${name}@${version} (${category})`);
+        else dependencies.set(name, `${path}: ${name}@${version}`);
       }
     }
   } catch {
@@ -243,15 +291,16 @@ const scanFile = (path) => {
     readFileSync(path, 'utf8')
       .split('\n')
       .forEach((line, index) => {
-        recordCredentials(line.split('=')[0] ?? '', `${rel}:${index + 1}`);
+        recordCredentials(line.split('=')[0] ?? '', `${rel}:${index + 1}`, true);
       });
     return;
   }
   if (!CODE.has(ext) || statSync(path).size > 1_000_000) return;
   const text = readFileSync(path, 'utf8');
   if (basename(path) === 'package.json') scanPackageJson(rel, text);
+  const isSettingsFile = SETTINGS_FILE.test(basename(path));
   text.split('\n').forEach((line, index) => {
-    recordCredentials(line, `${rel}:${index + 1}`);
+    recordCredentials(line, `${rel}:${index + 1}`, isSettingsFile);
     for (const [category, patterns] of Object.entries(PATTERNS)) {
       if (patterns.some((pattern) => pattern.test(line))) {
         record(category, `${rel}:${index + 1}: ${line.trim().slice(0, 160)}`);
@@ -275,9 +324,30 @@ const walk = (dir) => {
 
 walk(root);
 
+// A package the lists above don't know still counts when its name says what it does, or when it
+// shares a name with a setting such as ACME_API_KEY.
+const NOTIFICATION_NAME = /mail|smtp|sms|push|notif|messag|inbox|courier|apns|fcm/i;
+const settingPrefixes = [...settings.keys()].map((name) => name.split('_')[0]?.toLowerCase() ?? '');
+for (const [name, line] of dependencies) {
+  const bare = name.replace(/^@[^/]+\//, '').toLowerCase();
+  const scope = name.startsWith('@') ? name.slice(1, name.indexOf('/')).toLowerCase() : '';
+  const named = settingPrefixes.find(
+    (prefix) => prefix.length > 2 && (bare.includes(prefix) || scope === prefix),
+  );
+  if (named)
+    packages.push(`${line} (unknown, shares its name with the ${named.toUpperCase()}_ settings)`);
+  else if (NOTIFICATION_NAME.test(name)) packages.push(`${line} (unknown, named like a sender)`);
+}
+
 const sections = [
   ['packages', packages],
   ['credentials', [...credentials].map(([name, where]) => `${name}: ${where.join(', ')}`)],
+  [
+    'other settings',
+    [...settings].map(
+      ([name, where]) => `${name}: ${where.join(', ')} (a provider this list lacks?)`,
+    ),
+  ],
   ['template files', templateFiles],
   ...hits.entries(),
 ];

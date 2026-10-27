@@ -27,7 +27,7 @@ the endpoints the host's frontend calls for the signed-in user, which `chaskijs/
   (`test/fixture/seed.ts`), so the dashboard has something to show.
 - `pnpm build:dashboard` (Vite) writes `src/generated/dashboard.ts`, which the server code imports.
   It is generated and gitignored; run it once before typechecking or testing on a fresh clone.
-- `pnpm typecheck` (tsc, nine projects), `pnpm lint` (Biome), `pnpm format` (Biome with fixes),
+- `pnpm typecheck` (tsc, ten projects), `pnpm lint` (Biome), `pnpm format` (Biome with fixes),
   `pnpm test` (Vitest in workerd), `pnpm build` (dashboard, tsdown, then the declarations).
 - `pnpm dev:site` serves chaski.sh, landing and docs, with Vite. `pnpm build:site` prerenders every
   page to `site/dist/client` and writes their headers; `pnpm --filter chaski-site preview` serves
@@ -136,7 +136,8 @@ with the code they govern.
   `tsconfig.browser.json` (the browser entries and the contract, DOM types),
   `src/dashboard/tsconfig.json` (DOM and JSX), `test/tsconfig.json` (Workers plus the Vitest
   plugin), `test/browser/tsconfig.json` (the browser tests), `test/sw/tsconfig.json` (a real service
-  worker scope against `chaskijs/sw`, WebWorker types), `site/tsconfig.json` (the site, DOM types),
+  worker scope against `chaskijs/sw`, WebWorker types), `test/node/tsconfig.json` (the tests of the
+  skill's scripts, Node types), `site/tsconfig.json` (the site, DOM types),
   `site/tsconfig.node.json` (its config files and build script) and `tsconfig.node.json` (the config
   files and scripts).
 - tsdown bundles the JavaScript and TypeScript 7's compiler emits the declarations
@@ -149,12 +150,13 @@ with the code they govern.
 - Test logic and observable behavior. Do not assert markup or props.
 - **Never wait with sleeps or arbitrary timeouts.** Use the test runner's own waiting, `vi.waitFor`
   or fake timers.
-- Vitest runs two projects. `worker` runs inside workerd with `@cloudflare/vitest-plugin`, against
+- Vitest runs three projects. `worker` runs inside workerd with `@cloudflare/vitest-plugin`, against
   the fixture host through `exports.default.fetch()`: assert status, headers and JSON; the only
   markup a test reads is the injected `<base href>`. `browser` runs `test/browser` in happy-dom,
   with a fake network and a fake socket (`test/browser/fakes.ts`) and fake timers for the
-  reconnection logic; it also covers the dashboard's `lib/`. The dashboard's screens have no tests:
-  check them in `pnpm dev`.
+  reconnection logic; it also covers the dashboard's `lib/`. `node` runs `test/node` against the
+  skill's scripts, on projects it writes to a temporary folder. The dashboard's screens have no
+  tests: check them in `pnpm dev`.
 - `test/setup.ts` applies the migrations, empties the tables and restores the fixture config before
   each test, and stubs the queue producer: tests drain deliveries with `processDeliveries()` from
   `test/helpers.ts`. Only the end-to-end test lets the real queue and consumer run.
