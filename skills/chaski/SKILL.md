@@ -24,6 +24,10 @@ Read the one that matches the task, and only that one until it sends you to anot
 | Send, schedule, write templates or set preferences in code | [references/sending.md](references/sending.md) |
 | Fix a Chaski error or a part that doesn’t work | [references/troubleshooting.md](references/troubleshooting.md) |
 
+When you read this file from https://chaski.sh/skill/SKILL.md rather than from disk, its links
+resolve on chaski.sh too. Only the audit’s finder has to be on disk to run:
+[references/audit.md](references/audit.md) says how to download it.
+
 ## What every task needs
 
 - **Fit.** Chaski runs only inside a Cloudflare Worker, and its routes are Hono 4.8+ apps. Code

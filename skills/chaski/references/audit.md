@@ -25,6 +25,18 @@ keep its output:
 node <skill folder>/scripts/find-sends.mjs <project root> > "${TMPDIR:-/tmp}/chaski-sends.txt"
 ```
 
+When you read the skill from chaski.sh, it isn’t on disk: download the finder into a temporary
+folder, then run it with Node. Keep it in a `scripts` folder of its own, since it skips everything
+under its parent folder as the skill’s:
+
+```sh
+mkdir -p "${TMPDIR:-/tmp}/chaski-skill/scripts"
+curl -fsSL https://chaski.sh/skill/scripts/find-sends.mjs \
+  -o "${TMPDIR:-/tmp}/chaski-skill/scripts/find-sends.mjs"
+node "${TMPDIR:-/tmp}/chaski-skill/scripts/find-sends.mjs" <project root> \
+  > "${TMPDIR:-/tmp}/chaski-sends.txt"
+```
+
 It prints counts, then each hit as `file:line: code`, under these headings: packages,
 credentials, template files, email, push, notification services, other sends, sms and chat,
 templates, jobs and schedules, preferences and devices, in-app feed. From `.env` and `.dev.vars`
