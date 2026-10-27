@@ -92,6 +92,9 @@ export class TemplateService extends BaseService {
     return Boolean(row);
   };
 
+  /** Templates not in the trash: one per type a send can name. */
+  static countLive = (): Promise<number> => TemplateService.client.templates.count({ where: {} });
+
   static typeNames = async (): Promise<string[]> => {
     const rows = await TemplateService.client.templates.findMany({ orderBy: [{ type: 'asc' }] });
     return rows.map((row) => row.type);

@@ -53,14 +53,17 @@ export interface ChaskiFeedApi {
   markRead(input: MarkFeedReadInput): Promise<{ marked: number }>;
 }
 
-/** What `ready()` found: the channels the config turns on, and whether it's a dry run. */
-export type ChaskiReadiness = { channels: Channel[]; dryRun: boolean };
+/**
+ * What `ready()` found: the channels the config turns on, whether it's a dry run, and how many
+ * templates there are; with none, every send is refused as an unknown type.
+ */
+export type ChaskiReadiness = { channels: Channel[]; dryRun: boolean; templates: number };
 
 /** Chaski's in-process API: the host's Worker calls it directly, with no HTTP in between. */
 export interface ChaskiApi {
   /**
-   * Checks the config and asks the database for the applied migrations, changing nothing;
-   * throws the `config` error a send would, for a health check.
+   * Checks the config, asks the database for the applied migrations and counts the templates,
+   * changing nothing; throws the `config` error a send would, for a health check.
    */
   ready(): Promise<ChaskiReadiness>;
   send(request: SendRequest): Promise<SendResult>;

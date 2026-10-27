@@ -19,7 +19,11 @@ const run =
 export const api: ChaskiApi = {
   ready: async () => {
     const config = await ready({ fresh: true });
-    return { channels: config.enabledChannels, dryRun: config.dryRun };
+    return {
+      channels: config.enabledChannels,
+      dryRun: config.dryRun,
+      templates: await TemplateService.countLive(),
+    };
   },
   send: run((request) => NotificationService.send(request)),
   schedule: run((request) => ScheduleService.schedule(request)),

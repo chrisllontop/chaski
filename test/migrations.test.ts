@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { describe, expect, it } from 'vitest';
 import { createChaski } from '../src';
 import { ensureMigrations, MIGRATIONS } from '../src/server/migrations';
+import { TemplateService } from '../src/server/services/template.service';
 import { fixtureConfig } from './fixture/worker';
 import { useConfig } from './helpers';
 
@@ -49,11 +50,29 @@ describe('chaski.ready()', () => {
   it('reports the channels and dry run, in process and over RPC', async () => {
     const chaski = useConfig();
 
-    expect(await chaski.ready()).toEqual({ channels: ['email', 'in_app'], dryRun: false });
+    expect(await chaski.ready()).toEqual({
+      channels: ['email', 'in_app'],
+      dryRun: false,
+      templates: 0,
+    });
     expect(await exports.ChaskiEntrypoint.ready()).toEqual({
       channels: ['email', 'in_app'],
       dryRun: false,
+      templates: 0,
     });
+  });
+
+  // With no template every send is refused, as on a fresh database or after a forgotten import.
+  it('counts the templates a send can name, leaving out the deleted ones', async () => {
+    const chaski = useConfig();
+    await chaski.templates.import({
+      format: 'chaski.templates',
+      version: 1,
+      templates: [{ type: 'welcome' }, { type: 'payment_received' }, { type: 'old' }],
+    });
+    await TemplateService.deleteTemplate((await TemplateService.getByType('old')).template.id);
+
+    expect((await chaski.ready()).templates).toBe(2);
   });
 
   it('throws the config error a send would', async () => {

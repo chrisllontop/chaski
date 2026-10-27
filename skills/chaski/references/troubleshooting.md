@@ -9,7 +9,8 @@ https://chaski.sh/docs/errors.
 
 Chaski checks the config on every call. The message starts with `Chaski config:`.
 `await chaski.ready()` runs the same checks, and the migrations’, without sending anything: call it
-from a temporary route, or the project’s health route, to see the error.
+from a temporary route, or the project’s health route, to see the error. Its `templates` count at
+`0` means every send will be refused as an unknown type: load the templates (sending.md).
 
 | Message | Fix |
 | --- | --- |
