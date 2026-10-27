@@ -336,8 +336,11 @@ Skip the user routes when the project has no signed-in users or no frontend that
 notifications.
 
 A second inbox for the same user, such as one their team shares, is a second mount on another
-path whose `identify` names another contact (`team:<id>`), with `push: false`: a browser belongs
-to one contact, so registering it on that mount would take it from the user’s own inbox.
+path whose `identify` names another contact (`team:<id>`), with `groups: ['feed']`: a browser
+belongs to one contact, so registering it on that mount would take it from the user’s own inbox.
+When the project keeps a preferences API of its own, with rules of its own, leave `preferences`
+out of `groups` on every mount, so the browser can’t write around them. `allowPush: (c, id) =>
+boolean` answers 403 to the contacts that may not register a device.
 
 ### The main module
 

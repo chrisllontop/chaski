@@ -1,4 +1,5 @@
 import { exports } from 'cloudflare:workers';
+import { Hono } from 'hono';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FeedPage, FeedSocketEvent } from '../src';
 import { getClient } from '../src/server/db';
@@ -251,15 +252,49 @@ describe('a second mount for a shared inbox', () => {
   });
 
   // One browser belongs to one contact: registering it here would take it from the user's own inbox.
-  it('serves no push routes with push: false', async () => {
+  it('serves the feed alone with groups: [feed]', async () => {
     const register = await team('/push/subscriptions', {
       method: 'POST',
       body: JSON.stringify(SUBSCRIPTION),
     });
-    const key = await team('/push/vapid-public-key');
+    const preferences = await team('/preferences', {
+      method: 'PATCH',
+      body: JSON.stringify({ mutedTypes: ['payment_received'] }),
+    });
 
     expect(register.status).toBe(404);
-    expect(key.status).toBe(404);
+    expect(preferences.status).toBe(404);
+    expect((await team('/feed/unread-count')).status).toBe(200);
     expect(await getClient().deviceTokens.count({ where: {} })).toBe(0);
+    expect(await getClient().preferences.count({ where: {} })).toBe(0);
+  });
+});
+
+describe('allowPush', () => {
+  const host = new Hono().route(
+    '/me',
+    chaski.userRoutes({
+      identify: (c) => c.req.header('x-user') ?? null,
+      allowPush: (_c, recipientId) => !recipientId.startsWith('guest'),
+    }),
+  );
+  const call = (user: string, method: string) =>
+    host.request('/me/push/subscriptions', {
+      method,
+      headers: { 'x-user': user, 'content-type': 'application/json' },
+      body: JSON.stringify(method === 'POST' ? SUBSCRIPTION : { endpoint: SUBSCRIPTION.endpoint }),
+    });
+
+  it('answers 403 to a contact it turns away, and lets anyone drop a device', async () => {
+    const refused = await call('guest_1', 'POST');
+    const accepted = await call('user_1', 'POST');
+
+    expect(refused.status).toBe(403);
+    expect(await refused.json()).toEqual({
+      error: 'forbidden',
+      message: 'this contact may not register devices',
+    });
+    expect(accepted.status).toBe(201);
+    expect((await call('guest_1', 'DELETE')).status).toBe(200);
   });
 });

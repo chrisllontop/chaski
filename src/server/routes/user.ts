@@ -30,12 +30,17 @@ export type UserRoutesOptions<E extends Env = Env> = {
    */
   allowedOrigins?: string[];
   /**
-   * false leaves out the push routes, for a mount whose contact has no devices of its own,
-   * such as a shared inbox: a browser belongs to one contact, so registering it there would
-   * take it away from the user's own inbox.
+   * The groups of routes this mount serves, all three by default. A shared inbox serves the
+   * feed alone: a browser belongs to one contact, so registering it there would take it from
+   * the user's own inbox. A host with a preferences API of its own leaves `preferences` out.
    */
-  push?: boolean;
+  groups?: UserRouteGroup[];
+  /** Whether the signed-in contact may register a device; false answers 403. */
+  allowPush?: (c: Context<E>, recipientId: string) => boolean | Promise<boolean>;
 };
+
+export const USER_ROUTE_GROUPS = ['feed', 'push', 'preferences'] as const;
+export type UserRouteGroup = (typeof USER_ROUTE_GROUPS)[number];
 
 const recipients = new WeakMap<Request, string>();
 
@@ -70,15 +75,17 @@ const jsonBody = async (c: Context): Promise<unknown> => {
 export const mountUserRoutes = <E extends Env = Env>({
   identify,
   allowedOrigins,
-  push = true,
+  groups = [...USER_ROUTE_GROUPS],
+  allowPush,
 }: UserRoutesOptions<E>): Hono<E> => {
+  const serves = new Set<UserRouteGroup>(groups);
   const app = new Hono<E>();
   app.onError(handleError);
   app.use(sameOrigin(allowedOrigins));
   app.use(identified(identify));
   app.use(requireReady);
 
-  if (push) {
+  if (serves.has('push')) {
     app.get('/push/vapid-public-key', (c) =>
       c.json({ publicKey: resolveConfig().channels.push?.vapid?.publicKey ?? null }),
     );
@@ -86,6 +93,12 @@ export const mountUserRoutes = <E extends Env = Env>({
     app.post('/push/subscriptions', async (c) => {
       const device = parseInput(deviceSubscriptionSchema, await jsonBody(c));
       const recipient = { id: recipientOf(c) };
+      if (allowPush && !(await allowPush(c, recipient.id))) {
+        return c.json(
+          { error: 'forbidden', message: 'this contact may not register devices' },
+          403,
+        );
+      }
       const userAgent = c.req.header('user-agent')?.slice(0, 512);
       const request =
         'deviceToken' in device
@@ -103,33 +116,39 @@ export const mountUserRoutes = <E extends Env = Env>({
     });
   }
 
-  app.get('/feed', async (c) => {
-    const params = parseInput(feedListParamsSchema, c.req.query());
-    return c.json(await FeedService.list({ ...params, recipientId: recipientOf(c) }));
-  });
+  if (serves.has('feed')) {
+    app.get('/feed', async (c) => {
+      const params = parseInput(feedListParamsSchema, c.req.query());
+      return c.json(await FeedService.list({ ...params, recipientId: recipientOf(c) }));
+    });
 
-  app.get('/feed/unread-count', async (c) => c.json(await FeedService.unreadCount(recipientOf(c))));
+    app.get('/feed/unread-count', async (c) =>
+      c.json(await FeedService.unreadCount(recipientOf(c))),
+    );
 
-  app.post('/feed/read', async (c) => {
-    const body = parseInput(markFeedReadBodySchema, await jsonBody(c));
-    return c.json(await FeedService.markRead({ ...body, recipientId: recipientOf(c) }));
-  });
+    app.post('/feed/read', async (c) => {
+      const body = parseInput(markFeedReadBodySchema, await jsonBody(c));
+      return c.json(await FeedService.markRead({ ...body, recipientId: recipientOf(c) }));
+    });
 
-  // The 101 must pass through untouched, so no middleware may rewrite it.
-  app.get('/feed/socket', async (c) => {
-    if (c.req.header('upgrade')?.toLowerCase() !== 'websocket') {
-      return c.json({ error: 'upgrade_required', message: 'expected a WebSocket upgrade' }, 426);
-    }
-    return feedStub(recipientOf(c)).fetch(c.req.raw);
-  });
+    // The 101 must pass through untouched, so no middleware may rewrite it.
+    app.get('/feed/socket', async (c) => {
+      if (c.req.header('upgrade')?.toLowerCase() !== 'websocket') {
+        return c.json({ error: 'upgrade_required', message: 'expected a WebSocket upgrade' }, 426);
+      }
+      return feedStub(recipientOf(c)).fetch(c.req.raw);
+    });
+  }
 
-  app.get('/preferences', async (c) => c.json(await PreferenceService.get(recipientOf(c))));
+  if (serves.has('preferences')) {
+    app.get('/preferences', async (c) => c.json(await PreferenceService.get(recipientOf(c))));
 
-  app.patch('/preferences', async (c) =>
-    c.json(await PreferenceService.set(recipientOf(c), await jsonBody(c))),
-  );
+    app.patch('/preferences', async (c) =>
+      c.json(await PreferenceService.set(recipientOf(c), await jsonBody(c))),
+    );
 
-  app.get('/preferences/topics', async (c) => c.json(await PreferenceService.topics()));
+    app.get('/preferences/topics', async (c) => c.json(await PreferenceService.topics()));
+  }
 
   app.all('*', (c) => c.json({ error: 'not_found', message: 'no such endpoint' }, 404));
   return app;

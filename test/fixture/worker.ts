@@ -69,13 +69,13 @@ const notifications = chaski.userRoutes({
 });
 
 // A second inbox for the same signed-in user, shared with their team: its own contact, so its own
-// feed, socket and count, and no devices, so a browser can't leave the user's own inbox for it.
+// feed, socket and count, and the feed alone, so a browser can't leave the user's own inbox for it.
 const teamNotifications = chaski.userRoutes({
   identify: (c) => {
     const user = c.req.header('x-fixture-user');
     return user ? `team:${user}` : null;
   },
-  push: false,
+  groups: ['feed'],
 });
 
 const app = new Hono<{ Bindings: FixtureEnv }>()
