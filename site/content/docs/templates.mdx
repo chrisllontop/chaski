@@ -72,7 +72,10 @@ const result = await chaski.templates.import(templates);
 ```
 
 `{ preview: true }` reports the changes without applying them, and `chaski.templates.export()`
-returns the file the dashboard downloads.
+returns the file the dashboard downloads. To load the file with no Worker running, before
+`wrangler dev` or from a deploy job, turn it into SQL with `npx chaskijs templates sql` and run it
+with `wrangler d1 execute`: [Local development](/docs/local-development#seed-the-templates) has
+the script.
 
 ```json title="chaski-templates.json"
 {

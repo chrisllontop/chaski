@@ -25,9 +25,12 @@ string of JSON the dashboard previews it with.
 
 Templates live in Chaski’s database: the user writes them in the dashboard under **Templates**,
 **New template**, with a live preview. A project can also keep them in its repository as the file
-the dashboard exports, and load it from a seed route, its tests or another Worker with
+the dashboard exports, and load it from its tests or another Worker with
 `chaski.templates.import(file)` (`{ preview: true }` reports without applying; over RPC,
-`env.CHASKI.templates().import(file)`). Otherwise, when a template comes from code, hand the user
+`env.CHASKI.templates().import(file)`). With no Worker running, `npx chaskijs templates sql
+<file>` prints SQL that applies the file the same way, for `wrangler d1 execute --local --file`
+before `wrangler dev`, or `--remote` from a deploy job once the user agrees; run Chaski’s
+migrations first. Otherwise, when a template comes from code, hand the user
 its fields to paste, channel by channel:
 
 ```text

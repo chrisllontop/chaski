@@ -63,7 +63,10 @@ the endpoints the host's frontend calls for the signed-in user, which `chaskijs/
   range would make npm install a second `drizzle-orm`); keep it out of `dependencies`.
 - Four entries, one per runtime: `chaskijs` (the Worker), `chaskijs/client` (the page),
   `chaskijs/sw` (the service worker) and `chaskijs/react` (hooks over the client). React is an
-  optional peer dependency, and no browser entry may import server code.
+  optional peer dependency, and no browser entry may import server code. The package also ships
+  a `chaskijs` command for Node (`src/cli`): `chaskijs templates sql <file>` prints the SQL that
+  applies a template file the way `templates.import()` does; `test/templates-sql.test.ts` holds
+  the two to the same result.
 - `src/contract` is what hosts and clients see: the zod schemas and types of the API, the
   in-process API's interface, the errors and the template file format.
 - `src/server` is the engine:
@@ -139,7 +142,7 @@ with the code they govern.
   worker scope against `chaskijs/sw`, WebWorker types), `test/node/tsconfig.json` (the tests of the
   skill's scripts, Node types), `site/tsconfig.json` (the site, DOM types),
   `site/tsconfig.node.json` (its config files and build script) and `tsconfig.node.json` (the config
-  files and scripts).
+  files, the scripts and the `chaskijs` command).
 - tsdown bundles the JavaScript and TypeScript 7's compiler emits the declarations
   (`pnpm build:types`), so exported Drizzle tables and zod schemas keep their inferred types.
   `scripts/fix-declaration-imports.ts` then gives their relative imports the file extensions that

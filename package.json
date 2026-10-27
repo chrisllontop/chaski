@@ -46,6 +46,9 @@
     },
     "./package.json": "./package.json"
   },
+  "bin": {
+    "chaskijs": "./dist/cli.js"
+  },
   "files": [
     "dist",
     "migrations/*.sql"

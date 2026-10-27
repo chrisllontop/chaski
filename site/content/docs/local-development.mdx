@@ -41,6 +41,27 @@ CHASKI_PUBLIC_URL=http://localhost:8787/admin/notifications
 The config function runs on every call, so values from `.dev.vars` apply locally and your
 production vars apply once deployed.
 
+## Seed the templates
+
+A template file you keep in your repository loads into the local database before `wrangler dev`
+starts, with the command `chaskijs` ships and Wrangler’s own `d1 execute`. The command turns the
+file into SQL that applies it the way `chaski.templates.import()` does: templates match by type,
+fields the file leaves out are cleared, channels it leaves out keep their content, and a template
+that already matches isn’t written, so running it again changes nothing.
+
+```json title="package.json"
+{
+  "scripts": {
+    "seed": "wrangler d1 migrations apply CHASKI_DB --local && chaskijs templates sql chaski-templates.json > .wrangler/chaski-templates.sql && wrangler d1 execute CHASKI_DB --local --file .wrangler/chaski-templates.sql"
+  }
+}
+```
+
+The SQL follows the tables of the `chaskijs` version you installed, so apply its migrations first,
+as the script does. With `--remote` in place of `--local`, the same two steps load the file into
+the deployed database from a deploy job. A dashboard already open shows the change once you reload
+it.
+
 ## Read the emails
 
 Without `dryRun`, `wrangler dev` stands in for Email Service: each email Chaski sends lands on

@@ -484,7 +484,9 @@ project’s dev command, then check each of these, in order:
    template under **Templates**, **New template**, with the channels they picked. Give them a
    subject and a body to paste for each channel ([sending.md](sending.md) says what each field
    holds), and wait until they confirm it’s saved. When the project keeps its templates in a file,
-   load it with `chaski.templates.import(file)` from the temporary route in check 4 instead.
+   load it instead: `npx chaskijs templates sql <file> > .wrangler/chaski-templates.sql`, then
+   `npx wrangler d1 execute CHASKI_DB --local --file .wrangler/chaski-templates.sql`, after step 4’s
+   migrations.
 4. **A send goes through.** Add a temporary route that only answers in dry run, and call it:
 
    ```ts
