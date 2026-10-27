@@ -51,6 +51,12 @@ tarballs or local copies of the repository.
 may sit in the root `node_modules` instead; note the path from the Wrangler config’s folder to
 `chaskijs/migrations`, since step 3 needs it.
 
+When the install succeeds but `dist/index.d.ts` is missing, npm served a version older than this
+guide: `0.0.1` only reserved the name and ships no code. Tell the user which version installed
+(`node_modules/chaskijs/package.json`) and which is the latest (`npm view chaskijs version`), and
+stop here until a release that ships `dist` is out. Don’t reach for the repository or a tarball
+instead.
+
 ## 3. Declare the bindings
 
 Agree with the user on what to turn on, then declare only what that needs:
@@ -467,10 +473,11 @@ project’s dev command, then check each of these, in order:
    (`-b 'session=…'`) for its own sign-in, nothing with the local Access bypass.
 2. **Chaski read the config.** Ask the user to open the dashboard’s **Channels** page: it says dry
    run is on and shows the channels they picked as enabled.
-3. **A template exists.** Sending a type without one fails, and templates are written in the
-   dashboard. Ask the user to create a `welcome` template under **Templates**, **New template**,
-   with the channels they picked. Give them a subject and a body to paste for each channel
-   ([sending.md](sending.md) says what each field holds), and wait until they confirm it’s saved.
+3. **A template exists.** Sending a type without one fails. Ask the user to create a `welcome`
+   template under **Templates**, **New template**, with the channels they picked. Give them a
+   subject and a body to paste for each channel ([sending.md](sending.md) says what each field
+   holds), and wait until they confirm it’s saved. When the project keeps its templates in a file,
+   load it with `chaski.templates.import(file)` from the temporary route in check 4 instead.
 4. **A send goes through.** Add a temporary route that only answers in dry run, and call it:
 
    ```ts

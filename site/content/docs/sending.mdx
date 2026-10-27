@@ -19,7 +19,8 @@ const result = await chaski.send({
 ```
 
 Chaski delivers through every channel the template has turned on, except the ones the contact
-muted. Each delivery goes through the queue, and the dashboard shows it as it moves.
+muted. Each delivery goes through the queue, unless the send is [inline](#inline), and the
+dashboard shows it as it moves.
 
 | Field | What it does |
 | --- | --- |
@@ -30,6 +31,7 @@ muted. Each delivery goes through the queue, and the dashboard shows it as it mo
 | `transactional` | Sends regardless of the contact’s preferences, for receipts and password resets. |
 | `email` | Per-send email options: `fromName`, `replyTo` and up to 10 `attachments`. |
 | `idempotencyKey` | Makes the send safe to repeat: the same key returns the first send’s result. |
+| `inline` | Delivers the email before `send()` returns, for someone waiting on it; see [below](#inline). |
 
 The recipient’s fields are saved with the notification, so a retry later delivers to the address
 the send named even if the contact changes in between.
@@ -58,6 +60,42 @@ did, such as an email delivery for a recipient without an address.
 A channel is skipped, with its reason, when it isn’t configured (`channel_not_configured`), the
 contact muted it (`muted_by_preferences`), the recipient has no address or device for it
 (`missing_email`, `no_device_tokens`) or the template has no content for it (`no_template`).
+
+## Deliver while someone waits [#inline]
+
+A password reset or a verification email has someone on screen waiting for it. With `inline: true`,
+Chaski delivers the email before `send()` returns instead of through the queue, so the request that
+asked for it can tell that person when it didn’t go out:
+
+```ts title="src/auth.ts"
+import { isChaskiError } from 'chaskijs';
+
+try {
+  await chaski.send({
+    type: 'password_reset',
+    recipient: { id: `email:${address}`, email: address },
+    payload: { link },
+    channels: ['email'],
+    transactional: true,
+    inline: true,
+  });
+} catch (error) {
+  if (isChaskiError(error) && error.code === 'delivery_failed') {
+    return c.json({ error: 'We couldn’t send the email. Please try again.' }, 502);
+  }
+  throw error;
+}
+```
+
+An inline send is one email that preferences can’t skip, so it needs `transactional: true` and
+`channels: ['email']`. The delivery is recorded like any other, and the dashboard shows it. When
+the provider doesn’t take the email, the delivery is `failed` with the provider’s error, nothing
+retries it in the background, and `send()` throws a `ChaskiError` with the code `delivery_failed`.
+A template Liquid can’t render throws `validation`, and a recipient without an address throws
+`validation` before anything is recorded.
+
+With an `idempotencyKey`, asking again tries a failed email once more, and an email that went out
+is returned as it was: the key still never sends twice.
 
 ## Attachments
 

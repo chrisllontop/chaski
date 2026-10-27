@@ -69,7 +69,7 @@ the endpoints the host's frontend calls for the signed-in user, which `chaskijs/
   - `chaski.ts` (`createChaski()`), `api.ts` (the in-process API), `entrypoint.ts`
     (`ChaskiEntrypoint`, that API over RPC) and `config.ts` (the host's config, validated on every
     call). A service binding sees methods, never getters, so over RPC the groups are methods:
-    `feed()`, `push()`, `preferences()`, `schedules()`.
+    `feed()`, `push()`, `preferences()`, `schedules()`, `templates()`.
   - `routes/` holds the Hono sub-apps: the dashboard shell and assets, the admin API under `/api`,
     the open-tracking pixel and the user routes.
   - `services/` holds the business logic (`.cursor/rules/services.mdc`), with one adapter per

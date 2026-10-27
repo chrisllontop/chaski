@@ -23,6 +23,8 @@ description: The in-process API your Worker calls, the routes Chaski mounts and 
 | `push.register(request)` | `{ id }` | Registers a web push subscription or an iOS device token. |
 | `push.unregister(query)` | `{ unregistered }` | By `recipientId`, `endpoint` or `deviceToken`. |
 | `push.vapidPublicKey()` | `{ publicKey }` | The key for `pushManager.subscribe()`, or `null`. |
+| `templates.import(file, { preview? })` | `TemplateImportResult` | Creates or updates templates by type from a [template file](/docs/templates#move-templates-between-environments); `preview` only reports. |
+| `templates.export()` | `TemplateFile` | Every template, as the file the dashboard exports. |
 
 It also mounts and consumes:
 
@@ -43,9 +45,11 @@ type SendRequest = {
   transactional?: boolean;
   email?: { fromName?: string; replyTo?: string; attachments?: AttachmentInput[] };
   idempotencyKey?: string;
+  // Delivers the one transactional email before send() returns; see Sending.
+  inline?: boolean;
 };
 
-type ScheduleRequest = SendRequest & {
+type ScheduleRequest = Omit<SendRequest, 'inline'> & {
   // ISO 8601 with an explicit offset: Z or ±hh:mm.
   scheduledAt: string;
   groupKey?: string;
@@ -100,7 +104,7 @@ returns. `chaskijs/client` calls them for you.
 | `GET /feed` | The feed; `cursor`, `limit` and `unreadOnly` as query parameters. |
 | `GET /feed/unread-count` | `{ unread }` |
 | `POST /feed/read` | Marks items read: `{ ids?, before? }`, or `{}` for the whole feed. |
-| `GET /feed/socket` | A WebSocket that announces new items. |
+| `GET /feed/socket` | A WebSocket that announces new items, and reads made in other tabs and devices. |
 | `GET /preferences` | The user’s preferences. |
 | `PATCH /preferences` | Updates them. |
 | `GET /preferences/topics` | Template types grouped by topic. |
@@ -116,7 +120,7 @@ Writes and socket upgrades from an origin other than the request’s own, `publi
 
 | Entry | Runs in | |
 | --- | --- | --- |
-| `chaski` | Your Worker | `createChaski`, the auth helpers, the Durable Objects, the Workflow, `ChaskiEntrypoint`, the errors and every type. |
+| `chaskijs` | Your Worker | `createChaski`, the auth helpers, the Durable Objects, the Workflow, `ChaskiEntrypoint`, the errors and every type. |
 | `chaskijs/client` | The browser | `createChaskiClient`, `chaskiQueries`, `ChaskiRequestError`. |
 | `chaskijs/sw` | Your service worker | `handlePushEvents`. |
 | `chaskijs/react` | The browser, with React 18 or 19 | `ChaskiProvider` and the hooks. |

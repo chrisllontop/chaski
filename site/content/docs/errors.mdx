@@ -20,6 +20,7 @@ change. Its routes answer with the same code, as JSON:
 | `forbidden` | 403 | The signed-in user may not do this, or the request came from an origin Chaski doesn’t know. |
 | `not_found` | 404 | The template, delivery or endpoint doesn’t exist. |
 | `conflict` | 409 | It already exists, or another request holds it. |
+| `delivery_failed` | 502 | An [inline send](/docs/sending#inline)’s email didn’t go out; the message carries the provider’s error. |
 | `internal` | 500 | Something failed along the way that a retry may fix. |
 
 ## Check for one
@@ -44,7 +45,8 @@ try {
 
 `isRetryableChaskiError()` is the rule Chaski’s own queue consumer follows: `internal` errors are
 worth another try, every other code is permanent, and errors that aren’t Chaski’s, such as a
-network failure, are assumed to pass.
+network failure, are assumed to pass. `delivery_failed` counts as permanent: it answers someone
+waiting on the email, and they decide whether to ask again.
 
 ```ts
 import { isRetryableChaskiError } from 'chaskijs';

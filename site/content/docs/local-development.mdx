@@ -41,6 +41,17 @@ CHASKI_PUBLIC_URL=http://localhost:8787/admin/notifications
 The config function runs on every call, so values from `.dev.vars` apply locally and your
 production vars apply once deployed.
 
+## Read the emails
+
+Without `dryRun`, `wrangler dev` stands in for Email Service: each email Chaski sends lands on
+disk instead of in an inbox. The log prints where its HTML, its text and each attachment went,
+under `.wrangler/tmp/email/`, and the local explorer lists every one with its sender, recipients,
+reply-to address and attachments:
+
+```bash
+curl http://localhost:8787/cdn-cgi/local/explorer/api/local/email/sending
+```
+
 ## Sign in to the local dashboard
 
 Cloudflare Access doesn’t sit in front of `wrangler dev`, so `cloudflareAccess()` answers 403 to

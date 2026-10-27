@@ -73,6 +73,9 @@ Type errors:
 | `channels not configured: <channels>` | The send’s `channels` lists a channel the config doesn’t turn on. |
 | `scheduledAt must be ISO 8601 with an explicit offset (Z or ±hh:mm)` | Add the offset: `2026-11-01T09:00:00-05:00` or `…Z`. |
 | `scheduledAt is in the past` | The time passed more than five minutes ago. |
+| `an inline send delivers one email: it needs transactional: true and channels: ['email']` | Add both, or drop `inline`. |
+| `the inline email would be skipped: <reason>` | The send recorded nothing; `missing_email` means the `recipient` has no `email`, `no_template` that the template has no enabled email content. |
+| `delivery_failed`: `the email didn't go out: <provider error> (<code>, delivery <id>)` | An inline send the provider refused or couldn’t take; the delivery is `failed` in the dashboard with the same error. `sender_not_verified` and `sender_domain_not_available` are the setup’s to fix (the domain onboarded to Email Service), `recipient_suppressed` the address’s. |
 
 A delivery skipped at send time carries its reason:
 

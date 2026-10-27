@@ -23,9 +23,12 @@ A channel goes out only when the template has it `enabled`. A template can also 
 `description`, a `topic` that groups it on the user’s preferences screen, and `sampleData`, a
 string of JSON the dashboard previews it with.
 
-Templates live in Chaski’s database, not in the host’s code: the user writes them in the
-dashboard under **Templates**, **New template**, with a live preview. When a template comes from
-code, hand the user its fields to paste, channel by channel:
+Templates live in Chaski’s database: the user writes them in the dashboard under **Templates**,
+**New template**, with a live preview. A project can also keep them in its repository as the file
+the dashboard exports, and load it from a seed route, its tests or another Worker with
+`chaski.templates.import(file)` (`{ preview: true }` reports without applying; over RPC,
+`env.CHASKI.templates().import(file)`). Otherwise, when a template comes from code, hand the user
+its fields to paste, channel by channel:
 
 ```text
 Type         payment_received
@@ -77,12 +80,14 @@ const result = await chaski.send({
 | `transactional` | `true` sends whatever the contact’s preferences say: receipts, password resets, security alerts. |
 | `email` | `fromName`, `replyTo`, and up to 10 `attachments` (`filename`, `contentType`, and base64 `content` or a `url`); attachments need the R2 binding. |
 | `idempotencyKey` | The same key returns the first send’s result (`replayed: true`) instead of sending again. |
+| `inline` | `true` delivers the email before `send()` returns, for someone waiting on it; needs `transactional: true` and `channels: ['email']`. |
 
 Derive the idempotency key from the event the notification is about, such as the payment or the
 order, so a retried request or a redelivered queue message sends once.
 
 `send()` records the notification and puts one delivery per channel on the queue; it doesn’t wait
-for providers. It returns `{ notificationId, replayed, outcome, deliveries }`:
+for providers, except with `inline` (below). It returns
+`{ notificationId, replayed, outcome, deliveries }`:
 
 - `outcome: 'delivered'`: at least one channel took it.
 - `outcome: 'suppressed'`: the contact’s preferences skipped every channel.
@@ -90,6 +95,17 @@ for providers. It returns `{ notificationId, replayed, outcome, deliveries }`:
 
 A skipped delivery carries a `reason`: `channel_not_configured`, `muted_by_preferences`,
 `missing_email`, `no_device_tokens` or `no_template`.
+
+### Inline, for someone waiting
+
+A password reset, a verification or a sign-in link has a person on screen waiting for the email.
+Send those with `inline: true`, `transactional: true` and `channels: ['email']`: Chaski delivers
+the email before `send()` returns and throws `ChaskiError` with the code `delivery_failed` when the
+provider doesn’t take it, so the route answers the person with an error instead of a silent
+success. The delivery is recorded and shows in the dashboard as usual; a failed one isn’t retried
+in the background. With an `idempotencyKey`, a second request tries a failed email again and
+returns one that went out as it was. Everything else (receipts, digests, reminders) stays on the
+queue, which retries with backoff.
 
 ## Schedule
 
@@ -162,7 +178,8 @@ The frontend reaches the same data as the signed-in user through `chaski.userRou
 ## Errors
 
 Chaski throws `ChaskiError` with a `code`: `validation` (fix the request or the template),
-`config` (fix the setup), `not_found`, `conflict`, `unauthorized`, `forbidden`, `internal`. Check
+`config` (fix the setup), `delivery_failed` (an inline email didn’t go out), `not_found`,
+`conflict`, `unauthorized`, `forbidden`, `internal`. Check
 it with `isChaskiError(error)`, never `instanceof`, since the class doesn’t survive a service
 binding or a queue. `isRetryableChaskiError(error)` is `true` only for `internal` and for errors
 that aren’t Chaski’s.

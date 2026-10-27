@@ -105,8 +105,10 @@ declare const self: ServiceWorkerGlobalScope;
 handlePushEvents(self, { icon: '/icon-192.png' });
 ```
 
-It shows each push as a notification. A click focuses an open window and takes it to the push’s
-link, or opens one, and open windows get a message to refresh their feed.
+It shows each push as a notification. A click takes an open window to the push’s link and focuses
+it, or opens the link in a new window, and open windows get a message to refresh their feed. A
+window the service worker doesn’t control yet, such as the page that just turned push on, can’t be
+navigated, so the link opens in a new one until that page reloads.
 
 ## React
 
@@ -127,8 +129,9 @@ const Bell = () => {
 ```
 
 The hooks share what they learn: marking an item read in the list updates the unread count on the
-same page. `usePush()` and `usePreferences()` cover the rest: a push toggle, and a preferences
-screen built from the types each topic groups.
+same page at once, and in the user’s other tabs and devices through the socket. `usePush()` and
+`usePreferences()` cover the rest: a push toggle, and a preferences screen built from the types
+each topic groups.
 
 ## With a query cache
 

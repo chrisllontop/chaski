@@ -61,6 +61,19 @@ production say. Templates are keyed by type, so importing the same file twice ch
 the import shows what it creates and updates before it applies anything. Channels the file leaves
 out are never touched.
 
+The same file loads from code, so templates can live in your repository and reach an environment
+from a seed route, your tests or another Worker, without signing in to the dashboard:
+
+```ts title="src/seed.ts"
+import templates from '../chaski-templates.json';
+
+// { applied: true, changes: [{ type, change: 'create' | 'update' | 'unchanged', fields }] }
+const result = await chaski.templates.import(templates);
+```
+
+`{ preview: true }` reports the changes without applying them, and `chaski.templates.export()`
+returns the file the dashboard downloads.
+
 ```json title="chaski-templates.json"
 {
   "format": "chaski.templates",
