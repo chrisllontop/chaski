@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useRef } from 'react';
+import { Agent } from '~/components/landing/agent';
 import { Browser } from '~/components/landing/browser';
 import { Closing } from '~/components/landing/closing';
 import { Features } from '~/components/landing/features';
@@ -28,6 +29,7 @@ const Landing = () => {
         <Hero />
         <ProductShot />
         <HowItWorks />
+        <Agent />
         <Features />
         <Browser />
         <Handoffs />
