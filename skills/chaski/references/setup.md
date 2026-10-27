@@ -37,26 +37,14 @@ Stop and tell the user before going further when:
 
 ## 2. Install the package
 
+Add the latest `chaskijs` from npm with the project’s package manager:
+
 ```sh
-npm view chaskijs version
+pnpm add chaskijs@latest   # or npm install / yarn add / bun add
 ```
 
-- **It prints 0.1.0 or later:** add `chaskijs`, and `hono` too when it’s missing or older than 4.8,
-  with the project’s package manager (`pnpm add chaskijs hono`, `npm install chaskijs hono`, …).
-- **It prints 0.0.1:** that version only holds the name and has no code, so Chaski isn’t on npm
-  yet. Build it from source (Node 24 and pnpm 12), copy the tarball into the project so the
-  lockfile doesn’t point at a temporary folder, and install that:
-
-  ```sh
-  SRC="$(mktemp -d)/chaski"
-  git clone --depth 1 https://github.com/chrisllontop/chaski.git "$SRC"
-  (cd "$SRC" && pnpm install && pnpm build && pnpm pack)
-  mkdir -p vendor && cp "$SRC"/chaskijs-*.tgz vendor/
-  npm install ./vendor/chaskijs-<version>.tgz   # or pnpm add / yarn add / bun add
-  ```
-
-  Add `hono` the same way when it’s missing or older than 4.8. Tell the user the dependency points
-  at a file in `vendor/` until Chaski is on npm.
+Add `hono` the same way when it’s missing or older than 4.8. Install from npm only: no Git URLs,
+tarballs or local copies of the repository.
 
 **Done when** `node_modules/chaskijs/dist/index.d.ts` and
 `node_modules/chaskijs/migrations/0000_init.sql` exist next to the Worker. In a monorepo the package
