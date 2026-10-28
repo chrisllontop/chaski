@@ -1,6 +1,6 @@
 {
   "name": "chaskijs",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Embeddable notification infrastructure for Cloudflare Workers, dashboard included.",
   "keywords": [
     "cloudflare-workers",
