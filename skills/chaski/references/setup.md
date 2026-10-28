@@ -44,7 +44,8 @@ pnpm add chaskijs@latest   # or npm install / yarn add / bun add
 ```
 
 Add `hono` the same way when it’s missing or older than 4.8. Install from npm only: no Git URLs,
-tarballs or local copies of the repository.
+tarballs or local copies of the repository. When the user is trying a pre-release, install
+`chaskijs@next` instead; `npm view chaskijs dist-tags` shows what `latest` and `next` hold.
 
 **Done when** `node_modules/chaskijs/dist/index.d.ts` and
 `node_modules/chaskijs/migrations/0000_init.sql` exist next to the Worker. In a monorepo the package

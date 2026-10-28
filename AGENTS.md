@@ -42,11 +42,14 @@ the endpoints the host's frontend calls for the signed-in user, which `chaskijs/
 
 - **Verify** (`.github/workflows/pull-request.yml`) runs on every pull request: `pnpm check` and
   `pnpm build` on Linux.
-- **Release Drafter** keeps a draft release from merged pull requests (labels `breaking`,
-  `feature`/`enhancement` pick the version bump; patch is the default). `v0.0.1` is the baseline.
-- **Release** runs when a `v*` release is published: it checks that the tag matches
-  `package.json`'s version and is on `main`, builds the package and publishes it to npm with
-  trusted publishing (OIDC, no token). Bump the package version before publishing.
+- **Release Drafter** keeps two drafts from merged pull requests (labels `breaking`,
+  `feature`/`enhancement` pick the version bump; patch is the default; `v0.0.1` is the baseline):
+  the next release (`v0.1.0`) and its next pre-release (`v0.1.0-rc.N`).
+- **Release** runs when a `v*` release is published, from `main`, and publishes to npm with
+  trusted publishing (OIDC, no token). A release's tag must match `package.json`'s version and
+  goes out as `latest`. A pre-release's tag is that version with a suffix (`v0.1.0-rc.1` for
+  `0.1.0`); the job takes its version from the tag and publishes it as `next`, so `latest` stays.
+  Bump `package.json` to the version the drafts name before publishing either.
 - **Workers Builds** (Cloudflare, not GitHub Actions) builds `site/` for the Worker `chaski`: a
   merge to `main` deploys chaski.sh, and every pull request gets a preview on workers.dev, linked
   in a comment. Its settings live in the Cloudflare dashboard: root directory `site`, build

@@ -17,7 +17,7 @@ concurrency:
 jobs:
   publish:
     name: Publish to npm
-    if: ${{ !github.event.release.prerelease && startsWith(github.event.release.tag_name, 'v') }}
+    if: ${{ startsWith(github.event.release.tag_name, 'v') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -25,16 +25,26 @@ jobs:
           ref: ${{ github.event.release.tag_name }}
           fetch-depth: 0
 
-      # npm takes the version from package.json, so the tag must match it.
+      # npm takes the version from package.json. A release's tag is that version. A pre-release's
+      # tag adds a suffix to it (v0.1.0-rc.1 for 0.1.0), so each pre-release of a version needs no
+      # bump of its own, and it goes out under the next dist-tag, leaving latest where it was.
       - name: Validate release source
+        id: release
         shell: bash
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
+          PRERELEASE: ${{ github.event.release.prerelease }}
         run: |
-          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]
           git merge-base --is-ancestor HEAD origin/main
           version="$(node -p "require('./package.json').version")"
-          [[ "$RELEASE_TAG" == "v$version" ]] || { echo "Tag $RELEASE_TAG does not match package version $version"; exit 1; }
+          if [[ "$PRERELEASE" == "true" ]]; then
+            [[ "$RELEASE_TAG" == "v$version-"?* ]] || { echo "Pre-release tag $RELEASE_TAG must be v$version-<suffix>, such as v$version-rc.0"; exit 1; }
+            echo "dist-tag=next" >> "$GITHUB_OUTPUT"
+          else
+            [[ "$RELEASE_TAG" == "v$version" ]] || { echo "Tag $RELEASE_TAG does not match package version $version"; exit 1; }
+            echo "dist-tag=latest" >> "$GITHUB_OUTPUT"
+          fi
 
       - uses: pnpm/action-setup@v6
 
@@ -46,6 +56,13 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # In this checkout only: main keeps the version without the suffix.
+      - name: Take the pre-release version from the tag
+        if: ${{ github.event.release.prerelease }}
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: npm pkg set version="${RELEASE_TAG#v}"
+
       - run: pnpm build
 
-      - run: npm publish
+      - run: npm publish --tag ${{ steps.release.outputs.dist-tag }}
