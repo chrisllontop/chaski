@@ -1,5 +1,6 @@
 import type {
   CancelScheduledQuery,
+  Channel,
   ChaskiPreferences,
   FeedPage,
   ListFeedQuery,
@@ -13,6 +14,7 @@ import type {
   SendResult,
   UnregisterPushSubscriptionQuery,
 } from './contract';
+import type { TemplateFile, TemplateImportResult } from './template-file';
 
 export interface ChaskiSchedulesApi {
   /** Pending schedules, soonest first. */
@@ -35,14 +37,35 @@ export interface ChaskiPreferencesApi {
   topics(): Promise<Array<{ topic: string | null; types: string[] }>>;
 }
 
+export interface ChaskiTemplatesApi {
+  /**
+   * Creates or overwrites templates by type from a template file; `preview` only reports. The
+   * file is validated here, so a JSON import whose fields TypeScript widens to strings fits.
+   */
+  import(file: unknown, options?: { preview?: boolean }): Promise<TemplateImportResult>;
+  /** Every live template, as the file `import` takes. */
+  export(): Promise<TemplateFile>;
+}
+
 export interface ChaskiFeedApi {
   list(query: ListFeedQuery): Promise<FeedPage>;
   unreadCount(recipientId: string): Promise<{ unread: number }>;
   markRead(input: MarkFeedReadInput): Promise<{ marked: number }>;
 }
 
+/**
+ * What `ready()` found: the channels the config turns on, whether it's a dry run, and how many
+ * templates there are; with none, every send is refused as an unknown type.
+ */
+export type ChaskiReadiness = { channels: Channel[]; dryRun: boolean; templates: number };
+
 /** Chaski's in-process API: the host's Worker calls it directly, with no HTTP in between. */
 export interface ChaskiApi {
+  /**
+   * Checks the config, asks the database for the applied migrations and counts the templates,
+   * changing nothing; throws the `config` error a send would, for a health check.
+   */
+  ready(): Promise<ChaskiReadiness>;
   send(request: SendRequest): Promise<SendResult>;
   /** Sends later, at scheduledAt; needs the ChaskiScheduler Workflow binding. */
   schedule(request: ScheduleRequest): Promise<ScheduleResult>;
@@ -50,4 +73,5 @@ export interface ChaskiApi {
   readonly push: ChaskiPushApi;
   readonly preferences: ChaskiPreferencesApi;
   readonly feed: ChaskiFeedApi;
+  readonly templates: ChaskiTemplatesApi;
 }

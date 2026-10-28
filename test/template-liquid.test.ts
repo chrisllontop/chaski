@@ -49,10 +49,9 @@ describe('Liquid the parser rejects', () => {
       ],
     };
 
-    for (const path of ['/templates/import?preview=true', '/templates/import']) {
-      const response = await api(path, { method: 'POST', body: JSON.stringify(file) });
-      expect(response.status).toBe(400);
-      expect(await response.json()).toMatchObject({
+    for (const preview of [true, false]) {
+      await expect(chaski.templates.import(file, { preview })).rejects.toMatchObject({
+        code: 'validation',
         message: expect.stringMatching(/^payment_received email body: /),
       });
     }

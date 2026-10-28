@@ -51,6 +51,12 @@ tarballs or local copies of the repository.
 may sit in the root `node_modules` instead; note the path from the Wrangler config’s folder to
 `chaskijs/migrations`, since step 3 needs it.
 
+When the install succeeds but `dist/index.d.ts` is missing, npm served a version older than this
+guide: `0.0.1` only reserved the name and ships no code. Tell the user which version installed
+(`node_modules/chaskijs/package.json`) and which is the latest (`npm view chaskijs version`), and
+stop here until a release that ships `dist` is out. Don’t reach for the repository or a tarball
+instead.
+
 ## 3. Declare the bindings
 
 Agree with the user on what to turn on, then declare only what that needs:
@@ -329,6 +335,13 @@ chaski.userRoutes<AppEnv>({ identify: (c) => c.get('user')?.id ?? null });
 Skip the user routes when the project has no signed-in users or no frontend that shows
 notifications.
 
+A second inbox for the same user, such as one their team shares, is a second mount on another
+path whose `identify` names another contact (`team:<id>`), with `groups: ['feed']`: a browser
+belongs to one contact, so registering it on that mount would take it from the user’s own inbox.
+When the project keeps a preferences API of its own, with rules of its own, leave `preferences`
+out of `groups` on every mount, so the browser can’t write around them. `allowPush: (c, id) =>
+boolean` answers 403 to the contacts that may not register a device.
+
 ### The main module
 
 ```ts
@@ -467,10 +480,11 @@ project’s dev command, then check each of these, in order:
    (`-b 'session=…'`) for its own sign-in, nothing with the local Access bypass.
 2. **Chaski read the config.** Ask the user to open the dashboard’s **Channels** page: it says dry
    run is on and shows the channels they picked as enabled.
-3. **A template exists.** Sending a type without one fails, and templates are written in the
-   dashboard. Ask the user to create a `welcome` template under **Templates**, **New template**,
-   with the channels they picked. Give them a subject and a body to paste for each channel
-   ([sending.md](sending.md) says what each field holds), and wait until they confirm it’s saved.
+3. **A template exists.** Sending a type without one fails. Write a `welcome` template, with a
+   subject and a body for each channel the user picked, into a scratch template file,
+   `.wrangler/chaski-check.json`, and load it ([sending.md](sending.md) has the format and the
+   commands). The project’s `chaski-templates.json` holds the types it sends. **Templates**
+   lists `welcome`.
 4. **A send goes through.** Add a temporary route that only answers in dry run, and call it:
 
    ```ts
@@ -515,6 +529,9 @@ npx wrangler d1 migrations apply CHASKI_DB --remote
 npx wrangler secret put VAPID_PRIVATE_KEY            # and every other secret from .dev.vars
 npx wrangler deploy
 ```
+
+With the migrations applied, the project’s template file loads into production with `--remote`
+([sending.md](sending.md)); ask for that too.
 
 Before `deploy`, check that `CHASKI_PUBLIC_URL` in `vars` is the production URL of the mount,
 that `CHASKI_DRY_RUN` and `CHASKI_LOCAL_ADMIN` are unset in production, that the email domain is

@@ -1,4 +1,5 @@
 import { exports } from 'cloudflare:workers';
+import { Hono } from 'hono';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FeedPage, FeedSocketEvent } from '../src';
 import { getClient } from '../src/server/db';
@@ -104,7 +105,9 @@ describe('feed', () => {
     await sendInApp('user_1');
 
     const [item] = (await chaski.feed.list({ recipientId: 'user_1' })).items;
-    await vi.waitFor(() => expect(received.map((event) => event.feedItemId)).toEqual([item?.id]));
+    await vi.waitFor(() =>
+      expect(received).toEqual([expect.objectContaining({ feedItemId: item?.id })]),
+    );
     socket.close();
   });
 
@@ -192,10 +195,139 @@ describe('preferences', () => {
 });
 
 describe('routes', () => {
-  it('answers 404 in JSON for anything else', async () => {
-    const response = await me('/whatever');
+  it('leaves a path it does not serve to the host, without asking identify', async () => {
+    const response = await me('/whatever', { user: null });
 
     expect(response.status).toBe(404);
-    expect(await response.json()).toMatchObject({ error: 'not_found' });
+    expect(response.headers.get('cache-control')).toBeNull();
+  });
+});
+
+describe('a second mount for a shared inbox', () => {
+  const team = (path: string, init: RequestInit = {}) =>
+    exports.default.fetch(`${ORIGIN}/me/team-notifications${path}`, {
+      ...init,
+      headers: {
+        'content-type': 'application/json',
+        origin: ORIGIN,
+        'x-fixture-user': 'user_1',
+        ...init.headers,
+      },
+    });
+
+  it('keeps its own feed and count for the same signed-in user', async () => {
+    await seedTemplate('payment_received', 'in_app');
+    await sendInApp('team:user_1');
+    await sendInApp('team:user_1');
+    await sendInApp('user_1');
+
+    expect(await json(await team('/feed/unread-count'))).toEqual({ unread: 2 });
+    expect(await json(await me('/feed/unread-count'))).toEqual({ unread: 1 });
+    expect((await json<FeedPage>(await team('/feed'))).items).toHaveLength(2);
+    await team('/feed/read', { method: 'POST', body: '{}' });
+    expect(await json(await team('/feed/unread-count'))).toEqual({ unread: 0 });
+    expect(await json(await me('/feed/unread-count'))).toEqual({ unread: 1 });
+  });
+
+  it('signals its own socket only', async () => {
+    await seedTemplate('payment_received', 'in_app');
+    const open = async (fetcher: typeof me) => {
+      const socket = (await fetcher('/feed/socket', { headers: { upgrade: 'websocket' } }))
+        .webSocket;
+      if (!socket) throw new Error('no upgrade');
+      socket.accept();
+      const received: unknown[] = [];
+      socket.addEventListener('message', (event) => received.push(event.data));
+      return { socket, received };
+    };
+    const personal = await open(me);
+    const shared = await open(team);
+
+    await sendInApp('user_1');
+
+    await vi.waitFor(() => expect(personal.received).toHaveLength(1));
+    expect(shared.received).toEqual([]);
+    personal.socket.close();
+    shared.socket.close();
+  });
+
+  // One browser belongs to one contact: registering it here would take it from the user's own inbox.
+  it('serves the feed alone with groups: [feed]', async () => {
+    const register = await team('/push/subscriptions', {
+      method: 'POST',
+      body: JSON.stringify(SUBSCRIPTION),
+    });
+    const preferences = await team('/preferences', {
+      method: 'PATCH',
+      body: JSON.stringify({ mutedTypes: ['payment_received'] }),
+    });
+
+    expect(register.status).toBe(404);
+    expect(preferences.status).toBe(404);
+    expect((await team('/feed/unread-count')).status).toBe(200);
+    expect(await getClient().deviceTokens.count({ where: {} })).toBe(0);
+    expect(await getClient().preferences.count({ where: {} })).toBe(0);
+  });
+});
+
+describe('allowPush', () => {
+  const host = new Hono().route(
+    '/me',
+    chaski.userRoutes({
+      identify: (c) => c.req.header('x-user') ?? null,
+      allowPush: (_c, recipientId) => !recipientId.startsWith('guest'),
+    }),
+  );
+  const call = (user: string, method: string) =>
+    host.request('/me/push/subscriptions', {
+      method,
+      headers: { 'x-user': user, 'content-type': 'application/json' },
+      body: JSON.stringify(method === 'POST' ? SUBSCRIPTION : { endpoint: SUBSCRIPTION.endpoint }),
+    });
+
+  it('answers 403 to a contact it turns away, and lets anyone drop a device', async () => {
+    const refused = await call('guest_1', 'POST');
+    const accepted = await call('user_1', 'POST');
+
+    expect(refused.status).toBe(403);
+    expect(await refused.json()).toEqual({
+      error: 'forbidden',
+      message: 'this contact may not register devices',
+    });
+    expect(accepted.status).toBe(201);
+    expect((await call('guest_1', 'DELETE')).status).toBe(200);
+  });
+});
+
+// A mount must not answer for paths it doesn't serve, so mounts nested under its path work in
+// whichever order the host registers them, and its identify doesn't run for them.
+describe('nested mounts', () => {
+  const personal = () =>
+    chaski.userRoutes({ identify: (c) => c.req.header('x-user') ?? null, groups: ['feed'] });
+  const team = () => chaski.userRoutes({ identify: () => 'team:shared', groups: ['feed'] });
+
+  it.each([
+    [
+      'the outer mount first',
+      () => new Hono().route('/inbox', personal()).route('/inbox/team', team()),
+    ],
+    [
+      'the inner mount first',
+      () => new Hono().route('/inbox/team', team()).route('/inbox', personal()),
+    ],
+  ])('answers both with %s', async (_, build) => {
+    await seedTemplate('payment_received', 'in_app');
+    await sendInApp('team:shared');
+    const host = build();
+
+    const teamCount = await host.request('/inbox/team/feed/unread-count');
+    const personalCount = await host.request('/inbox/feed/unread-count', {
+      headers: { 'x-user': 'user_1' },
+    });
+
+    expect(teamCount.status).toBe(200);
+    expect(await teamCount.json()).toEqual({ unread: 1 });
+    expect(await personalCount.json()).toEqual({ unread: 0 });
+    expect((await host.request('/inbox/elsewhere')).status).toBe(404);
   });
 });

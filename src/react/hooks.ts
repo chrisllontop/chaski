@@ -14,7 +14,7 @@ export const useFeedConnection = (): FeedConnectionStatus => {
 
 export type UseUnreadCountResult = { unread: number | null; refresh: () => Promise<void> };
 
-/** The unread count, kept fresh by the socket and by reads made on this page. */
+/** The unread count, kept fresh by the socket (new items, reads elsewhere) and by local reads. */
 export const useUnreadCount = (options: { enabled?: boolean } = {}): UseUnreadCountResult => {
   const { client, bus } = useChaskiContext();
   const { enabled = true } = options;
@@ -142,26 +142,39 @@ export const useFeed = (options: UseFeedOptions = {}): UseFeedResult => {
     void load({ limit, unreadOnly });
   }, [load, limit, unreadOnly, enabled]);
 
-  // Keyed on the client only, so changing the query refetches without
-  // closing and reopening the socket.
-  useEffect(() => {
-    if (!enabled) return;
-    return client.feed.subscribe(() => void mergeHead());
-  }, [client, mergeHead, enabled]);
-
-  const applyRead = useCallback((ids: Set<string> | null) => {
+  const applyRead = useCallback((read: (item: FeedItem) => boolean) => {
     const readAt = new Date().toISOString();
     setItems((current) =>
-      current.map((item) =>
-        (ids === null || ids.has(item.id)) && item.readAt === null ? { ...item, readAt } : item,
-      ),
+      current.map((item) => (item.readAt === null && read(item) ? { ...item, readAt } : item)),
     );
   }, []);
+
+  // Keyed on the client only, so changing the query refetches without
+  // closing and reopening the socket. A read in another tab or device
+  // arrives with what it marked, so it applies without a refetch.
+  useEffect(() => {
+    if (!enabled) return;
+    return client.feed.subscribe((event) => {
+      if (event?.type !== 'feed_item.read') {
+        void mergeHead();
+        return;
+      }
+      const ids = event.ids ? new Set(event.ids) : null;
+      const before = event.before ? Date.parse(event.before) : null;
+      applyRead(
+        (item) =>
+          (ids === null || ids.has(item.id)) &&
+          (before === null || Date.parse(item.createdAt) <= before),
+      );
+    });
+  }, [client, mergeHead, applyRead, enabled]);
 
   useEffect(
     () =>
       bus.subscribe((change) => {
-        if (change.origin !== origin) applyRead(change.ids);
+        if (change.origin !== origin) {
+          applyRead((item) => change.ids === null || change.ids.has(item.id));
+        }
       }),
     [bus, origin, applyRead],
   );
@@ -172,7 +185,7 @@ export const useFeed = (options: UseFeedOptions = {}): UseFeedResult => {
       try {
         await client.feed.markRead(ids ? { ids } : {});
         const readIds = ids ? new Set(ids) : null;
-        applyRead(readIds);
+        applyRead((item) => readIds === null || readIds.has(item.id));
         bus.emit({ ids: readIds, origin });
       } finally {
         setIsMarkingRead(false);

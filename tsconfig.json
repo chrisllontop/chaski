@@ -18,5 +18,5 @@
     "types": ["@cloudflare/workers-types"]
   },
   "include": ["src"],
-  "exclude": ["src/dashboard", "src/client", "src/sw", "src/react"]
+  "exclude": ["src/dashboard", "src/client", "src/sw", "src/react", "src/cli"]
 }

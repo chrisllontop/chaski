@@ -44,6 +44,9 @@ a tag with `raw` to output HTML you built yourself:
 `raw` applies to the whole value, so escape text from people before adding markup to it:
 `{{ comment | escape | newline_to_br | raw }}`. The subject, the text body, and in-app and push
 content are plain text and come out as written, so show in-app items as text in your frontend.
+An HTML entity there, such as `&middot;` or `&#8217;` from content written for an HTML tool,
+reaches people as typed: type the character itself. The editor points one out under its field,
+and an import lists each one it finds, in its preview too, without changing the content.
 
 A template Liquid can’t parse is the author’s to fix: the dashboard names the field when you save
 it, and a delivery that hits one fails at once instead of retrying.
@@ -54,12 +57,25 @@ The editor previews each channel as you type, rendered with sample data you keep
 template. For email, **Send test** delivers the saved content, rendered with the sample data, to the
 address you enter.
 
-## Move templates between environments
+## Keep templates in a file
 
-**Export** downloads every template as a JSON file, and **Import** applies one, staging to
-production say. Templates are keyed by type, so importing the same file twice changes nothing, and
-the import shows what it creates and updates before it applies anything. Channels the file leaves
-out are never touched.
+Templates can also live in your repository, as a JSON file that `chaski.templates.import()` loads
+from a seed route, a deploy job, your tests or another Worker. Templates are keyed by type, so
+loading the same file twice changes nothing, and channels the file leaves out are never touched.
+
+```ts title="src/seed.ts"
+import templates from '../chaski-templates.json';
+
+// { applied: true, changes: [{ type, change: 'create' | 'update' | 'unchanged', fields, warnings }] }
+const result = await chaski.templates.import(templates);
+```
+
+`{ preview: true }` reports the changes without applying them. A load overwrites the types the
+file holds, edits made in the dashboard included, so bring those into the file first:
+`chaski.templates.export()` returns every template in this format. To load the file with no Worker
+running, before `wrangler dev` or from a deploy job, turn it into SQL with
+`npx chaskijs templates sql` and run it with `wrangler d1 execute`:
+[Local development](/docs/local-development#seed-the-templates) has the script.
 
 ```json title="chaski-templates.json"
 {

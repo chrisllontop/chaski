@@ -53,13 +53,16 @@ export const sendRequestSchema = z.object({
   transactional: z.boolean().default(false),
   email: emailOptionsSchema.optional(),
   idempotencyKey: z.string().min(1).max(512).optional(),
+  // Delivers the email within the call instead of through the queue, so a provider failure
+  // reaches the caller; only for one transactional email (see NotificationService.send).
+  inline: z.boolean().default(false),
 });
 export type SendRequest = z.input<typeof sendRequestSchema>;
 
 // A schedule with an idempotencyKey is upserted by it: declaring it again with
 // another scheduledAt moves the pending schedule instead of adding one, so the
 // key must not be derived from the time.
-export const scheduleRequestSchema = sendRequestSchema.extend({
+export const scheduleRequestSchema = sendRequestSchema.omit({ inline: true }).extend({
   scheduledAt: z.string().regex(OFFSET_TIMESTAMP_REGEX, {
     message: 'scheduledAt must be ISO 8601 with an explicit offset (Z or ±hh:mm)',
   }),
@@ -178,12 +181,20 @@ export type MarkFeedReadInput = z.input<typeof markFeedReadSchema>;
 
 // Socket events carry no title or body: they tell clients to refetch, and the
 // feed API stays the source of truth. Clients ignore types they don't know, so
-// the protocol can grow without breaking older bundles.
-export const feedSocketEventSchema = z.object({
-  type: z.literal('feed_item.created'),
-  feedItemId: z.string().min(1),
-  createdAt: z.string(),
-});
+// the protocol can grow without breaking older bundles. A read names the items
+// it marked (`ids`), every item created up to `before`, or both.
+export const feedSocketEventSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('feed_item.created'),
+    feedItemId: z.string().min(1),
+    createdAt: z.string(),
+  }),
+  z.object({
+    type: z.literal('feed_item.read'),
+    ids: z.array(z.string().min(1)).optional(),
+    before: z.string().optional(),
+  }),
+]);
 export type FeedSocketEvent = z.infer<typeof feedSocketEventSchema>;
 
 /** What a web push carries; Chaski's service worker shows it as a notification. */

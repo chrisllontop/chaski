@@ -104,3 +104,8 @@ onError: (error, context) => {
 | --- | --- |
 | `identify` | Required. Returns the signed-in user’s id, `null` to answer 401, or a `Response`. |
 | `allowedOrigins` | Origins of your frontend when it’s served from another origin than these routes. Your app answers CORS for them: see [Browser clients](/docs/browser-clients). |
+| `groups` | The routes the mount serves: `['feed', 'push', 'preferences']` by default. A team inbox `identify` names `team:<id>` serves `['feed']`: a browser belongs to one contact, so registering it there would take it from the user’s own inbox. Leave out `preferences` when your app keeps a preferences API of its own, so the browser can’t write around its rules. |
+| `allowPush` | `(c, recipientId) => boolean`, asked before a device is registered; `false` answers 403. Removing a device is always allowed. |
+
+Mount `userRoutes()` once per inbox: each mount’s `identify` names its contact, with a feed, a
+socket and an unread count of its own.

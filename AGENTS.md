@@ -16,17 +16,18 @@ the endpoints the host's frontend calls for the signed-in user, which `chaskijs/
 ## Run it
 
 - `pnpm i` installs the dependencies (Node 24 and pnpm 12). `devEngines` holds contributors to
-  Node 24 without putting that constraint on the people who install `chaski`.
+  Node 24 without putting that constraint on the people who install `chaskijs`.
 - `pnpm dev` builds the dashboard and runs the fixture host (`test/fixture`) with Wrangler, in
   dry run so no email or push leaves the machine. It mounts the dashboard at `/chaski` and
-  `/admin/notifications` and the user routes at `/me/notifications`; there is no hot reload, so
-  rerun it after a dashboard change. Apply the migrations to the local D1 first:
+  `/admin/notifications`, the user routes at `/me/notifications` and a shared inbox at
+  `/me/team-notifications`; there is no hot reload, so rerun it after a dashboard change. Apply
+  the migrations to the local D1 first:
   `pnpm wrangler d1 migrations apply CHASKI_DB --local -c test/fixture/wrangler.jsonc`.
   `curl -X POST localhost:8787/dev/seed` then fills it with sample templates, sends and schedules
   (`test/fixture/seed.ts`), so the dashboard has something to show.
 - `pnpm build:dashboard` (Vite) writes `src/generated/dashboard.ts`, which the server code imports.
   It is generated and gitignored; run it once before typechecking or testing on a fresh clone.
-- `pnpm typecheck` (tsc, nine projects), `pnpm lint` (Biome), `pnpm format` (Biome with fixes),
+- `pnpm typecheck` (tsc, ten projects), `pnpm lint` (Biome), `pnpm format` (Biome with fixes),
   `pnpm test` (Vitest in workerd), `pnpm build` (dashboard, tsdown, then the declarations).
 - `pnpm dev:site` serves chaski.sh, landing and docs, with Vite. `pnpm build:site` prerenders every
   page to `site/dist/client` and writes their headers; `pnpm --filter chaski-site preview` serves
@@ -62,14 +63,17 @@ the endpoints the host's frontend calls for the signed-in user, which `chaskijs/
   range would make npm install a second `drizzle-orm`); keep it out of `dependencies`.
 - Four entries, one per runtime: `chaskijs` (the Worker), `chaskijs/client` (the page),
   `chaskijs/sw` (the service worker) and `chaskijs/react` (hooks over the client). React is an
-  optional peer dependency, and no browser entry may import server code.
+  optional peer dependency, and no browser entry may import server code. The package also ships
+  a `chaskijs` command for Node (`src/cli`): `chaskijs templates sql <file>` prints the SQL that
+  applies a template file the way `templates.import()` does; `test/templates-sql.test.ts` holds
+  the two to the same result.
 - `src/contract` is what hosts and clients see: the zod schemas and types of the API, the
   in-process API's interface, the errors and the template file format.
 - `src/server` is the engine:
   - `chaski.ts` (`createChaski()`), `api.ts` (the in-process API), `entrypoint.ts`
     (`ChaskiEntrypoint`, that API over RPC) and `config.ts` (the host's config, validated on every
     call). A service binding sees methods, never getters, so over RPC the groups are methods:
-    `feed()`, `push()`, `preferences()`, `schedules()`.
+    `feed()`, `push()`, `preferences()`, `schedules()`, `templates()`.
   - `routes/` holds the Hono sub-apps: the dashboard shell and assets, the admin API under `/api`,
     the open-tracking pixel and the user routes.
   - `services/` holds the business logic (`.cursor/rules/services.mdc`), with one adapter per
@@ -135,9 +139,10 @@ with the code they govern.
   `tsconfig.browser.json` (the browser entries and the contract, DOM types),
   `src/dashboard/tsconfig.json` (DOM and JSX), `test/tsconfig.json` (Workers plus the Vitest
   plugin), `test/browser/tsconfig.json` (the browser tests), `test/sw/tsconfig.json` (a real service
-  worker scope against `chaskijs/sw`, WebWorker types), `site/tsconfig.json` (the site, DOM types),
+  worker scope against `chaskijs/sw`, WebWorker types), `test/node/tsconfig.json` (the tests of the
+  skill's scripts, Node types), `site/tsconfig.json` (the site, DOM types),
   `site/tsconfig.node.json` (its config files and build script) and `tsconfig.node.json` (the config
-  files and scripts).
+  files, the scripts and the `chaskijs` command).
 - tsdown bundles the JavaScript and TypeScript 7's compiler emits the declarations
   (`pnpm build:types`), so exported Drizzle tables and zod schemas keep their inferred types.
   `scripts/fix-declaration-imports.ts` then gives their relative imports the file extensions that
@@ -148,12 +153,13 @@ with the code they govern.
 - Test logic and observable behavior. Do not assert markup or props.
 - **Never wait with sleeps or arbitrary timeouts.** Use the test runner's own waiting, `vi.waitFor`
   or fake timers.
-- Vitest runs two projects. `worker` runs inside workerd with `@cloudflare/vitest-plugin`, against
+- Vitest runs three projects. `worker` runs inside workerd with `@cloudflare/vitest-plugin`, against
   the fixture host through `exports.default.fetch()`: assert status, headers and JSON; the only
   markup a test reads is the injected `<base href>`. `browser` runs `test/browser` in happy-dom,
   with a fake network and a fake socket (`test/browser/fakes.ts`) and fake timers for the
-  reconnection logic; it also covers the dashboard's `lib/`. The dashboard's screens have no tests:
-  check them in `pnpm dev`.
+  reconnection logic; it also covers the dashboard's `lib/`. `node` runs `test/node` against the
+  skill's scripts, on projects it writes to a temporary folder. The dashboard's screens have no
+  tests: check them in `pnpm dev`.
 - `test/setup.ts` applies the migrations, empties the tables and restores the fixture config before
   each test, and stubs the queue producer: tests drain deliveries with `processDeliveries()` from
   `test/helpers.ts`. Only the end-to-end test lets the real queue and consumer run.

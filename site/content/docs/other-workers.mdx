@@ -41,22 +41,24 @@ export const sendPaymentReceived = async (env: Env, user: { id: string; email: s
 };
 ```
 
-The other Worker only needs `chaski` for its types; Chaski itself runs in the host.
+The other Worker only needs `chaskijs` for its types; Chaski itself runs in the host.
 
 ## Groups are methods
 
 A service binding exposes methods only, so over RPC the groups are methods: `feed()`, `push()`,
-`preferences()` and `schedules()`. A call like `env.CHASKI.feed().list(query)` still takes a single
-round trip.
+`preferences()`, `schedules()` and `templates()`. A call like `env.CHASKI.feed().list(query)` still
+takes a single round trip.
 
 | In the host | Over RPC |
 | --- | --- |
+| `chaski.ready()` | `env.CHASKI.ready()` |
 | `chaski.send(request)` | `env.CHASKI.send(request)` |
 | `chaski.schedule(request)` | `env.CHASKI.schedule(request)` |
 | `chaski.schedules.cancel(query)` | `env.CHASKI.schedules().cancel(query)` |
 | `chaski.feed.unreadCount(id)` | `env.CHASKI.feed().unreadCount(id)` |
 | `chaski.preferences.get(id)` | `env.CHASKI.preferences().get(id)` |
 | `chaski.push.register(request)` | `env.CHASKI.push().register(request)` |
+| `chaski.templates.import(file)` | `env.CHASKI.templates().import(file)` |
 
 Errors arrive with their `name` (`ChaskiError`) and `code`, such as `validation`, when both Workers
 use a compatibility date on or after `2026-04-21`. Check them with `isChaskiError()`, since class

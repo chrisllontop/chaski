@@ -46,6 +46,9 @@
     },
     "./package.json": "./package.json"
   },
+  "bin": {
+    "chaskijs": "./dist/cli.js"
+  },
   "files": [
     "dist",
     "migrations/*.sql"
@@ -78,7 +81,7 @@
     "dev:site": "pnpm --filter chaski-site dev",
     "build:site": "pnpm --filter chaski-site build",
     "deploy:site": "pnpm build:site && pnpm --filter chaski-site run deploy",
-    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.browser.json && tsc -p src/dashboard/tsconfig.json && tsc -p test/tsconfig.json && tsc -p test/browser/tsconfig.json && tsc -p test/sw/tsconfig.json && tsc -p site/tsconfig.json && tsc -p site/tsconfig.node.json && tsc -p tsconfig.node.json",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.browser.json && tsc -p src/dashboard/tsconfig.json && tsc -p test/tsconfig.json && tsc -p test/browser/tsconfig.json && tsc -p test/sw/tsconfig.json && tsc -p test/node/tsconfig.json && tsc -p site/tsconfig.json && tsc -p site/tsconfig.node.json && tsc -p tsconfig.node.json",
     "lint": "biome check .",
     "format": "biome check --write .",
     "test": "vitest run",

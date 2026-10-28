@@ -10,6 +10,7 @@ description: The in-process API your Worker calls, the routes Chaski mounts and 
 
 | Call | Returns | |
 | --- | --- | --- |
+| `ready()` | `{ channels, dryRun, templates }` | Checks the config and the applied migrations and counts the templates, changing nothing; throws the `config` error a send would. |
 | `send(request)` | `SendResult` | Sends now; see [Sending](/docs/sending). |
 | `schedule(request)` | `ScheduleResult` | Sends at `scheduledAt`; see [Scheduling](/docs/scheduling). |
 | `schedules.list({ recipientId? })` | `ScheduledItem[]` | Pending schedules, soonest first. |
@@ -23,6 +24,23 @@ description: The in-process API your Worker calls, the routes Chaski mounts and 
 | `push.register(request)` | `{ id }` | Registers a web push subscription or an iOS device token. |
 | `push.unregister(query)` | `{ unregistered }` | By `recipientId`, `endpoint` or `deviceToken`. |
 | `push.vapidPublicKey()` | `{ publicKey }` | The key for `pushManager.subscribe()`, or `null`. |
+| `templates.import(file, { preview? })` | `TemplateImportResult` | Creates or updates templates by type from a [template file](/docs/templates#keep-templates-in-a-file); `preview` only reports. |
+| `templates.export()` | `TemplateFile` | Every template, as the file `templates.import()` takes. |
+
+`ready()` suits a health route: it asks the database each time, so a database that doesn’t answer
+fails it too. `templates` counts the templates outside the trash; at `0`, every send is refused as
+an unknown type, as on a fresh database or after a deploy that forgot to load them.
+
+```ts
+app.get('/health', async (c) => {
+  try {
+    const status = await chaski.ready();
+    return c.json({ chaski: status }, status.templates > 0 ? 200 : 503);
+  } catch (error) {
+    return c.json({ chaski: String(error) }, 503);
+  }
+});
+```
 
 It also mounts and consumes:
 
@@ -43,9 +61,11 @@ type SendRequest = {
   transactional?: boolean;
   email?: { fromName?: string; replyTo?: string; attachments?: AttachmentInput[] };
   idempotencyKey?: string;
+  // Delivers the one transactional email before send() returns; see Sending.
+  inline?: boolean;
 };
 
-type ScheduleRequest = SendRequest & {
+type ScheduleRequest = Omit<SendRequest, 'inline'> & {
   // ISO 8601 with an explicit offset: Z or ±hh:mm.
   scheduledAt: string;
   groupKey?: string;
@@ -100,13 +120,19 @@ returns. `chaskijs/client` calls them for you.
 | `GET /feed` | The feed; `cursor`, `limit` and `unreadOnly` as query parameters. |
 | `GET /feed/unread-count` | `{ unread }` |
 | `POST /feed/read` | Marks items read: `{ ids?, before? }`, or `{}` for the whole feed. |
-| `GET /feed/socket` | A WebSocket that announces new items. |
+| `GET /feed/socket` | A WebSocket that announces new items, and reads made in other tabs and devices. |
 | `GET /preferences` | The user’s preferences. |
 | `PATCH /preferences` | Updates them. |
 | `GET /preferences/topics` | Template types grouped by topic. |
 | `GET /push/vapid-public-key` | `{ publicKey }` |
 | `POST /push/subscriptions` | Registers this browser’s subscription, or an iOS device token. |
 | `DELETE /push/subscriptions` | Drops one, by `endpoint` or `deviceToken`. |
+
+A path the mount doesn’t serve, including those of a group left out of `groups`, reaches your
+app’s own 404, and `identify` doesn’t run for it. So a second mount can sit under the first
+one’s path (`/me/notifications/team` under `/me/notifications`) and both answer, in whichever
+order you register them. The dashboard’s mount is the exception: it’s a single-page app, so it
+answers every path under its own.
 
 Writes and socket upgrades from an origin other than the request’s own, `publicUrl`’s or one in
 `allowedOrigins` answer 403. Errors answer as `{ error, message }`, with the codes in
@@ -116,7 +142,7 @@ Writes and socket upgrades from an origin other than the request’s own, `publi
 
 | Entry | Runs in | |
 | --- | --- | --- |
-| `chaski` | Your Worker | `createChaski`, the auth helpers, the Durable Objects, the Workflow, `ChaskiEntrypoint`, the errors and every type. |
+| `chaskijs` | Your Worker | `createChaski`, the auth helpers, the Durable Objects, the Workflow, `ChaskiEntrypoint`, the errors and every type. |
 | `chaskijs/client` | The browser | `createChaskiClient`, `chaskiQueries`, `ChaskiRequestError`. |
 | `chaskijs/sw` | Your service worker | `handlePushEvents`. |
 | `chaskijs/react` | The browser, with React 18 or 19 | `ChaskiProvider` and the hooks. |

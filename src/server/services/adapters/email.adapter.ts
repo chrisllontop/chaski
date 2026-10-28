@@ -7,7 +7,7 @@ import type { StoredAttachment } from '../attachment.service';
 import { AttachmentService } from '../attachment.service';
 import { BaseService } from '../base.service';
 import type { ContactSnapshot } from '../contact.service';
-import { EmailSenderService } from '../email-sender.service';
+import { EmailSenderService, senderAddress } from '../email-sender.service';
 import { TemplateService } from '../template.service';
 import type { AdapterContext, AdapterResult } from './types';
 
@@ -54,13 +54,11 @@ export class EmailAdapter extends BaseService {
     // comes from the publicUrl the host declares.
     const html = injectOpenPixel(renderedHtml, openPixelUrl(config.publicUrl, ctx.delivery.id));
 
-    const fromName = overrides.fromName ?? emailConfig.fromName;
-    const from = fromName ? `${fromName} <${emailConfig.from}>` : emailConfig.from;
+    const from = senderAddress(emailConfig.from, overrides.fromName ?? emailConfig.fromName);
     const replyTo = overrides.replyTo ?? emailConfig.replyTo;
 
-    const attachments = await EmailAdapter.loadAttachments(
-      parseJson<StoredAttachment[]>(ctx.notification.attachments, []),
-    );
+    const stored = parseJson<StoredAttachment[]>(ctx.notification.attachments, []);
+    const attachments = await EmailAdapter.loadAttachments(stored);
 
     const { messageId } = await EmailSenderService.send({
       to: snapshot.email,
@@ -71,6 +69,8 @@ export class EmailAdapter extends BaseService {
       text,
       attachments: attachments.length > 0 ? attachments : undefined,
     });
+    // A sent email can't be replayed, so nothing reads its attachments again.
+    await AttachmentService.discard(stored, { deliveryId: ctx.delivery.id, channel: 'email' });
     return { providerMessageId: messageId };
   };
 

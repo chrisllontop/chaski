@@ -94,11 +94,15 @@ describe('feed socket', () => {
     sockets[0]?.receive(
       JSON.stringify({ type: 'feed_item.created', feedItemId: 'f1', createdAt: 'now' }),
     );
+    sockets[0]?.receive(JSON.stringify({ type: 'feed_item.read', ids: ['f1'] }));
     sockets[0]?.receive(JSON.stringify({ type: 'feed_item.deleted', feedItemId: 'f1' }));
     sockets[0]?.receive('pong');
     sockets[0]?.receive('not json');
 
-    expect(events).toEqual([{ type: 'feed_item.created', feedItemId: 'f1', createdAt: 'now' }]);
+    expect(events).toEqual([
+      { type: 'feed_item.created', feedItemId: 'f1', createdAt: 'now' },
+      { type: 'feed_item.read', ids: ['f1'] },
+    ]);
   });
 
   it('reconnects with backoff after the socket drops', async () => {

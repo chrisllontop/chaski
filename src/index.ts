@@ -4,7 +4,9 @@ export type {
   ChaskiFeedApi,
   ChaskiPreferencesApi,
   ChaskiPushApi,
+  ChaskiReadiness,
   ChaskiSchedulesApi,
+  ChaskiTemplatesApi,
 } from './contract/api';
 export type {
   AttachmentInput,
@@ -63,7 +65,7 @@ export { ChaskiEvents } from './server/durable/events';
 export { ChaskiFeed } from './server/durable/feed';
 export { ChaskiEntrypoint } from './server/entrypoint';
 export type { RoutesOptions } from './server/routes';
-export type { Identify, UserRoutesOptions } from './server/routes/user';
+export type { Identify, UserRouteGroup, UserRoutesOptions } from './server/routes/user';
 export type {
   DeliveryMessage,
   EmailAttachment,

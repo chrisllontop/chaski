@@ -41,6 +41,49 @@ CHASKI_PUBLIC_URL=http://localhost:8787/admin/notifications
 The config function runs on every call, so values from `.dev.vars` apply locally and your
 production vars apply once deployed.
 
+## Seed the templates
+
+A template file you keep in your repository loads into the local database before `wrangler dev`
+starts, with the command `chaskijs` ships and Wrangler’s own `d1 execute`. The command turns the
+file into SQL that applies it the way `chaski.templates.import()` does: templates match by type,
+fields the file leaves out are cleared, channels it leaves out keep their content, and a template
+that already matches isn’t written, so running it again changes nothing.
+
+```json title="package.json"
+{
+  "scripts": {
+    "seed": "wrangler d1 migrations apply CHASKI_DB --local && chaskijs templates sql chaski-templates.json > .wrangler/chaski-templates.sql && wrangler d1 execute CHASKI_DB --local --file .wrangler/chaski-templates.sql"
+  }
+}
+```
+
+The SQL follows the tables of the `chaskijs` version you installed, so apply its migrations first,
+as the script does. With `--remote` in place of `--local`, the same two steps load the file into
+the deployed database from a deploy job. A dashboard already open shows the change once you reload
+it.
+
+## Schedules across restarts
+
+`wrangler dev` keeps your schedules when it restarts, but its local Workflows engine doesn’t wake
+an instance that was asleep when the server stopped: a schedule made before the restart stays
+pending past its time, and **Schedules** in the dashboard marks it overdue. Schedules made after
+the restart fire on time, and deployed Workflows don’t have this limitation. To wake one, call
+`chaski.schedule()` again with the same `idempotencyKey`, which restarts its instance, or restart
+the instance from the local explorer or with
+`npx wrangler workflows instances restart <workflow name> <schedule id> --local`. The instance id
+is the schedule’s: `scheduledId` from `chaski.schedule()`, `id` from `chaski.schedules.list()`.
+
+## Read the emails
+
+Without `dryRun`, `wrangler dev` stands in for Email Service: each email Chaski sends lands on
+disk instead of in an inbox. The log prints where its HTML, its text and each attachment went,
+under `.wrangler/tmp/email/`, and the local explorer lists every one with its sender, recipients,
+reply-to address and attachments:
+
+```bash
+curl http://localhost:8787/cdn-cgi/local/explorer/api/local/email/sending
+```
+
 ## Sign in to the local dashboard
 
 Cloudflare Access doesn’t sit in front of `wrangler dev`, so `cloudflareAccess()` answers 403 to
@@ -70,3 +113,82 @@ app.route(
 With a template for the type in place, send from a route of your own, open the dashboard and
 follow the delivery from **Deliveries**. [Templates](/docs/templates) shows how to create the
 first one.
+
+## Test with Vitest
+
+Your Worker’s tests can send, deliver and check what came out, in workerd with
+[`@cloudflare/vitest-plugin`](https://developers.cloudflare.com/workers/testing/vitest-integration/).
+Point it at your Wrangler config and hand it Chaski’s migrations:
+
+```ts title="vitest.config.ts"
+import { cloudflareTest, readD1Migrations } from '@cloudflare/vitest-plugin';
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  plugins: [
+    cloudflareTest(async () => ({
+      wrangler: { configPath: './wrangler.jsonc' },
+      miniflare: {
+        bindings: { CHASKI_MIGRATIONS: await readD1Migrations('node_modules/chaskijs/migrations') },
+      },
+    })),
+  ],
+  test: { setupFiles: ['./test/setup.ts'] },
+});
+```
+
+```ts title="test/setup.ts"
+import { applyD1Migrations } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
+
+await applyD1Migrations(env.CHASKI_DB, env.CHASKI_MIGRATIONS);
+```
+
+Load your templates with `chaski.templates.import()`, since a send of a type without one fails.
+Then keep the deliveries Chaski queues and hand them to `chaski.queue()` yourself, as your consumer
+would, so a test decides when they go out:
+
+```ts title="test/notifications.test.ts"
+import { createExecutionContext, createMessageBatch, getQueueResult } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
+import type { DeliveryMessage } from 'chaskijs';
+import { expect, it, vi } from 'vitest';
+import templates from '../chaski-templates.json';
+import { chaski } from '../src/chaski';
+
+const captureDeliveries = () => {
+  const queued: DeliveryMessage[] = [];
+  vi.spyOn(env.CHASKI_QUEUE, 'sendBatch').mockImplementation(async (messages) => {
+    for (const message of messages) queued.push(message.body);
+    return { metadata: { metrics: { backlogCount: queued.length, backlogBytes: 0 } } };
+  });
+  return async () => {
+    const batch = createMessageBatch(
+      'my-app-deliveries',
+      queued.splice(0).map((body, index) => ({
+        id: String(index),
+        timestamp: new Date(),
+        attempts: 1,
+        body,
+      })),
+    );
+    const ctx = createExecutionContext();
+    await chaski.queue(batch, env, ctx);
+    return getQueueResult(batch, ctx);
+  };
+};
+
+it('welcomes a new user by email and in the feed', async () => {
+  await chaski.templates.import(templates);
+  const drain = captureDeliveries();
+  const send = vi.spyOn(env.CHASKI_EMAIL, 'send').mockResolvedValue({ messageId: 'test' });
+
+  await chaski.send({ type: 'welcome', recipient: { id: 'user_1', email: 'ana@example.com' } });
+  await drain();
+
+  expect(send).toHaveBeenCalledWith(expect.objectContaining({ to: 'ana@example.com' }));
+  expect(await chaski.feed.unreadCount('user_1')).toEqual({ unread: 1 });
+});
+```
+
+`inline: true` sends deliver within `send()`, so they need no draining.

@@ -90,7 +90,8 @@ const Bell = () => {
 ```
 
 The hooks open a WebSocket while mounted and add new items as they arrive; marking an item read
-updates the unread count on the same page. `useFeed({ enabled: false })` holds the first load
+updates the unread count on the same page at once, and in the user’s other tabs and devices
+through the socket. `useFeed({ enabled: false })` holds the first load
 until a panel opens.
 
 Without React, `chaskiClient.feed` has `list()`, `unreadCount()`, `markRead()` and
@@ -159,11 +160,15 @@ const PushToggle = () => {
 ```
 
 Without React: `chaskiClient.push.isSupported()`, `state()`, `enable()` and `disable()`.
-`enable()` throws when permission is denied or the server has no VAPID key. On iPhone and iPad,
+`enable()` throws when permission is denied, the server has no VAPID key or the user routes refuse
+the browser (`allowPush`). `state()` reads a subscription made with another VAPID key, such as the
+one the project’s earlier push provider left, as not subscribed, and `enable()` replaces it. On iPhone and iPad,
 web push reaches only a site the user added to the home screen.
 
-A click on a push focuses an open window and takes it to the push’s link, or opens one; open
-windows also get a message to refresh their feed. `handlePushEvents` shows every push the worker
+A click on a push takes an open window to the push’s link and focuses it, or opens the link in a
+new window; open windows also get a message to refresh their feed. A window the service worker
+doesn’t control yet (the page that just turned push on, until it reloads) can’t be navigated, so
+the link opens in a new one. `handlePushEvents` shows every push the worker
 receives, reading `title`, `body` and `href` from its JSON. A push of another shape still shows,
 but its click opens `/`, so while an old path sends pushes of its own the worker has to handle
 both.

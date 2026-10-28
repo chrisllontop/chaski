@@ -8,13 +8,16 @@ export default defineConfig({
     client: 'src/client/index.ts',
     sw: 'src/sw/index.ts',
     react: 'src/react/index.ts',
+    // The `chaskijs` command, for Node: it writes SQL and never touches a database.
+    cli: 'src/cli/index.ts',
   },
   format: ['esm'],
   platform: 'neutral',
   // tsc emits the declarations (pnpm build:types): it infers the Drizzle and zod types.
   dts: false,
   deps: {
-    neverBundle: ['cloudflare:workers'],
+    // The Workers runtime and, for the command, Node's own modules come with the runtime.
+    neverBundle: ['cloudflare:workers', /^node:/],
     // better-drizzle ships inside the bundle: its peer range pins drizzle-orm ^0.30, so npm would
     // install that older release next to ours and bundlers would pick it up. Its imports of
     // drizzle-orm stay external and reach the release Chaski depends on.

@@ -1,8 +1,8 @@
 # Plan the move onto Chaski
 
 The input is the inventory from [audit.md](audit.md); the output is the plan, added to the same
-file. The plan changes no code: carrying it out is a separate request from the user. Every Chaski
-call below is in [sending.md](sending.md).
+file, and the template file with every converted template. The plan changes no code: carrying it
+out is a separate request from the user. Every Chaski call below is in [sending.md](sending.md).
 
 ## 1. Sort the flows
 
@@ -74,6 +74,10 @@ Write these down per flow:
 An email body escapes every value for HTML on its own, so a converted tag needs no `escape`. A
 value that holds HTML on purpose goes through `raw` instead.
 
+- **Content written in the code** (a subject or body the send builds from strings): each value
+  it splices in becomes a tag, so `` `We received ${amount}` `` becomes `We received {{ amount }}`.
+  What the code computes for it (a formatted price, a link) becomes a payload field the send
+  passes.
 - **Handlebars and Mustache** (SendGrid dynamic templates, Postmark): `{{name}}` becomes
   `{{ name }}`, and `{{{html}}}` becomes `{{ html | raw }}`.
   `{{#each items}}{{this.title}}{{/each}}` becomes
@@ -99,10 +103,13 @@ value that holds HTML on purpose goes through `raw` instead.
   keep the output.
 - **Provider-hosted templates**: ask the user to export them from the provider’s dashboard, then
   convert as above.
+- **Entities in plain text.** Content written for HTML, or exported from a provider, often carries
+  `&middot;`, `&#8217;` or `&amp;` into subjects and push text, where Chaski shows them as typed.
+  Write the characters themselves in every field but the email body; loading the file prints a
+  warning for each one left.
 
-Write every converted template into the plan, field by field as [sending.md](sending.md) shows,
-with sample data for the preview. The user creates each one in the dashboard under
-**Templates**, **New template**, and checks it in the preview before its type moves.
+Write every converted template into the template file ([sending.md](sending.md)), with
+`sampleData` that fills every tag it uses, and note in the plan where each one came from.
 
 ### State to bring over
 
@@ -116,8 +123,9 @@ with sample data for the preview. The user creates each one in the dashboard und
   that same pair, and register each one with
   `chaski.push.register({ recipient: { id }, subscription: { endpoint, keys: { p256dh, auth } } })`.
   Browsers keep their subscription, and `client.push.enable()` reuses it. Subscriptions made with
-  another pair, or FCM web tokens, can’t come over: those users turn push on again once the
-  frontend has Chaski’s toggle. Chaski’s pushes carry `{ title, body, href, tag }`; while the old
+  another pair, or FCM web tokens, can’t come over: `client.push.state()` reports those browsers
+  as not subscribed, so Chaski’s toggle offers push again, and where permission is already
+  `granted`, `enable()` replaces the subscription without asking. Chaski’s pushes carry `{ title, body, href, tag }`; while the old
   path still sends pushes of another shape, the service worker has to show both.
 - **APNs device tokens**: `chaski.push.register({ recipient: { id }, platform: 'ios', deviceToken })`,
   with the same bundle id and environment in `channels.push.apns`.
@@ -138,7 +146,8 @@ opt-in flag) reads it until the column goes; afterwards it sends to everyone it 
 lets preferences skip the rest, each skipped send recorded as `suppressed`.
 
 **Done when** every flow that moves has its type, channels, call, idempotency key,
-`transactional` choice, template source and bindings, and every piece of stored state has its way
+`transactional` choice, template source and bindings; the template file holds a template for every
+type, with `sampleData` that fills every tag it uses; and every piece of stored state has its way
 over or a reason it stays.
 
 ## 3. Stage it
@@ -146,9 +155,9 @@ over or a reason it stays.
 Write the stages into the plan in this order:
 
 1. **Chaski in dry run.** Set it up on a branch ([setup.md](setup.md)) with the bindings the
-   moving flows need. The user creates the converted templates in the dashboard and checks each
-   one in its preview. Before the first email type, the user onboards the sending domain to Email Service, a
-   DNS change on their side.
+   moving flows need. Load the template file into the local database ([sending.md](sending.md)),
+   and the user checks each template in the dashboard’s preview. Before the first email type, the
+   user onboards the sending domain to Email Service, a DNS change on their side.
 2. **Backfills**, before the types that depend on them: preferences before any type that respects
    them, devices before any push type, with the double writes above from the same deploy.
 3. **The frontend** ([browser-clients.md](browser-clients.md)), before the in-app and web push
@@ -164,9 +173,11 @@ Write the stages into the plan in this order:
       dry run, to see Chaski’s delivery in the dashboard (content, recipient, skipped channels).
       Compare the two. With its provider key set, the old path sends for real even locally: point
       it at a test address, or log what it would send.
-   3. Deploy with the type unlisted, so nothing changes, then list it in production and watch
-      **Deliveries** and the type’s health on the **Overview**. `dryRun` covers the whole config,
-      so in production the switch is what moves types one at a time.
+   3. Load its template into production (the template file’s `--remote` load in
+      [sending.md](sending.md), with the user’s go-ahead). Deploy with the type unlisted, so
+      nothing changes, then list it in production and watch **Deliveries** and the type’s
+      health on the **Overview**. `dryRun` covers the whole config, so in production the switch
+      is what moves types one at a time.
    4. Keep the old path and the provider’s credentials until the type has run clean for as long
       as the user wants. Unlisting the type switches back.
 5. **Clean-up**, once every type has moved: delete the old send code, templates and tables, drop

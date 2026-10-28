@@ -21,7 +21,7 @@ export default defineConfig({
         test: {
           name: 'worker',
           include: ['test/**/*.test.ts'],
-          exclude: ['test/browser/**'],
+          exclude: ['test/browser/**', 'test/node/**'],
           setupFiles: ['./test/setup.ts'],
         },
       },
@@ -33,6 +33,10 @@ export default defineConfig({
           environmentOptions: { happyDOM: { url: 'https://app.example.com/inbox' } },
           include: ['test/browser/**/*.test.ts'],
         },
+      },
+      {
+        // The agent skill's scripts run in Node, against a project on disk.
+        test: { name: 'node', environment: 'node', include: ['test/node/**/*.test.ts'] },
       },
     ],
   },

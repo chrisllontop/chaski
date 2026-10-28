@@ -8,6 +8,10 @@ https://chaski.sh/docs/errors.
 ## Config errors
 
 Chaski checks the config on every call. The message starts with `Chaski config:`.
+`await chaski.ready()` runs the same checks, and the migrations’, without sending anything: call it
+from a temporary route, or the project’s health route, to see the error. Its `templates` count at
+`0` means every send will be refused as an unknown type: load the template file
+([sending.md](sending.md)).
 
 | Message | Fix |
 | --- | --- |
@@ -69,10 +73,13 @@ Type errors:
 
 | The send throws | Fix |
 | --- | --- |
-| `unknown notification type '<type>': register a template for it before sending` | Have the user create the template in the dashboard ([sending.md](sending.md)). |
+| `unknown notification type '<type>': register a template for it before sending` | Add the type to the template file and load it ([sending.md](sending.md)). |
 | `channels not configured: <channels>` | The send’s `channels` lists a channel the config doesn’t turn on. |
 | `scheduledAt must be ISO 8601 with an explicit offset (Z or ±hh:mm)` | Add the offset: `2026-11-01T09:00:00-05:00` or `…Z`. |
 | `scheduledAt is in the past` | The time passed more than five minutes ago. |
+| `an inline send delivers one email: it needs transactional: true and channels: ['email']` | Add both, or drop `inline`. |
+| `the inline email would be skipped: <reason>` | The send recorded nothing; `missing_email` means the `recipient` has no `email`, `no_template` that the template has no enabled email content. |
+| `delivery_failed`: `the email didn't go out: <provider error> (<code>, delivery <id>)` | An inline send the provider refused or couldn’t take; the delivery is `failed` in the dashboard with the same error. `sender_not_verified` and `sender_domain_not_available` are the setup’s to fix (the domain onboarded to Email Service), `recipient_suppressed` the address’s. |
 
 A delivery skipped at send time carries its reason:
 
@@ -99,12 +106,29 @@ with backoff until `maxRetries`, then the delivery is `dead`. Fix the cause, the
 the dashboard. Keep `max_retries` on the queue consumer equal to `maxRetries` (5 by default), or
 rows can stay `pending` after the queue gave up on them.
 
+`attachment_missing` means a file under `att/` in the attachments bucket was gone when the
+delivery read it: an R2 lifecycle rule deleted it before the schedule fired or the replay sent.
+Lengthen the rule, then send again.
+
 **Nothing arrives, yet deliveries show `sent`.** `dryRun` is on: in dry run Chaski records email
 and push without handing them to a provider. The dashboard’s **Channels** page says
 whether dry run is on. In-app items reach the feed in dry run too.
 
 **Web push stopped reaching browsers after a key change.** A subscription belongs to the VAPID key
 it was made with. Put the earlier pair back, or have users turn push on again.
+
+**Schedules don’t fire locally after a restart.** Under `wrangler dev`, a schedule made before the
+dev server restarted stays `pending` past its time, and the dashboard marks it overdue. Its
+Workflow instance is still listed as running, but the local Workflows engine doesn’t wake an
+instance that was asleep when the server stopped (seen with Wrangler 4.152); schedules made after
+the restart fire on time, and deployed Workflows aren’t affected. Wake one of two ways:
+
+- Call `chaski.schedule()` again with the same `idempotencyKey` and `scheduledAt`: it restarts the
+  instance.
+- Restart the instance, whose id is the schedule’s (`scheduledId` from `chaski.schedule()`, `id`
+  from `chaski.schedules.list()`): from the local explorer at `/cdn-cgi/local/explorer`, which
+  lists the instances by that id, or
+  `npx wrangler workflows instances restart <workflow name> <schedule id> --local`.
 
 ## Sign-in
 

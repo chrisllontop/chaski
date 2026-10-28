@@ -51,10 +51,10 @@ const browser = (permission: NotificationPermission = 'granted') => {
   };
 };
 
-const client = () => {
+const client = (register: () => unknown = () => ({ id: 'dt_1' })) => {
   const network = fakeFetch({
     'GET /me/notifications/push/vapid-public-key': () => ({ publicKey: VAPID_KEY }),
-    'POST /me/notifications/push/subscriptions': () => ({ id: 'dt_1' }),
+    'POST /me/notifications/push/subscriptions': register,
     'DELETE /me/notifications/push/subscriptions': () => ({ unregistered: 1 }),
   });
   const chaski = createChaskiClient({
@@ -118,6 +118,31 @@ describe('push client', () => {
 
     expect(fake.pushManager.subscribe).not.toHaveBeenCalled();
     expect(network.calls.at(-1)?.body).toMatchObject({ endpoint: 'https://push.example/sub/kept' });
+  });
+
+  // As a browser that another push provider subscribed with its own key stands.
+  it('reports a subscription made with another key as not subscribed until enable replaces it', async () => {
+    const fake = browser();
+    fake.subscribed('https://push.example/sub/old', [4, 9, 9]);
+    const { push } = client();
+
+    expect(await push.state()).toEqual({ subscribed: false, permission: 'granted' });
+    await push.enable();
+    expect(await push.state()).toEqual({ subscribed: true, permission: 'granted' });
+  });
+
+  it('drops the subscription it just made when the server refuses the browser', async () => {
+    const fake = browser();
+    const { push } = client(() =>
+      Response.json(
+        { error: 'forbidden', message: 'this contact may not register devices' },
+        { status: 403 },
+      ),
+    );
+
+    await expect(push.enable()).rejects.toMatchObject({ code: 'forbidden', status: 403 });
+    expect(await fake.pushManager.getSubscription()).toBeNull();
+    expect(await push.state()).toEqual({ subscribed: false, permission: 'granted' });
   });
 
   it('stops when the user denies permission', async () => {

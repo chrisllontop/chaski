@@ -23,22 +23,62 @@ A channel goes out only when the template has it `enabled`. A template can also 
 `description`, a `topic` that groups it on the user’s preferences screen, and `sampleData`, a
 string of JSON the dashboard previews it with.
 
-Templates live in Chaski’s database, not in the host’s code: the user writes them in the
-dashboard under **Templates**, **New template**, with a live preview. When a template comes from
-code, hand the user its fields to paste, channel by channel:
+### The template file
 
-```text
-Type         payment_received
-Topic        billing
-Sample data  {"amount": "$15.00", "recipient": {"name": "Ana"}}
+Templates live in Chaski’s database and reach it from a **template file** in the project:
+`chaski-templates.json` at its root, one entry per type. Write the templates there, load the file,
+and have the user check each one under **Templates** in the dashboard, whose preview renders it
+with its `sampleData`.
 
-email    subject   We received {{ amount }}
-         body      <p>Thanks, {{ recipient.name }}. We received {{ amount }}.</p>
-         textBody  Thanks, {{ recipient.name }}. We received {{ amount }}.
-in_app   subject   Payment received
-         body      We received {{ amount }}.
-         textBody  /payments
+```json title="chaski-templates.json"
+{
+  "format": "chaski.templates",
+  "version": 1,
+  "templates": [
+    {
+      "type": "payment_received",
+      "topic": "billing",
+      "sampleData": "{\"amount\": \"$15.00\", \"recipient\": {\"name\": \"Ana\"}}",
+      "channels": [
+        {
+          "channel": "email",
+          "enabled": true,
+          "subject": "We received {{ amount }}",
+          "body": "<p>Thanks, {{ recipient.name }}. We received {{ amount }}.</p>",
+          "textBody": "Thanks, {{ recipient.name }}. We received {{ amount }}."
+        },
+        {
+          "channel": "in_app",
+          "enabled": true,
+          "subject": "Payment received",
+          "body": "We received {{ amount }}.",
+          "textBody": "/payments"
+        }
+      ]
+    }
+  ]
+}
 ```
+
+Load it into the local database, after Chaski’s migrations:
+
+```sh
+npx chaskijs templates sql chaski-templates.json > .wrangler/chaski-templates.sql
+npx wrangler d1 execute CHASKI_DB --local --file .wrangler/chaski-templates.sql
+```
+
+- **Loaded** when both commands exit 0 and **Templates** lists every type in the file.
+  `chaskijs templates sql` stops at a file it can’t load (Liquid that doesn’t parse, a type listed
+  twice) and names the type, channel and field; fix the file and run both again.
+- **Loading again** changes nothing for the types that match. A type that differs takes the
+  file’s fields, overwriting what the user edited in the dashboard. Once the user edits there,
+  bring the file up to date from `chaski.templates.export()`, or load a file with only the new
+  types.
+- **Production** runs the same two commands with `--remote` in place of `--local`, after
+  `wrangler d1 migrations apply CHASKI_DB --remote`. They write to the user’s database: ask first.
+- **From the host’s code**, `chaski.templates.import(file)` applies the same file (a seed route,
+  the host’s tests), and `{ preview: true }` reports what it would change without writing. Over
+  RPC: `env.CHASKI.templates().import(file)`.
 
 ### Liquid
 
@@ -48,12 +88,14 @@ Templates are [Liquid](https://liquidjs.com). They see the send’s `payload` at
 - A missing key renders empty instead of failing the delivery.
 - An email `body` escapes every value for HTML on its own. A value that holds HTML on purpose
   goes through `raw`: `{{ summary_html | raw }}`. The subject, the text body, in-app and push
-  are plain text and stay as written.
+  are plain text and stay as written, HTML entities included: `&middot;` reaches the inbox as
+  typed. Write the characters themselves: `chaskijs templates sql` prints a warning for each
+  entity left, and `templates.import()` lists them under `warnings`.
 - Loops and conditions: `{% for item in items %}…{% endfor %}`, `{% if overdue %}…{% endif %}`.
   Only `nil` and `false` are false: test a list with `{% if items.size > 0 %}` and a string with
   `{% if name != blank %}`.
-- Liquid that doesn’t parse is rejected when the template is saved, and fails its delivery at once
-  instead of retrying.
+- Liquid that doesn’t parse is rejected when the template is saved or loaded, and fails its
+  delivery at once instead of retrying.
 
 ## Send
 
@@ -75,14 +117,16 @@ const result = await chaski.send({
 | `payload` | The values the template renders with. |
 | `channels` | Narrows the send to some of the template’s channels, such as `['email']`. A channel the config doesn’t turn on fails the send. |
 | `transactional` | `true` sends whatever the contact’s preferences say: receipts, password resets, security alerts. |
-| `email` | `fromName`, `replyTo`, and up to 10 `attachments` (`filename`, `contentType`, and base64 `content` or a `url`); attachments need the R2 binding. |
+| `email` | `fromName`, `replyTo`, and up to 10 `attachments` (`filename`, `contentType`, and base64 `content` or a `url`); attachments need the R2 binding. Chaski deletes them once the email goes out or its schedule is cancelled; a failed or dead delivery keeps them for a replay, so suggest an R2 lifecycle rule on `att/` that outlasts the farthest schedule with attachments. |
 | `idempotencyKey` | The same key returns the first send’s result (`replayed: true`) instead of sending again. |
+| `inline` | `true` delivers the email before `send()` returns, for someone waiting on it; needs `transactional: true` and `channels: ['email']`. |
 
 Derive the idempotency key from the event the notification is about, such as the payment or the
 order, so a retried request or a redelivered queue message sends once.
 
 `send()` records the notification and puts one delivery per channel on the queue; it doesn’t wait
-for providers. It returns `{ notificationId, replayed, outcome, deliveries }`:
+for providers, except with `inline` (below). It returns
+`{ notificationId, replayed, outcome, deliveries }`:
 
 - `outcome: 'delivered'`: at least one channel took it.
 - `outcome: 'suppressed'`: the contact’s preferences skipped every channel.
@@ -90,6 +134,17 @@ for providers. It returns `{ notificationId, replayed, outcome, deliveries }`:
 
 A skipped delivery carries a `reason`: `channel_not_configured`, `muted_by_preferences`,
 `missing_email`, `no_device_tokens` or `no_template`.
+
+### Inline, for someone waiting
+
+A password reset, a verification or a sign-in link has a person on screen waiting for the email.
+Send those with `inline: true`, `transactional: true` and `channels: ['email']`: Chaski delivers
+the email before `send()` returns and throws `ChaskiError` with the code `delivery_failed` when the
+provider doesn’t take it, so the route answers the person with an error instead of a silent
+success. The delivery is recorded and shows in the dashboard as usual; a failed one isn’t retried
+in the background. With an `idempotencyKey`, a second request tries a failed email again and
+returns one that went out as it was. Everything else (receipts, digests, reminders) stays on the
+queue, which retries with backoff.
 
 ## Schedule
 
@@ -162,7 +217,8 @@ The frontend reaches the same data as the signed-in user through `chaski.userRou
 ## Errors
 
 Chaski throws `ChaskiError` with a `code`: `validation` (fix the request or the template),
-`config` (fix the setup), `not_found`, `conflict`, `unauthorized`, `forbidden`, `internal`. Check
+`config` (fix the setup), `delivery_failed` (an inline email didn’t go out), `not_found`,
+`conflict`, `unauthorized`, `forbidden`, `internal`. Check
 it with `isChaskiError(error)`, never `instanceof`, since the class doesn’t survive a service
 binding or a queue. `isRetryableChaskiError(error)` is `true` only for `internal` and for errors
 that aren’t Chaski’s.

@@ -1,5 +1,8 @@
 import type { AttachmentInput } from '../../contract/contract';
 import { ChaskiError } from '../../contract/errors';
+import type { ErrorContext } from '../config';
+import { parseJson } from '../lib/json';
+import { reportError } from '../lib/report-error';
 import { BaseService } from './base.service';
 
 export type StoredAttachment = {
@@ -22,6 +25,8 @@ const decodeBase64 = (value: string): Uint8Array => {
 // Attachment bodies never travel through the queue (128 KB message cap); they
 // are persisted to R2 at ingest and read back by the channel adapter at send time.
 export class AttachmentService extends BaseService {
+  protected static override name = 'attachments';
+
   static store = async (
     ownerId: string,
     attachments: AttachmentInput[],
@@ -60,6 +65,28 @@ export class AttachmentService extends BaseService {
       });
     }
     return stored;
+  };
+
+  /**
+   * Deletes attachments nothing reads again: those of an email that went out, and of a
+   * schedule cancelled or replaced. A failed or dead delivery keeps its own, for a replay.
+   */
+  static discard = async (
+    stored: StoredAttachment[] | string | null,
+    context: Omit<ErrorContext, 'source'>,
+  ): Promise<void> => {
+    const keys = (
+      typeof stored === 'string' ? parseJson<StoredAttachment[]>(stored, []) : (stored ?? [])
+    ).map((attachment) => attachment.r2Key);
+    const bucket = AttachmentService.bindings.attachments;
+    if (keys.length === 0 || !bucket) return;
+    // What they were attached to already happened; a leftover file costs storage, not a send.
+    try {
+      await bucket.delete(keys);
+    } catch (error) {
+      reportError(error, { source: 'attachments', ...context });
+      AttachmentService.log.error('attachments not deleted', error, { keys: keys.length });
+    }
   };
 
   static read = async (stored: StoredAttachment): Promise<ArrayBuffer | null> => {

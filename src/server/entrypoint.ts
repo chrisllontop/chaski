@@ -5,6 +5,7 @@ import type {
   ChaskiPreferencesApi,
   ChaskiPushApi,
   ChaskiSchedulesApi,
+  ChaskiTemplatesApi,
 } from '../contract/api';
 import type {
   CancelScheduledQuery,
@@ -63,6 +64,15 @@ class Feed extends RpcTarget implements ChaskiFeedApi {
   }
 }
 
+class Templates extends RpcTarget implements ChaskiTemplatesApi {
+  import(file: unknown, options?: { preview?: boolean }) {
+    return api.templates.import(file, options);
+  }
+  export() {
+    return api.templates.export();
+  }
+}
+
 /**
  * The in-process API over RPC, for the host's other Workers; only Workers in the
  * host's account can bind to it. A service binding sees methods, never getters,
@@ -70,8 +80,12 @@ class Feed extends RpcTarget implements ChaskiFeedApi {
  */
 export class ChaskiEntrypoint
   extends WorkerEntrypoint
-  implements Pick<ChaskiApi, 'send' | 'schedule'>
+  implements Pick<ChaskiApi, 'ready' | 'send' | 'schedule'>
 {
+  ready() {
+    return api.ready();
+  }
+
   send(request: SendRequest) {
     return api.send(request);
   }
@@ -94,5 +108,9 @@ export class ChaskiEntrypoint
 
   feed() {
     return new Feed();
+  }
+
+  templates() {
+    return new Templates();
   }
 }

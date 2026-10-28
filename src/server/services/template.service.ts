@@ -1,10 +1,15 @@
 import { and, eq, isNotNull, sql } from 'drizzle-orm';
 import type { Channel } from '../../contract/contract';
 import { ChaskiError } from '../../contract/errors';
-import type {
-  TemplateChange,
-  TemplateImportResult,
-  TemplateRecord,
+import {
+  TEMPLATE_FILE_FORMAT,
+  TEMPLATE_FILE_VERSION,
+  type TemplateChange,
+  type TemplateFile,
+  type TemplateImportResult,
+  type TemplateRecord,
+  templateFileSchema,
+  templateWarnings,
 } from '../../contract/template-file';
 import { notifications, templates } from '../db/schema';
 import { publishAdminEvents } from '../lib/admin-events';
@@ -12,8 +17,9 @@ import { DeliveryError } from '../lib/errors';
 import { newId } from '../lib/ids';
 import { parseJson } from '../lib/json';
 import { assertTemplates, renderHtml, renderTemplate } from '../lib/render';
+import { parseInput } from '../lib/validate';
 import { BaseService } from './base.service';
-import { EmailSenderService } from './email-sender.service';
+import { EmailSenderService, senderAddress } from './email-sender.service';
 
 export type ChannelContentInput = {
   enabled?: boolean;
@@ -53,7 +59,8 @@ const diffTemplate = (
   existing: TemplateRecord | undefined,
   incoming: TemplateRecord,
 ): TemplateChange => {
-  if (!existing) return { type: incoming.type, change: 'create', fields: [] };
+  const warnings = templateWarnings(incoming);
+  if (!existing) return { type: incoming.type, change: 'create', fields: [], warnings };
   const fields: string[] = TEMPLATE_FIELDS.filter(
     (field) => (existing[field] ?? null) !== (incoming[field] ?? null),
   );
@@ -69,7 +76,12 @@ const diffTemplate = (
       }
     }
   }
-  return { type: incoming.type, change: fields.length > 0 ? 'update' : 'unchanged', fields };
+  return {
+    type: incoming.type,
+    change: fields.length > 0 ? 'update' : 'unchanged',
+    fields,
+    warnings,
+  };
 };
 
 export class TemplateService extends BaseService {
@@ -79,6 +91,9 @@ export class TemplateService extends BaseService {
     const row = await TemplateService.client.templates.findFirst({ where: { type } });
     return Boolean(row);
   };
+
+  /** Templates not in the trash: one per type a send can name. */
+  static countLive = (): Promise<number> => TemplateService.client.templates.count({ where: {} });
 
   static typeNames = async (): Promise<string[]> => {
     const rows = await TemplateService.client.templates.findMany({ orderBy: [{ type: 'asc' }] });
@@ -257,6 +272,21 @@ export class TemplateService extends BaseService {
           textBody: channel.textBody,
         })),
     }));
+  };
+
+  /** Every live template, as the file `chaski.templates.import()` takes. */
+  static exportFile = async (): Promise<TemplateFile> => ({
+    format: TEMPLATE_FILE_FORMAT,
+    version: TEMPLATE_FILE_VERSION,
+    templates: await TemplateService.exportTemplates(),
+  });
+
+  static importFile = async (
+    rawFile: unknown,
+    options: { preview?: boolean } = {},
+  ): Promise<TemplateImportResult> => {
+    const file = parseInput(templateFileSchema, rawFile);
+    return TemplateService.importTemplates(file.templates, { preview: options.preview ?? false });
   };
 
   /**
@@ -452,7 +482,7 @@ export class TemplateService extends BaseService {
     try {
       return await EmailSenderService.send({
         to: input.to,
-        from: email.fromName ? `${email.fromName} <${email.from}>` : email.from,
+        from: senderAddress(email.from, email.fromName),
         replyTo: email.replyTo,
         subject: `[test] ${rendered.subject}`,
         html: rendered.html,

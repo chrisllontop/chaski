@@ -2,11 +2,6 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { channelSchema, OFFSET_TIMESTAMP_REGEX } from '../../contract/contract';
 import { ChaskiError, isChaskiError } from '../../contract/errors';
-import {
-  TEMPLATE_FILE_FORMAT,
-  TEMPLATE_FILE_VERSION,
-  templateFileSchema,
-} from '../../contract/template-file';
 import { actorOf } from '../auth';
 import { DELIVERY_STATUS } from '../db/schema';
 import { eventsStub } from '../durable/events';
@@ -83,8 +78,6 @@ const previewSchema = z.object({
     .optional(),
 });
 
-const importQuerySchema = z.object({ preview: z.stringbool().default(false) });
-
 const metricsQuerySchema = z.object({ period: z.enum(METRIC_PERIODS).default('30d') });
 
 export const admin = new Hono();
@@ -99,7 +92,7 @@ const READ_ONLY_POSTS = /\/preview(\/document)?$/;
 admin.use(async (c, next) => {
   await next();
   if (c.req.method === 'GET' || c.req.method === 'HEAD') return;
-  if (READ_ONLY_POSTS.test(c.req.path) || c.req.query('preview') === 'true') return;
+  if (READ_ONLY_POSTS.test(c.req.path)) return;
   log.info('admin action', {
     actor: actorOf(c)?.id,
     method: c.req.method,
@@ -111,21 +104,6 @@ admin.use(async (c, next) => {
 admin.get('/me', (c) => c.json({ actor: actorOf(c) ?? null }));
 
 admin.get('/templates', async (c) => c.json({ templates: await TemplateService.list() }));
-
-admin.get('/templates/export', async (c) => {
-  c.header('content-disposition', 'attachment; filename="chaski-templates.json"');
-  return c.json({
-    format: TEMPLATE_FILE_FORMAT,
-    version: TEMPLATE_FILE_VERSION,
-    templates: await TemplateService.exportTemplates(),
-  });
-});
-
-admin.post('/templates/import', async (c) => {
-  const { preview } = parseInput(importQuerySchema, c.req.query());
-  const file = parseInput(templateFileSchema, await c.req.json());
-  return c.json(await TemplateService.importTemplates(file.templates, { preview }));
-});
 
 admin.get('/templates/deleted', async (c) =>
   c.json({ templates: await TemplateService.listDeleted() }),

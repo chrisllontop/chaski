@@ -5,6 +5,7 @@ export const CHASKI_ERROR_CODES = [
   'forbidden',
   'not_found',
   'conflict',
+  'delivery_failed',
   'internal',
 ] as const;
 
@@ -29,7 +30,8 @@ export const isChaskiError = (e: unknown): e is ChaskiError =>
   typeof (e as { code?: unknown }).code === 'string';
 
 /** Retry policy for queue consumers: Chaski codes other than `internal` are
- * permanent (caller bug or config error; retrying cannot fix them).
- * Other errors (network, runtime) are assumed transient. */
+ * permanent: a caller bug, a config error, or an inline email the provider
+ * didn't take, which is for the person waiting on it to try again. Other
+ * errors (network, runtime) are assumed transient. */
 export const isRetryableChaskiError = (e: unknown): boolean =>
   isChaskiError(e) ? e.code === 'internal' : true;

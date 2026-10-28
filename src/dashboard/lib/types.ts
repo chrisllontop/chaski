@@ -126,12 +126,6 @@ export type TemplateDetail = {
 
 export type RenderedPreview = { subject: string; html: string; text?: string };
 
-export type TemplateChange = {
-  type: string;
-  change: 'create' | 'update' | 'unchanged';
-  fields: string[];
-};
-
 export type ScheduledItem = {
   id: string;
   recipientId: string;

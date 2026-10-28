@@ -78,6 +78,27 @@ describe('in-app channel', () => {
     other.socket.close();
   });
 
+  // Without this signal, another tab or device of the same recipient keeps counting what was read.
+  it('signals reads to the open feed sockets of that recipient', async () => {
+    await seedTemplate('payment_received', 'in_app');
+    await sendInApp(1);
+    await sendInApp(2);
+    const ana = await openFeedSocket('user_1');
+    const [first] = (await chaski.feed.list({ recipientId: 'user_1' })).items;
+
+    await chaski.feed.markRead({ recipientId: 'user_1', ids: [first?.id ?? ''] });
+    await chaski.feed.markRead({ recipientId: 'user_1' });
+    await chaski.feed.markRead({ recipientId: 'user_1' });
+
+    await vi.waitFor(() =>
+      expect(ana.received).toEqual([
+        { type: 'feed_item.read', ids: [first?.id] },
+        { type: 'feed_item.read', before: expect.any(String) },
+      ]),
+    );
+    ana.socket.close();
+  });
+
   it('keeps the delivery sent when the realtime signal fails', async () => {
     await seedTemplate('payment_received', 'in_app');
     const onError = vi.fn();

@@ -288,6 +288,12 @@ plus `recipient`:
 Thanks, {{ recipient.name }}. We received your payment of {{ amount }}.
 ```
 
+Templates can also live in your repository as a
+[template file](https://chaski.sh/docs/templates#keep-templates-in-a-file), loaded from your tests
+or another Worker with `await chaski.templates.import(file)`, which creates or updates them by
+type. Before `wrangler dev` starts, or from a deploy job, `npx chaskijs templates sql
+chaski-templates.json` turns the file into SQL for `wrangler d1 execute --file`.
+
 Then send from anywhere in your Worker:
 
 ```ts
@@ -305,6 +311,21 @@ muted. `channels: ['email']` narrows that, and `transactional: true` sends regar
 contact’s preferences, for receipts and password resets. Each delivery goes through the queue, and
 the dashboard shows it as it moves.
 
+When someone waits on screen for the email, such as a password reset, add `inline: true`: Chaski
+delivers it before `send()` returns, and throws a `ChaskiError` with the code `delivery_failed`
+when the provider doesn’t take it, so the request that asked for it can say so.
+
+```ts
+await chaski.send({
+  type: 'password_reset',
+  recipient: { id: user.id, email: user.email },
+  payload: { link },
+  channels: ['email'],
+  transactional: true,
+  inline: true,
+});
+```
+
 To send later, pass a time with its offset:
 
 ```ts
@@ -321,7 +342,7 @@ await chaski.schedules.cancel({ idempotencyKey: 'invoice-due:INV-1042' });
 ```
 
 The same object answers for a contact’s feed (`chaski.feed`), devices (`chaski.push`) and
-preferences (`chaski.preferences`) on the server.
+preferences (`chaski.preferences`) on the server, and for the templates (`chaski.templates`).
 
 ## Call Chaski from your other Workers
 
@@ -357,9 +378,9 @@ export const sendPaymentReceived = async (env: Env, user: { id: string; email: s
 ```
 
 A service binding exposes methods only, so over RPC the groups are methods: `feed()`, `push()`,
-`preferences()` and `schedules()`. A call like `env.CHASKI.feed().list(query)` still takes a single
-round trip. Errors arrive with their `name` (`ChaskiError`) and `code`, such as `validation`, when
-both Workers use a compatibility date on or after `2026-04-21`.
+`preferences()`, `schedules()` and `templates()`. A call like `env.CHASKI.feed().list(query)` still
+takes a single round trip. Errors arrive with their `name` (`ChaskiError`) and `code`, such as
+`validation`, when both Workers use a compatibility date on or after `2026-04-21`.
 
 ## In the browser
 
@@ -416,8 +437,20 @@ from the types each topic groups.
 npx wrangler d1 migrations apply CHASKI_DB --local
 ```
 
+`.dev.vars` overrides `vars` under `wrangler dev`: point `CHASKI_PUBLIC_URL` at the local mount
+there, and keep the private keys from step 6 next to it.
+
+```sh
+CHASKI_PUBLIC_URL=http://localhost:8787/admin/notifications
+VAPID_PRIVATE_KEY=<private key from step 6>
+```
+
 Set `dryRun: true` in the config while you develop: Chaski renders and records email and push
 deliveries, and shows them in the dashboard, without handing them to a provider.
+
+Cloudflare Access doesn’t sit in front of `wrangler dev`, so `cloudflareAccess()` answers 403 to
+the local dashboard. [Local development](https://chaski.sh/docs/local-development) shows how to let
+a local session in, and where to read the emails `wrangler dev` sends.
 
 ## Use Chaski with a coding agent
 

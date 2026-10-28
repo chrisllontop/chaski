@@ -63,7 +63,14 @@ export type ResolvedPush = {
   apns?: ApnsCredentials;
 };
 
-export type ErrorSource = 'http' | 'queue' | 'workflow' | 'tracking' | 'feed' | 'events';
+export type ErrorSource =
+  | 'http'
+  | 'queue'
+  | 'workflow'
+  | 'tracking'
+  | 'feed'
+  | 'events'
+  | 'attachments';
 
 export type ErrorContext = {
   source: ErrorSource;
