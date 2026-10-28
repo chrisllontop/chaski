@@ -9,6 +9,9 @@ permissions:
   contents: write
   pull-requests: read
 
+# Two drafts from the same merged pull requests: the release (v0.1.0), with everything since the
+# last one, and its next pre-release (v0.1.0-rc.N), with what changed since the previous
+# pre-release. Publishing either runs the Release workflow; a pre-release goes to npm as next.
 jobs:
   update_release_draft:
     runs-on: ubuntu-latest
@@ -17,3 +20,12 @@ jobs:
         uses: release-drafter/release-drafter@v7
         with:
           config-name: release-drafter.yml
+
+  update_prerelease_draft:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Draft pre-release (v*-rc.*)
+        uses: release-drafter/release-drafter@v7
+        with:
+          config-name: release-drafter.yml
+          prerelease-identifier: rc
