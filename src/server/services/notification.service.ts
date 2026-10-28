@@ -73,16 +73,25 @@ const assertInline = (request: { transactional: boolean; channels?: Channel[] })
   }
 };
 
-// A template Liquid can't render is the caller's to fix, as at ingest; anything else is the
-// provider's answer, with the code the adapter classified it under.
-const deliveryFailed = (delivery: DeliveryRow): ChaskiError =>
-  delivery.errorCode === 'validation'
+// A paused channel holds the email for someone to send from the dashboard. A template Liquid
+// can't render is the caller's to fix, as at ingest; anything else is the provider's answer,
+// with the code the adapter classified it under.
+const deliveryFailed = (delivery: DeliveryRow): ChaskiError => {
+  if (delivery.status === 'held') {
+    return new ChaskiError(
+      'channel_paused',
+      `the email channel is paused: delivery ${delivery.id} is held until someone sends or ` +
+        'discards it in the dashboard',
+    );
+  }
+  return delivery.errorCode === 'validation'
     ? new ChaskiError('validation', delivery.lastError ?? 'the email template failed to render')
     : new ChaskiError(
         'delivery_failed',
         `the email didn't go out: ${delivery.lastError ?? 'the provider refused it'} ` +
           `(${delivery.errorCode ?? 'unknown'}, delivery ${delivery.id})`,
       );
+};
 
 export const splitEmailOptions = (
   email: { fromName?: string; replyTo?: string; attachments?: AttachmentInput[] } | undefined,
@@ -256,16 +265,19 @@ export class NotificationService extends BaseService {
     }
   };
 
-  // The same key tries a failed inline email again, so a person who asks once more gets another
-  // attempt, and claiming the row first keeps two retries from both sending. An email that went
-  // out, or is going out, replays as it stands: a key never sends twice.
+  // The same key tries a failed or held inline email again, so a person who asks once more gets
+  // another attempt (held again while its channel is paused), and claiming the row first keeps two
+  // retries from both sending. An email that went out, or is going out, replays as it stands: a
+  // key never sends twice.
   private static retryInline = async (existing: SendResult): Promise<SendResult> => {
     const email = existing.deliveries.find((d) => d.channel === 'email');
     if (!email?.id) return existing;
     const claimed = await NotificationService.db
       .update(deliveries)
       .set({ status: 'pending', updatedAt: new Date() })
-      .where(and(eq(deliveries.id, email.id), inArray(deliveries.status, ['failed', 'dead'])));
+      .where(
+        and(eq(deliveries.id, email.id), inArray(deliveries.status, ['failed', 'dead', 'held'])),
+      );
     if (claimed.meta.changes === 0) return existing;
 
     const notification = await NotificationService.client.notifications.findFirst({

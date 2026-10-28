@@ -20,7 +20,8 @@ describe('migrations', () => {
     await expect(ensureMigrations(env.CHASKI_DB, 'missing_migrations')).rejects.toMatchObject({
       code: 'config',
       message: expect.stringContaining(
-        'missing migrations 0000_init.sql, 0001_delivery_latency.sql. Apply them with `wrangler d1',
+        'missing migrations 0000_init.sql, 0001_delivery_latency.sql, 0002_channel_pauses.sql. ' +
+          'Apply them with `wrangler d1',
       ),
     });
   });
@@ -52,11 +53,13 @@ describe('chaski.ready()', () => {
 
     expect(await chaski.ready()).toEqual({
       channels: ['email', 'in_app'],
+      paused: [],
       dryRun: false,
       templates: 0,
     });
     expect(await exports.ChaskiEntrypoint.ready()).toEqual({
       channels: ['email', 'in_app'],
+      paused: [],
       dryRun: false,
       templates: 0,
     });

@@ -7,6 +7,7 @@ await applyD1Migrations(env.CHASKI_DB, env.TEST_MIGRATIONS);
 
 // Children before parents so foreign keys never block the wipe.
 const TABLES = [
+  'channel_pauses',
   'deliveries',
   'feed_items',
   'notifications',

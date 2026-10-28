@@ -59,6 +59,8 @@ const dashboard = chaski.routes({
       }
       return { id: c.req.header('x-fixture-actor') ?? 'admin@host.test', name: 'Fixture admin' };
     },
+    // Everyone may pause here, unless a test says otherwise; a host checks the actor's role.
+    canPauseChannels: (c) => c.req.header('x-fixture-can-pause') !== 'no',
   },
 });
 

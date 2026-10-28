@@ -273,14 +273,22 @@ describe('GET /api/channels', () => {
     expect(JSON.parse(text)).toEqual({
       dryRun: false,
       realtime: true,
+      canPause: true,
       channels: [
         expect.objectContaining({
           channel: 'email',
           enabled: true,
+          paused: null,
           from: 'notifications@host.test',
         }),
-        { channel: 'in_app', enabled: true },
-        { channel: 'push', enabled: true, web: { vapidPublicKey: publicKey }, ios: null },
+        { channel: 'in_app', enabled: true, paused: null },
+        {
+          channel: 'push',
+          enabled: true,
+          paused: null,
+          web: { vapidPublicKey: publicKey },
+          ios: null,
+        },
       ],
     });
     expect(text).not.toContain(jwk.d);
