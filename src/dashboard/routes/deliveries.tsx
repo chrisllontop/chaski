@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearch } from '@tanstack/react-router';
-import { MoreHorizontal, RotateCcw, Search } from 'lucide-react';
+import { MoreHorizontal, RotateCcw, Search, Send, Trash2 } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { ConfirmDialog } from '~/components/app/confirm-dialog';
 import {
@@ -44,6 +44,7 @@ import {
 import { Skeleton } from '~/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs';
 import { api, query } from '~/lib/api';
+import { useChannelsOverview } from '~/lib/channels';
 import { useDebounced } from '~/lib/debounce';
 import {
   CHANNEL_LABELS,
@@ -54,7 +55,9 @@ import {
 } from '~/lib/format';
 import type { Channel, Delivery, DeliveryPage, DeliveryStatus, TemplateSummary } from '~/lib/types';
 
-const STATUSES: DeliveryStatus[] = ['pending', 'sent', 'failed', 'dead', 'skipped'];
+type HeldSelection = { ids?: string[]; channel?: Channel; type?: string };
+
+const STATUSES: DeliveryStatus[] = ['pending', 'held', 'sent', 'failed', 'dead', 'skipped'];
 const REPLAYABLE: DeliveryStatus[] = ['failed', 'dead'];
 
 const RANGES = {
@@ -97,6 +100,15 @@ const stepsOf = (delivery: Delivery): Step[] => {
   const after = (at: string) =>
     `${formatDuration(new Date(at).getTime() - new Date(delivery.createdAt).getTime())} after the send`;
   const steps: Step[] = [{ label: 'Sent to the queue', at: delivery.createdAt, tone: 'done' }];
+  if (delivery.status === 'held') {
+    steps.push({
+      label: `Held: ${CHANNEL_LABELS[delivery.channel].toLowerCase()} is paused`,
+      at: delivery.updatedAt,
+      detail: 'It waits here until someone sends or discards it.',
+      tone: 'wait',
+    });
+    return steps;
+  }
   if (delivery.status === 'skipped') {
     steps.push({
       label: 'Skipped',
@@ -167,14 +179,24 @@ const Timeline = ({ steps }: { steps: Step[] }) => (
   </ol>
 );
 
+// What can happen to a held delivery: sent once its channel runs, or discarded.
+type HeldActions = {
+  canAct: boolean;
+  isPaused: (channel: Channel) => boolean;
+  onSend: (delivery: Delivery) => void;
+  onDiscard: (delivery: Delivery) => void;
+};
+
 const DeliverySheet = ({
   deliveryId,
   onClose,
   onReplay,
+  held,
 }: {
   deliveryId: string | null;
   onClose: () => void;
   onReplay: (delivery: Delivery) => void;
+  held: HeldActions;
 }) => {
   const { data, error } = useQuery({
     queryKey: ['delivery', deliveryId],
@@ -263,6 +285,22 @@ const DeliverySheet = ({
             </Button>
           </SheetFooter>
         ) : null}
+        {delivery?.status === 'held' && held.canAct ? (
+          <SheetFooter className="border-t">
+            {held.isPaused(delivery.channel) ? (
+              <p className="text-muted-foreground text-xs">
+                Resume {CHANNEL_LABELS[delivery.channel].toLowerCase()} under Channels to send it.
+              </p>
+            ) : (
+              <Button onClick={() => held.onSend(delivery)}>
+                <Send /> Send delivery
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => held.onDiscard(delivery)}>
+              <Trash2 /> Discard delivery
+            </Button>
+          </SheetFooter>
+        ) : null}
       </SheetContent>
     </Sheet>
   );
@@ -285,6 +323,10 @@ export const DeliveriesPage = () => {
   const [selected, setSelected] = useState<string | null>(null);
   const [replaying, setReplaying] = useState<Delivery | null>(null);
   const [replayingDead, setReplayingDead] = useState(false);
+  const [sending, setSending] = useState<Delivery | null>(null);
+  const [discarding, setDiscarding] = useState<Delivery | null>(null);
+  const [bulk, setBulk] = useState<'send' | 'discard' | null>(null);
+  const channels = useChannelsOverview();
   const recipientId = useDebounced(contact.trim(), 300);
 
   const filters = {
@@ -324,9 +366,21 @@ export const DeliveriesPage = () => {
     queryFn: () => api.get<{ counts: Record<string, number> }>('deliveries/counts'),
   });
 
+  // Held deliveries are sent or discarded by channel and type, so the bulk actions count by those.
+  const selection = { channel: filters.channel, type: filters.type };
+  const heldCounts = useQuery({
+    queryKey: ['deliveries', 'counts', selection],
+    queryFn: () =>
+      api.get<{ counts: Record<string, number> }>(`deliveries/counts${query(selection)}`),
+  });
+
   const byStatus = counts.data?.counts ?? {};
   const all = Object.values(byStatus).reduce((sum, n) => sum + n, 0);
   const dead = unfiltered.data?.counts.dead ?? 0;
+  const heldTotal = heldCounts.data?.counts.held ?? 0;
+  const canAct = channels.data?.canPause ?? false;
+  const isPaused = (key: Channel) =>
+    channels.data?.channels.some((c) => c.channel === key && c.paused !== null) ?? false;
 
   const invalidate = () => client.invalidateQueries({ queryKey: ['deliveries'] });
   const replay = useMutation({
@@ -340,6 +394,26 @@ export const DeliveriesPage = () => {
     mutationFn: () => api.post<{ requeued: number }>('deliveries/replay-dead'),
     onSuccess: () => void invalidate(),
   });
+  const actOnHeld = useMutation({
+    mutationFn: ({ action, ...body }: { action: 'send' | 'discard' } & HeldSelection) =>
+      api.post(`deliveries/held/${action}`, body),
+    onSuccess: () => {
+      void invalidate();
+      void client.invalidateQueries({ queryKey: ['delivery'] });
+    },
+  });
+  const held: HeldActions = {
+    canAct,
+    isPaused,
+    onSend: setSending,
+    onDiscard: setDiscarding,
+  };
+  const scope = [
+    filters.channel ? CHANNEL_LABELS[filters.channel].toLowerCase() : null,
+    filters.type,
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <>
@@ -349,12 +423,24 @@ export const DeliveriesPage = () => {
           title="Deliveries"
           description="One row per notification and channel, latest change first"
           actions={
-            dead > 0 ? (
-              <Button variant="outline" size="sm" onClick={() => setReplayingDead(true)}>
-                <RotateCcw /> Replay {formatNumber(dead)} dead{' '}
-                {dead === 1 ? 'delivery' : 'deliveries'}
-              </Button>
-            ) : null
+            <>
+              {canAct && heldTotal > 0 ? (
+                <>
+                  <Button variant="outline" size="sm" onClick={() => setBulk('discard')}>
+                    <Trash2 /> Discard {formatNumber(heldTotal)} held
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setBulk('send')}>
+                    <Send /> Send {formatNumber(heldTotal)} held
+                  </Button>
+                </>
+              ) : null}
+              {dead > 0 ? (
+                <Button variant="outline" size="sm" onClick={() => setReplayingDead(true)}>
+                  <RotateCcw /> Replay {formatNumber(dead)} dead{' '}
+                  {dead === 1 ? 'delivery' : 'deliveries'}
+                </Button>
+              ) : null}
+            </>
           }
         />
 
@@ -520,6 +606,24 @@ export const DeliveriesPage = () => {
                             Replay delivery
                           </DropdownMenuItem>
                         ) : null}
+                        {delivery.status === 'held' && canAct ? (
+                          <>
+                            <DropdownMenuItem
+                              disabled={isPaused(delivery.channel)}
+                              onClick={() => setSending(delivery)}
+                            >
+                              {isPaused(delivery.channel)
+                                ? `Resume ${CHANNEL_LABELS[delivery.channel].toLowerCase()} to send`
+                                : 'Send delivery'}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              variant="destructive"
+                              onClick={() => setDiscarding(delivery)}
+                            >
+                              Discard delivery
+                            </DropdownMenuItem>
+                          </>
+                        ) : null}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </DataCell>
@@ -545,6 +649,46 @@ export const DeliveriesPage = () => {
         deliveryId={selected}
         onClose={() => setSelected(null)}
         onReplay={setReplaying}
+        held={held}
+      />
+
+      <ConfirmDialog
+        open={sending !== null}
+        onOpenChange={(open) => !open && setSending(null)}
+        title="Send this held delivery?"
+        description={
+          sending
+            ? `The ${CHANNEL_LABELS[sending.channel]} delivery of ${sending.type} to ${sending.recipientId} goes on the queue, held since ${formatRelative(sending.updatedAt)}.`
+            : null
+        }
+        action="Send delivery"
+        onConfirm={() => actOnHeld.mutateAsync({ action: 'send', ids: [sending?.id ?? ''] })}
+      />
+
+      <ConfirmDialog
+        open={discarding !== null}
+        onOpenChange={(open) => !open && setDiscarding(null)}
+        title="Discard this held delivery?"
+        description={
+          discarding
+            ? `The ${CHANNEL_LABELS[discarding.channel]} delivery of ${discarding.type} to ${discarding.recipientId} never goes out, and shows as skipped. It can’t be undone.`
+            : null
+        }
+        action="Discard delivery"
+        onConfirm={() => actOnHeld.mutateAsync({ action: 'discard', ids: [discarding?.id ?? ''] })}
+      />
+
+      <ConfirmDialog
+        open={bulk !== null}
+        onOpenChange={(open) => !open && setBulk(null)}
+        title={`${bulk === 'send' ? 'Send' : 'Discard'} ${formatNumber(heldTotal)} held ${scope ? `${scope} ` : ''}${heldTotal === 1 ? 'delivery' : 'deliveries'}?`}
+        description={
+          bulk === 'send'
+            ? `They go on the queue, up to 500 at a time. A channel that is still paused keeps its own until you resume it.`
+            : `They never go out, and show as skipped, up to 500 at a time. It can’t be undone.`
+        }
+        action={bulk === 'send' ? 'Send held' : 'Discard held'}
+        onConfirm={() => actOnHeld.mutateAsync({ action: bulk ?? 'send', ...selection })}
       />
 
       <ConfirmDialog

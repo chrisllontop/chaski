@@ -13,7 +13,7 @@ import { useAdminEvents } from './lib/events';
 import type { Channel, DeliveryStatus } from './lib/types';
 import type { DeliverySearch } from './routes/deliveries';
 
-const STATUSES: DeliveryStatus[] = ['pending', 'sent', 'failed', 'dead', 'skipped'];
+const STATUSES: DeliveryStatus[] = ['pending', 'held', 'sent', 'failed', 'dead', 'skipped'];
 const CHANNELS: Channel[] = ['email', 'in_app', 'push'];
 
 const Layout = () => {

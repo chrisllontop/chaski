@@ -10,6 +10,7 @@ const QUERY_KEYS: Record<string, string[][]> = {
   deliveries: [['deliveries'], ['delivery']],
   metrics: [['metrics']],
   templates: [['templates'], ['template']],
+  channels: [['channels']],
 };
 
 const invalidate = (client: QueryClient, topics: string[]) => {

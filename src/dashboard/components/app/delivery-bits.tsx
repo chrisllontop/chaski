@@ -9,6 +9,7 @@ const STATUS: Record<DeliveryStatus, { label: string; tone: Tone }> = {
   failed: { label: 'Failed', tone: 'danger' },
   dead: { label: 'Dead', tone: 'danger' },
   skipped: { label: 'Skipped', tone: 'neutral' },
+  held: { label: 'Held', tone: 'warning' },
 };
 
 export const STATUS_LABELS = Object.fromEntries(
