@@ -43,7 +43,7 @@ export interface ChaskiTemplatesApi {
    * file is validated here, so a JSON import whose fields TypeScript widens to strings fits.
    */
   import(file: unknown, options?: { preview?: boolean }): Promise<TemplateImportResult>;
-  /** Every live template, as the file `import` takes and the dashboard exports. */
+  /** Every live template, as the file `import` takes. */
   export(): Promise<TemplateFile>;
 }
 

@@ -3,20 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { TemplateFile } from '../src';
 import { getClient } from '../src/server/db';
 import { chaski } from './fixture/worker';
-import { api, recipient } from './helpers';
-
-const exported = async () => {
-  const response = await api('/templates/export');
-  return { response, data: (await response.json()) as TemplateFile };
-};
-
-const importTemplates = async (data: unknown, query = '') => {
-  const response = await api(`/templates/import${query}`, {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
-  return { status: response.status, body: (await response.json()) as Record<string, unknown> };
-};
+import { recipient } from './helpers';
 
 const updatedAt = async (type: string) =>
   (await getClient().templates.findFirst({ where: { type } }))?.updatedAt.getTime();
@@ -44,34 +31,35 @@ const FILE: TemplateFile = {
   ],
 };
 
-describe('template export and import', () => {
+// A host, or an agent setting Chaski up, writes its templates as a file and loads it from code:
+// a seed script, a deploy job, its own tests.
+describe('template import and export', () => {
   it('imports what it exported, unchanged', async () => {
-    await importTemplates(FILE);
-    const before = await exported();
-    expect(before.response.headers.get('content-disposition')).toContain('chaski-templates.json');
+    await chaski.templates.import(FILE);
+    const before = await chaski.templates.export();
 
     await wipeTemplates();
-    expect(await importTemplates(before.data)).toEqual({
-      status: 200,
-      body: {
-        applied: true,
-        changes: [
-          { type: 'payment_received', change: 'create', fields: [], warnings: [] },
-          { type: 'welcome', change: 'create', fields: [], warnings: [] },
-        ],
-      },
+    expect(await chaski.templates.import(before)).toEqual({
+      applied: true,
+      changes: [
+        { type: 'payment_received', change: 'create', fields: [], warnings: [] },
+        { type: 'welcome', change: 'create', fields: [], warnings: [] },
+      ],
     });
 
-    expect((await exported()).data).toEqual(before.data);
+    expect(await chaski.templates.export()).toEqual(before);
+    await expect(
+      chaski.send({ type: 'payment_received', recipient: recipient(), payload: { amount: 1 } }),
+    ).resolves.toMatchObject({ outcome: 'delivered' });
   });
 
   it('changes nothing when the same file is imported twice', async () => {
-    await importTemplates(FILE);
+    await chaski.templates.import(FILE);
     const stamped = await updatedAt('payment_received');
 
-    const again = await importTemplates(FILE);
+    const again = await chaski.templates.import(FILE);
 
-    expect(again.body.changes).toEqual([
+    expect(again.changes).toEqual([
       { type: 'payment_received', change: 'unchanged', fields: [], warnings: [] },
       { type: 'welcome', change: 'unchanged', fields: [], warnings: [] },
     ]);
@@ -81,10 +69,10 @@ describe('template export and import', () => {
   });
 
   it('previews what an import would change without writing anything', async () => {
-    await importTemplates(FILE);
-    const before = await exported();
+    await chaski.templates.import(FILE);
+    const before = await chaski.templates.export();
 
-    const preview = await importTemplates(
+    const preview = await chaski.templates.import(
       {
         ...FILE,
         templates: [
@@ -100,32 +88,29 @@ describe('template export and import', () => {
           { type: 'invoice_due', channels: [] },
         ],
       },
-      '?preview=true',
+      { preview: true },
     );
 
     expect(preview).toEqual({
-      status: 200,
-      body: {
-        applied: false,
-        changes: [
-          {
-            type: 'payment_received',
-            change: 'update',
-            fields: ['topic', 'channels.email.subject', 'channels.push'],
-            warnings: [],
-          },
-          { type: 'welcome', change: 'unchanged', fields: [], warnings: [] },
-          { type: 'invoice_due', change: 'create', fields: [], warnings: [] },
-        ],
-      },
+      applied: false,
+      changes: [
+        {
+          type: 'payment_received',
+          change: 'update',
+          fields: ['topic', 'channels.email.subject', 'channels.push'],
+          warnings: [],
+        },
+        { type: 'welcome', change: 'unchanged', fields: [], warnings: [] },
+        { type: 'invoice_due', change: 'create', fields: [], warnings: [] },
+      ],
     });
-    expect((await exported()).data).toEqual(before.data);
+    expect(await chaski.templates.export()).toEqual(before);
   });
 
   it('overwrites a template of the same type', async () => {
-    await importTemplates(FILE);
+    await chaski.templates.import(FILE);
 
-    await importTemplates({
+    await chaski.templates.import({
       ...FILE,
       templates: [
         {
@@ -136,7 +121,7 @@ describe('template export and import', () => {
       ],
     });
 
-    const [payment] = (await exported()).data.templates ?? [];
+    const [payment] = (await chaski.templates.export()).templates ?? [];
     expect(payment).toMatchObject({ topic: 'payments', description: null });
     expect(payment?.channels).toEqual([
       expect.objectContaining({ channel: 'email', enabled: false, subject: 'Received' }),
@@ -145,60 +130,33 @@ describe('template export and import', () => {
   });
 
   it('says where a file is wrong', async () => {
-    const { status, body } = await importTemplates({
-      format: 'chaski.templates',
-      version: 1,
-      templates: [{ type: 'ok' }, { type: 'bad type!' }],
+    await expect(
+      chaski.templates.import({
+        format: 'chaski.templates',
+        version: 1,
+        templates: [{ type: 'ok' }, { type: 'bad type!' }],
+      }),
+    ).rejects.toMatchObject({
+      code: 'validation',
+      message: expect.stringMatching(/^templates\.1\.type: /),
     });
-
-    expect(status).toBe(400);
-    expect(body.message).toMatch(/^templates\.1\.type: /);
   });
 
   it('refuses a file that lists a type twice', async () => {
-    const { status, body } = await importTemplates({
-      ...FILE,
-      templates: [{ type: 'welcome' }, { type: 'welcome' }],
+    await expect(
+      chaski.templates.import({ ...FILE, templates: [{ type: 'welcome' }, { type: 'welcome' }] }),
+    ).rejects.toMatchObject({
+      message: "templates.1.type: type 'welcome' appears more than once",
     });
-
-    expect(status).toBe(400);
-    expect(body.message).toBe("templates.1.type: type 'welcome' appears more than once");
   });
 
   it('refuses another format or version', async () => {
-    expect((await importTemplates({ ...FILE, version: 2 })).status).toBe(400);
-    expect((await importTemplates({ ...FILE, format: 'other' })).status).toBe(400);
-  });
-});
-
-// A host seeds and versions its templates from code (a seed script, CI, its own tests) without
-// signing in to the dashboard.
-describe('templates from the server', () => {
-  it('imports a template file in process, after a preview that writes nothing', async () => {
-    const preview = await chaski.templates.import(FILE, { preview: true });
-    expect(preview).toEqual({
-      applied: false,
-      changes: [
-        { type: 'payment_received', change: 'create', fields: [], warnings: [] },
-        { type: 'welcome', change: 'create', fields: [], warnings: [] },
-      ],
+    await expect(chaski.templates.import({ ...FILE, version: 2 })).rejects.toMatchObject({
+      code: 'validation',
     });
-    expect(await getClient().templates.count({ where: {} })).toBe(0);
-
-    expect(await chaski.templates.import(FILE)).toMatchObject({ applied: true });
-    expect((await chaski.templates.import(FILE)).changes.map((c) => c.change)).toEqual([
-      'unchanged',
-      'unchanged',
-    ]);
-    await expect(
-      chaski.send({ type: 'payment_received', recipient: recipient(), payload: { amount: 1 } }),
-    ).resolves.toMatchObject({ outcome: 'delivered' });
-  });
-
-  it('exports the same file the dashboard does', async () => {
-    await chaski.templates.import(FILE);
-
-    expect(await chaski.templates.export()).toEqual((await exported()).data);
+    await expect(chaski.templates.import({ ...FILE, format: 'other' })).rejects.toMatchObject({
+      code: 'validation',
+    });
   });
 
   it('works over the service binding', async () => {
@@ -209,15 +167,6 @@ describe('templates from the server', () => {
       'payment_received',
       'welcome',
     ]);
-  });
-
-  it('says where a file is wrong', async () => {
-    await expect(
-      chaski.templates.import({ ...FILE, templates: [{ type: 'bad type!' }] }),
-    ).rejects.toMatchObject({
-      code: 'validation',
-      message: expect.stringMatching(/^templates\.0\.type: /),
-    });
   });
 });
 

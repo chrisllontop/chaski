@@ -2,10 +2,10 @@ import { z } from 'zod';
 import { channelSchema, typeNameSchema } from './contract';
 import { htmlEntities, isPlainTextField } from './html-entities';
 
-// The file the dashboard downloads and uploads to carry templates between
-// environments, staging to production say. Templates are keyed by type, so
-// uploading the same file twice changes nothing; format and version let a
-// later Chaski read an older file and refuse one it does not know.
+// The file that carries templates from a repository, or from another
+// environment, into Chaski through chaski.templates.import(). Templates are
+// keyed by type, so loading the same file twice changes nothing; format and
+// version let a later Chaski read an older file and refuse one it does not know.
 export const TEMPLATE_FILE_FORMAT = 'chaski.templates';
 export const TEMPLATE_FILE_VERSION = 1;
 

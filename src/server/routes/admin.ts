@@ -78,8 +78,6 @@ const previewSchema = z.object({
     .optional(),
 });
 
-const importQuerySchema = z.object({ preview: z.stringbool().default(false) });
-
 const metricsQuerySchema = z.object({ period: z.enum(METRIC_PERIODS).default('30d') });
 
 export const admin = new Hono();
@@ -94,7 +92,7 @@ const READ_ONLY_POSTS = /\/preview(\/document)?$/;
 admin.use(async (c, next) => {
   await next();
   if (c.req.method === 'GET' || c.req.method === 'HEAD') return;
-  if (READ_ONLY_POSTS.test(c.req.path) || c.req.query('preview') === 'true') return;
+  if (READ_ONLY_POSTS.test(c.req.path)) return;
   log.info('admin action', {
     actor: actorOf(c)?.id,
     method: c.req.method,
@@ -106,16 +104,6 @@ admin.use(async (c, next) => {
 admin.get('/me', (c) => c.json({ actor: actorOf(c) ?? null }));
 
 admin.get('/templates', async (c) => c.json({ templates: await TemplateService.list() }));
-
-admin.get('/templates/export', async (c) => {
-  c.header('content-disposition', 'attachment; filename="chaski-templates.json"');
-  return c.json(await TemplateService.exportFile());
-});
-
-admin.post('/templates/import', async (c) => {
-  const { preview } = parseInput(importQuerySchema, c.req.query());
-  return c.json(await TemplateService.importFile(await c.req.json(), { preview }));
-});
 
 admin.get('/templates/deleted', async (c) =>
   c.json({ templates: await TemplateService.listDeleted() }),

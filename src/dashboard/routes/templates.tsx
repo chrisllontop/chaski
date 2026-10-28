@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { cn } from 'cn';
-import { Download, FileText, MoreHorizontal, Plus, Upload } from 'lucide-react';
-import { type ChangeEvent, useRef, useState } from 'react';
+import { FileText, MoreHorizontal, Plus } from 'lucide-react';
+import { useState } from 'react';
 import { ConfirmDialog } from '~/components/app/confirm-dialog';
 import {
   DataBody,
@@ -16,7 +16,6 @@ import {
 } from '~/components/app/data-table';
 import { CHANNEL_ICONS, HealthBadge } from '~/components/app/delivery-bits';
 import { ErrorAlert, PageHeader } from '~/components/app/page';
-import { Pill, type Tone } from '~/components/app/pill';
 import { SiteHeader } from '~/components/app/site-header';
 import { Button } from '~/components/ui/button';
 import {
@@ -48,14 +47,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs';
 import { ApiError, api } from '~/lib/api';
 import { CHANNEL_LABELS, formatDateTime, formatNumber, formatRelative } from '~/lib/format';
 import { healthByType } from '~/lib/health';
-import type {
-  Channel,
-  DeletedTemplate,
-  Health,
-  TemplateChange,
-  TemplateSummary,
-  TypeOutcome,
-} from '~/lib/types';
+import type { Channel, DeletedTemplate, Health, TemplateSummary, TypeOutcome } from '~/lib/types';
 
 const CHANNELS: Channel[] = ['email', 'in_app', 'push'];
 
@@ -199,86 +191,6 @@ const NewTemplateDialog = ({
   );
 };
 
-// ─── Import ───
-
-const CHANGE: Record<TemplateChange['change'], { label: string; tone: Tone }> = {
-  create: { label: 'Create', tone: 'success' },
-  update: { label: 'Update', tone: 'info' },
-  unchanged: { label: 'Unchanged', tone: 'neutral' },
-};
-
-const ImportDialog = ({
-  file,
-  onClose,
-}: {
-  file: { name: string; content: unknown } | null;
-  onClose: () => void;
-}) => {
-  const client = useQueryClient();
-  const preview = useQuery({
-    queryKey: ['templates', 'import-preview', file?.name, file?.content],
-    queryFn: () =>
-      api.post<{ changes: TemplateChange[] }>('templates/import?preview=true', file?.content),
-    enabled: file !== null,
-    retry: false,
-  });
-  const apply = useMutation({
-    mutationFn: () => api.post('templates/import', file?.content),
-    onSuccess: () => {
-      void client.invalidateQueries({ queryKey: ['templates'] });
-      onClose();
-    },
-  });
-  const changes = preview.data?.changes ?? [];
-  const count = changes.filter((change) => change.change !== 'unchanged').length;
-  return (
-    <Dialog open={file !== null} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Import templates</DialogTitle>
-          <DialogDescription>
-            {file?.name}. Templates are matched by type; channels the file leaves out keep their
-            content.
-          </DialogDescription>
-        </DialogHeader>
-        {preview.error ? <ErrorAlert error={preview.error} /> : null}
-        <ul className="max-h-80 divide-y overflow-y-auto rounded-md border text-[13px]">
-          {changes.map((change) => (
-            <li key={change.type} className="flex items-center justify-between gap-3 px-3 py-2.5">
-              <div className="min-w-0">
-                <div className="font-mono text-xs">{change.type}</div>
-                {change.fields.length > 0 ? (
-                  <div className="text-muted-foreground text-xs">
-                    Overwrites {change.fields.join(', ')}
-                  </div>
-                ) : null}
-                {change.warnings.map((warning) => (
-                  <div key={warning.field} className="text-warning text-xs">
-                    {warning.field} is plain text: {warning.entities.join(', ')} will appear as
-                    typed
-                  </div>
-                ))}
-              </div>
-              <Pill tone={CHANGE[change.change].tone}>{CHANGE[change.change].label}</Pill>
-            </li>
-          ))}
-        </ul>
-        {apply.error ? <ErrorAlert error={apply.error} /> : null}
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button disabled={count === 0 || apply.isPending} onClick={() => apply.mutate()}>
-            {count === 0
-              ? 'Nothing to import'
-              : `Import ${formatNumber(count)} ${count === 1 ? 'change' : 'changes'}`}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-};
-
 // ─── Page ───
 
 const TypeHealth = ({ health }: { health: Health | undefined }) =>
@@ -291,10 +203,7 @@ const TypeHealth = ({ health }: { health: Health | undefined }) =>
 export const TemplatesPage = () => {
   const client = useQueryClient();
   const navigate = useNavigate();
-  const fileInput = useRef<HTMLInputElement>(null);
   const [creating, setCreating] = useState(false);
-  const [importing, setImporting] = useState<{ name: string; content: unknown } | null>(null);
-  const [importError, setImportError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<TemplateSummary | null>(null);
   const [purging, setPurging] = useState<DeletedTemplate | null>(null);
 
@@ -326,40 +235,11 @@ export const TemplatesPage = () => {
     onSuccess: refresh,
   });
 
-  const readFile = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
-    try {
-      setImportError(null);
-      setImporting({ name: file.name, content: JSON.parse(await file.text()) });
-    } catch {
-      setImportError(`${file.name} isn’t a JSON file.`);
-    }
-  };
-
   const templates = live.data?.templates ?? [];
   const actions = (
-    <>
-      <input
-        ref={fileInput}
-        type="file"
-        accept="application/json,.json"
-        className="hidden"
-        onChange={readFile}
-      />
-      <Button variant="outline" size="sm" onClick={() => fileInput.current?.click()}>
-        <Upload /> Import
-      </Button>
-      <Button variant="outline" size="sm" asChild>
-        <a href={api.url('templates/export')} download>
-          <Download /> Export
-        </a>
-      </Button>
-      <Button size="sm" onClick={() => setCreating(true)}>
-        <Plus /> New template
-      </Button>
-    </>
+    <Button size="sm" onClick={() => setCreating(true)}>
+      <Plus /> New template
+    </Button>
   );
 
   return (
@@ -371,7 +251,6 @@ export const TemplatesPage = () => {
           description="The content of every notification type"
           actions={actions}
         />
-        {importError ? <p className="text-destructive text-sm">{importError}</p> : null}
         {live.error ? <ErrorAlert error={live.error} /> : null}
 
         {live.data && templates.length === 0 && (deleted.data?.templates.length ?? 0) === 0 ? (
@@ -381,17 +260,11 @@ export const TemplatesPage = () => {
                 <FileText />
               </EmptyMedia>
               <EmptyTitle>No templates yet</EmptyTitle>
-              <EmptyDescription>
-                Sends need a template for their type. Create one, or import a file exported from
-                another environment.
-              </EmptyDescription>
+              <EmptyDescription>Sends need a template for their type.</EmptyDescription>
             </EmptyHeader>
             <EmptyContent className="flex-row justify-center">
               <Button onClick={() => setCreating(true)}>
                 <Plus /> New template
-              </Button>
-              <Button variant="outline" onClick={() => fileInput.current?.click()}>
-                <Upload /> Import
               </Button>
             </EmptyContent>
           </Empty>
@@ -557,7 +430,6 @@ export const TemplatesPage = () => {
       </div>
 
       <NewTemplateDialog open={creating} onOpenChange={setCreating} />
-      <ImportDialog file={importing} onClose={() => setImporting(null)} />
 
       <ConfirmDialog
         open={deleting !== null}

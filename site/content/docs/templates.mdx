@@ -57,15 +57,11 @@ The editor previews each channel as you type, rendered with sample data you keep
 template. For email, **Send test** delivers the saved content, rendered with the sample data, to the
 address you enter.
 
-## Move templates between environments
+## Keep templates in a file
 
-**Export** downloads every template as a JSON file, and **Import** applies one, staging to
-production say. Templates are keyed by type, so importing the same file twice changes nothing, and
-the import shows what it creates and updates before it applies anything. Channels the file leaves
-out are never touched.
-
-The same file loads from code, so templates can live in your repository and reach an environment
-from a seed route, your tests or another Worker, without signing in to the dashboard:
+Templates can also live in your repository, as a JSON file that `chaski.templates.import()` loads
+from a seed route, a deploy job, your tests or another Worker. Templates are keyed by type, so
+loading the same file twice changes nothing, and channels the file leaves out are never touched.
 
 ```ts title="src/seed.ts"
 import templates from '../chaski-templates.json';
@@ -74,11 +70,12 @@ import templates from '../chaski-templates.json';
 const result = await chaski.templates.import(templates);
 ```
 
-`{ preview: true }` reports the changes without applying them, and `chaski.templates.export()`
-returns the file the dashboard downloads. To load the file with no Worker running, before
-`wrangler dev` or from a deploy job, turn it into SQL with `npx chaskijs templates sql` and run it
-with `wrangler d1 execute`: [Local development](/docs/local-development#seed-the-templates) has
-the script.
+`{ preview: true }` reports the changes without applying them. A load overwrites the types the
+file holds, edits made in the dashboard included, so bring those into the file first:
+`chaski.templates.export()` returns every template in this format. To load the file with no Worker
+running, before `wrangler dev` or from a deploy job, turn it into SQL with
+`npx chaskijs templates sql` and run it with `wrangler d1 execute`:
+[Local development](/docs/local-development#seed-the-templates) has the script.
 
 ```json title="chaski-templates.json"
 {

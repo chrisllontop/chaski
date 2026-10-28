@@ -24,8 +24,8 @@ description: The in-process API your Worker calls, the routes Chaski mounts and 
 | `push.register(request)` | `{ id }` | Registers a web push subscription or an iOS device token. |
 | `push.unregister(query)` | `{ unregistered }` | By `recipientId`, `endpoint` or `deviceToken`. |
 | `push.vapidPublicKey()` | `{ publicKey }` | The key for `pushManager.subscribe()`, or `null`. |
-| `templates.import(file, { preview? })` | `TemplateImportResult` | Creates or updates templates by type from a [template file](/docs/templates#move-templates-between-environments); `preview` only reports. |
-| `templates.export()` | `TemplateFile` | Every template, as the file the dashboard exports. |
+| `templates.import(file, { preview? })` | `TemplateImportResult` | Creates or updates templates by type from a [template file](/docs/templates#keep-templates-in-a-file); `preview` only reports. |
+| `templates.export()` | `TemplateFile` | Every template, as the file `templates.import()` takes. |
 
 `ready()` suits a health route: it asks the database each time, so a database that doesn’t answer
 fails it too. `templates` counts the templates outside the trash; at `0`, every send is refused as

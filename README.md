@@ -288,10 +288,11 @@ plus `recipient`:
 Thanks, {{ recipient.name }}. We received your payment of {{ amount }}.
 ```
 
-Templates can also live in your repository: export them from the dashboard, then load the file
-from your tests or another Worker with `await chaski.templates.import(file)`, which creates or
-updates them by type. Before `wrangler dev` starts, or from a deploy job, `npx chaskijs templates
-sql chaski-templates.json` turns the file into SQL for `wrangler d1 execute --file`.
+Templates can also live in your repository as a
+[template file](https://chaski.sh/docs/templates#keep-templates-in-a-file), loaded from your tests
+or another Worker with `await chaski.templates.import(file)`, which creates or updates them by
+type. Before `wrangler dev` starts, or from a deploy job, `npx chaskijs templates sql
+chaski-templates.json` turns the file into SQL for `wrangler d1 execute --file`.
 
 Then send from anywhere in your Worker:
 
