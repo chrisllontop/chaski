@@ -233,7 +233,10 @@ open-tracking link from it, and accepts writes from its origin.
 - `basicAuth({ username, password })` asks the browser for one username and password; read them
   from secrets.
 
-Admin actions in the dashboard are recorded under the `id` that `authorize` returns.
+Admin actions in the dashboard are recorded under the `id` that `authorize` returns. Add
+`canPauseChannels: (c, actor) => boolean` next to `authorize` for who may
+[pause a channel](https://chaski.sh/docs/dashboard#pause-a-channel), the dashboard’s emergency
+brake; without it nobody can.
 
 `userRoutes` reads the contact from `identify` only, never from what the browser sends. If your frontend is
 served from another origin, list it in `allowedOrigins`: Chaski refuses writes and live

@@ -79,6 +79,7 @@ Type errors:
 | `scheduledAt is in the past` | The time passed more than five minutes ago. |
 | `an inline send delivers one email: it needs transactional: true and channels: ['email']` | Add both, or drop `inline`. |
 | `the inline email would be skipped: <reason>` | The send recorded nothing; `missing_email` means the `recipient` has no `email`, `no_template` that the template has no enabled email content. |
+| `channel_paused`: `the email channel is paused: delivery <id> is held until someone sends or discards it in the dashboard` | Someone paused email under **Channels**. The email waits under **Deliveries**, **Held**; resuming the channel and sending it, or the same send with its `idempotencyKey` once email runs again, lets it go out. |
 | `delivery_failed`: `the email didn't go out: <provider error> (<code>, delivery <id>)` | An inline send the provider refused or couldn’t take; the delivery is `failed` in the dashboard with the same error. `sender_not_verified` and `sender_domain_not_available` are the setup’s to fix (the domain onboarded to Email Service), `recipient_suppressed` the address’s. |
 
 A delivery skipped at send time carries its reason:
@@ -93,6 +94,10 @@ A delivery skipped at send time carries its reason:
 
 A send whose `outcome` is `suppressed` was skipped everywhere by preferences; `undeliverable`
 was skipped everywhere for one of the other reasons.
+
+**Deliveries show `held`.** Their channel is paused under **Channels**, the dashboard’s emergency
+brake, and `chaski.ready()` lists it under `paused`. They wait until someone resumes the channel
+and sends them, or discards them; only an actor `canPauseChannels` allows can do either.
 
 **Deliveries stay `pending`.** Nothing consumes the queue. Check that the Wrangler config has a
 `queues.consumers` entry for the same queue as Chaski’s producer, that the default export has a
