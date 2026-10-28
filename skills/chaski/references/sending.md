@@ -23,28 +23,62 @@ A channel goes out only when the template has it `enabled`. A template can also 
 `description`, a `topic` that groups it on the user’s preferences screen, and `sampleData`, a
 string of JSON the dashboard previews it with.
 
-Templates live in Chaski’s database: the user writes them in the dashboard under **Templates**,
-**New template**, with a live preview. A project can also keep them in its repository as the file
-the dashboard exports, and load it from its tests or another Worker with
-`chaski.templates.import(file)` (`{ preview: true }` reports without applying; over RPC,
-`env.CHASKI.templates().import(file)`). With no Worker running, `npx chaskijs templates sql
-<file>` prints SQL that applies the file the same way, for `wrangler d1 execute --local --file`
-before `wrangler dev`, or `--remote` from a deploy job once the user agrees; run Chaski’s
-migrations first. Otherwise, when a template comes from code, hand the user
-its fields to paste, channel by channel:
+### The template file
 
-```text
-Type         payment_received
-Topic        billing
-Sample data  {"amount": "$15.00", "recipient": {"name": "Ana"}}
+Templates live in Chaski’s database and reach it from a **template file** in the project:
+`chaski-templates.json` at its root, one entry per type. Write the templates there, load the file,
+and have the user check each one under **Templates** in the dashboard, whose preview renders it
+with its `sampleData`.
 
-email    subject   We received {{ amount }}
-         body      <p>Thanks, {{ recipient.name }}. We received {{ amount }}.</p>
-         textBody  Thanks, {{ recipient.name }}. We received {{ amount }}.
-in_app   subject   Payment received
-         body      We received {{ amount }}.
-         textBody  /payments
+```json title="chaski-templates.json"
+{
+  "format": "chaski.templates",
+  "version": 1,
+  "templates": [
+    {
+      "type": "payment_received",
+      "topic": "billing",
+      "sampleData": "{\"amount\": \"$15.00\", \"recipient\": {\"name\": \"Ana\"}}",
+      "channels": [
+        {
+          "channel": "email",
+          "enabled": true,
+          "subject": "We received {{ amount }}",
+          "body": "<p>Thanks, {{ recipient.name }}. We received {{ amount }}.</p>",
+          "textBody": "Thanks, {{ recipient.name }}. We received {{ amount }}."
+        },
+        {
+          "channel": "in_app",
+          "enabled": true,
+          "subject": "Payment received",
+          "body": "We received {{ amount }}.",
+          "textBody": "/payments"
+        }
+      ]
+    }
+  ]
+}
 ```
+
+Load it into the local database, after Chaski’s migrations:
+
+```sh
+npx chaskijs templates sql chaski-templates.json > .wrangler/chaski-templates.sql
+npx wrangler d1 execute CHASKI_DB --local --file .wrangler/chaski-templates.sql
+```
+
+- **Loaded** when both commands exit 0 and **Templates** lists every type in the file.
+  `chaskijs templates sql` stops at a file it can’t load (Liquid that doesn’t parse, a type listed
+  twice) and names the type, channel and field; fix the file and run both again.
+- **Loading again** changes nothing for the types that match. A type that differs takes the
+  file’s fields, overwriting what the user edited in the dashboard. Once the user edits there,
+  bring the file up to date from `chaski.templates.export()`, or load a file with only the new
+  types.
+- **Production** runs the same two commands with `--remote` in place of `--local`, after
+  `wrangler d1 migrations apply CHASKI_DB --remote`. They write to the user’s database: ask first.
+- **From the host’s code**, `chaski.templates.import(file)` applies the same file (a seed route,
+  the host’s tests), and `{ preview: true }` reports what it would change without writing. Over
+  RPC: `env.CHASKI.templates().import(file)`.
 
 ### Liquid
 
@@ -55,13 +89,13 @@ Templates are [Liquid](https://liquidjs.com). They see the send’s `payload` at
 - An email `body` escapes every value for HTML on its own. A value that holds HTML on purpose
   goes through `raw`: `{{ summary_html | raw }}`. The subject, the text body, in-app and push
   are plain text and stay as written, HTML entities included: `&middot;` reaches the inbox as
-  typed. The import's result lists them per field under `warnings` (the dashboard and
-  `chaskijs templates sql` show them too); write the characters themselves.
+  typed. Write the characters themselves: `chaskijs templates sql` prints a warning for each
+  entity left, and `templates.import()` lists them under `warnings`.
 - Loops and conditions: `{% for item in items %}…{% endfor %}`, `{% if overdue %}…{% endif %}`.
   Only `nil` and `false` are false: test a list with `{% if items.size > 0 %}` and a string with
   `{% if name != blank %}`.
-- Liquid that doesn’t parse is rejected when the template is saved, and fails its delivery at once
-  instead of retrying.
+- Liquid that doesn’t parse is rejected when the template is saved or loaded, and fails its
+  delivery at once instead of retrying.
 
 ## Send
 

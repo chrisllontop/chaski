@@ -10,7 +10,8 @@ https://chaski.sh/docs/errors.
 Chaski checks the config on every call. The message starts with `Chaski config:`.
 `await chaski.ready()` runs the same checks, and the migrations’, without sending anything: call it
 from a temporary route, or the project’s health route, to see the error. Its `templates` count at
-`0` means every send will be refused as an unknown type: load the templates (sending.md).
+`0` means every send will be refused as an unknown type: load the template file
+([sending.md](sending.md)).
 
 | Message | Fix |
 | --- | --- |
@@ -72,7 +73,7 @@ Type errors:
 
 | The send throws | Fix |
 | --- | --- |
-| `unknown notification type '<type>': register a template for it before sending` | Have the user create the template in the dashboard ([sending.md](sending.md)). |
+| `unknown notification type '<type>': register a template for it before sending` | Add the type to the template file and load it ([sending.md](sending.md)). |
 | `channels not configured: <channels>` | The send’s `channels` lists a channel the config doesn’t turn on. |
 | `scheduledAt must be ISO 8601 with an explicit offset (Z or ±hh:mm)` | Add the offset: `2026-11-01T09:00:00-05:00` or `…Z`. |
 | `scheduledAt is in the past` | The time passed more than five minutes ago. |

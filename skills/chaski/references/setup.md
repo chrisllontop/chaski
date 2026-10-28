@@ -480,13 +480,11 @@ project’s dev command, then check each of these, in order:
    (`-b 'session=…'`) for its own sign-in, nothing with the local Access bypass.
 2. **Chaski read the config.** Ask the user to open the dashboard’s **Channels** page: it says dry
    run is on and shows the channels they picked as enabled.
-3. **A template exists.** Sending a type without one fails. Ask the user to create a `welcome`
-   template under **Templates**, **New template**, with the channels they picked. Give them a
-   subject and a body to paste for each channel ([sending.md](sending.md) says what each field
-   holds), and wait until they confirm it’s saved. When the project keeps its templates in a file,
-   load it instead: `npx chaskijs templates sql <file> > .wrangler/chaski-templates.sql`, then
-   `npx wrangler d1 execute CHASKI_DB --local --file .wrangler/chaski-templates.sql`, after step 4’s
-   migrations.
+3. **A template exists.** Sending a type without one fails. Write a `welcome` template, with a
+   subject and a body for each channel the user picked, into a scratch template file,
+   `.wrangler/chaski-check.json`, and load it ([sending.md](sending.md) has the format and the
+   commands). The project’s `chaski-templates.json` holds the types it sends. **Templates**
+   lists `welcome`.
 4. **A send goes through.** Add a temporary route that only answers in dry run, and call it:
 
    ```ts
@@ -531,6 +529,9 @@ npx wrangler d1 migrations apply CHASKI_DB --remote
 npx wrangler secret put VAPID_PRIVATE_KEY            # and every other secret from .dev.vars
 npx wrangler deploy
 ```
+
+With the migrations applied, the project’s template file loads into production with `--remote`
+([sending.md](sending.md)); ask for that too.
 
 Before `deploy`, check that `CHASKI_PUBLIC_URL` in `vars` is the production URL of the mount,
 that `CHASKI_DRY_RUN` and `CHASKI_LOCAL_ADMIN` are unset in production, that the email domain is
