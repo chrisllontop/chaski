@@ -97,6 +97,7 @@ onError: (error, context) => {
 | Option | |
 | --- | --- |
 | `dashboard.authorize` | Required. Decides who gets into the dashboard; see [Dashboard and sign-in](/docs/dashboard). |
+| `dashboard.canPauseChannels` | `(c, actor) => boolean`. Who may pause a channel and send or discard what it holds; without it, nobody can. See [Pause a channel](/docs/dashboard#pause-a-channel). |
 
 ## userRoutes()
 

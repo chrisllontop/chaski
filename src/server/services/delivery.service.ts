@@ -6,11 +6,13 @@ import type { DeliveryMessage } from '../types';
 import { CHANNEL_DEFS } from './adapters/registry';
 import type { DeliveryRow } from './adapters/types';
 import { BaseService } from './base.service';
+import { ChannelService } from './channel.service';
 
 export type ProcessOutcome =
   | { status: 'sent' }
   | { status: 'failed' }
   | { status: 'ack' }
+  | { status: 'held' }
   | { status: 'retry'; delaySeconds: number };
 
 const BASE_DELAY_SECONDS = 30;
@@ -39,6 +41,13 @@ export class DeliveryService extends BaseService {
     }
     if (delivery.status !== 'pending') {
       return { status: 'ack' };
+    }
+    if (await ChannelService.isPaused(delivery.channel)) {
+      await DeliveryService.client.deliveries.update({
+        where: { id: delivery.id },
+        data: { status: 'held' },
+      });
+      return { status: 'held' };
     }
 
     const notification = await DeliveryService.client.notifications.findFirst({

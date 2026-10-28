@@ -27,7 +27,8 @@ export const notifications = sqliteTable(
   ],
 );
 
-export const DELIVERY_STATUS = ['pending', 'sent', 'failed', 'dead', 'skipped'] as const;
+// `held` waits on a paused channel until someone sends or discards it from the dashboard.
+export const DELIVERY_STATUS = ['pending', 'sent', 'failed', 'dead', 'skipped', 'held'] as const;
 export type DeliveryStatus = (typeof DELIVERY_STATUS)[number];
 
 export const SKIP_REASONS = [
@@ -37,6 +38,7 @@ export const SKIP_REASONS = [
   'no_device_tokens',
   'no_template',
   'channel_not_available',
+  'discarded',
 ] as const;
 export type SkipReason = (typeof SKIP_REASONS)[number];
 

@@ -19,9 +19,19 @@ export type Authorize<E extends Env = Env> = (
   c: Context<E>,
 ) => Actor | null | Response | Promise<Actor | null | Response>;
 
+/**
+ * Whether the actor may pause channels, and send or discard what a paused channel holds. Without
+ * it nobody may: stopping a channel stops password resets with it.
+ */
+export type CanPauseChannels<E extends Env = Env> = (
+  c: Context<E>,
+  actor: Actor,
+) => boolean | Promise<boolean>;
+
 const log = logger('auth');
 
 const actors = new WeakMap<Request, Actor>();
+const pausePermissions = new WeakMap<Request, () => boolean | Promise<boolean>>();
 
 export const isActor = (value: unknown): value is Actor =>
   typeof value === 'object' &&
@@ -35,6 +45,13 @@ export const setActor = (c: Context, actor: Actor): void => {
 
 /** The actor authorize let in; the guard runs before every admin route. */
 export const actorOf = (c: Context): Actor | undefined => actors.get(c.req.raw);
+
+export const setPausePermission = (c: Context, check: () => boolean | Promise<boolean>): void => {
+  pausePermissions.set(c.req.raw, check);
+};
+
+export const mayPauseChannels = async (c: Context): Promise<boolean> =>
+  (await pausePermissions.get(c.req.raw)?.()) ?? false;
 
 // ─── Cloudflare Access ───
 

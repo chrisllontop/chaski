@@ -10,7 +10,7 @@ description: The in-process API your Worker calls, the routes Chaski mounts and 
 
 | Call | Returns | |
 | --- | --- | --- |
-| `ready()` | `{ channels, dryRun, templates }` | Checks the config and the applied migrations and counts the templates, changing nothing; throws the `config` error a send would. |
+| `ready()` | `{ channels, paused, dryRun, templates }` | Checks the config and the applied migrations, lists the [paused](/docs/dashboard#pause-a-channel) channels and counts the templates, changing nothing; throws the `config` error a send would. |
 | `send(request)` | `SendResult` | Sends now; see [Sending](/docs/sending). |
 | `schedule(request)` | `ScheduleResult` | Sends at `scheduledAt`; see [Scheduling](/docs/scheduling). |
 | `schedules.list({ recipientId? })` | `ScheduledItem[]` | Pending schedules, soonest first. |
@@ -29,7 +29,9 @@ description: The in-process API your Worker calls, the routes Chaski mounts and 
 
 `ready()` suits a health route: it asks the database each time, so a database that doesn’t answer
 fails it too. `templates` counts the templates outside the trash; at `0`, every send is refused as
-an unknown type, as on a fresh database or after a deploy that forgot to load them.
+an unknown type, as on a fresh database or after a deploy that forgot to load them. `paused` names
+the channels someone [paused](/docs/dashboard#pause-a-channel) in the dashboard, whose deliveries
+wait as held.
 
 ```ts
 app.get('/health', async (c) => {

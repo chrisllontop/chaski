@@ -1,6 +1,7 @@
 import type { ChaskiApi } from '../contract/api';
 import { resolveConfig } from './config';
 import { ready } from './migrations';
+import { ChannelService } from './services/channel.service';
 import { FeedService } from './services/feed.service';
 import { NotificationService } from './services/notification.service';
 import { PreferenceService } from './services/preference.service';
@@ -19,10 +20,15 @@ const run =
 export const api: ChaskiApi = {
   ready: async () => {
     const config = await ready({ fresh: true });
+    const [templates, pauses] = await Promise.all([
+      TemplateService.countLive(),
+      ChannelService.pauses(),
+    ]);
     return {
       channels: config.enabledChannels,
+      paused: config.enabledChannels.filter((channel) => pauses.has(channel)),
       dryRun: config.dryRun,
-      templates: await TemplateService.countLive(),
+      templates,
     };
   },
   send: run((request) => NotificationService.send(request)),

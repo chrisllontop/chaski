@@ -140,10 +140,11 @@ A skipped delivery carries a `reason`: `channel_not_configured`, `muted_by_prefe
 A password reset, a verification or a sign-in link has a person on screen waiting for the email.
 Send those with `inline: true`, `transactional: true` and `channels: ['email']`: Chaski delivers
 the email before `send()` returns and throws `ChaskiError` with the code `delivery_failed` when the
-provider doesn’t take it, so the route answers the person with an error instead of a silent
-success. The delivery is recorded and shows in the dashboard as usual; a failed one isn’t retried
-in the background. With an `idempotencyKey`, a second request tries a failed email again and
-returns one that went out as it was. Everything else (receipts, digests, reminders) stays on the
+provider doesn’t take it, or `channel_paused` when someone paused email in the dashboard, so the
+route answers the person with an error instead of a silent success. Handle both the same way. The
+delivery is recorded and shows in the dashboard as usual; a failed one isn’t retried in the
+background, and a paused one waits there as held. With an `idempotencyKey`, a second request tries
+a failed or held email again and returns one that went out as it was. Everything else (receipts, digests, reminders) stays on the
 queue, which retries with backoff.
 
 ## Schedule
@@ -217,7 +218,8 @@ The frontend reaches the same data as the signed-in user through `chaski.userRou
 ## Errors
 
 Chaski throws `ChaskiError` with a `code`: `validation` (fix the request or the template),
-`config` (fix the setup), `delivery_failed` (an inline email didn’t go out), `not_found`,
+`config` (fix the setup), `delivery_failed` (an inline email didn’t go out), `channel_paused` (an
+inline email is held: email is paused in the dashboard), `not_found`,
 `conflict`, `unauthorized`, `forbidden`, `internal`. Check
 it with `isChaskiError(error)`, never `instanceof`, since the class doesn’t survive a service
 binding or a queue. `isRetryableChaskiError(error)` is `true` only for `internal` and for errors

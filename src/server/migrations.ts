@@ -4,7 +4,11 @@ import { type ResolvedConfig, resolveConfig } from './config';
 // The files the package ships in migrations/; a test keeps this list in sync.
 // The host applies them with `wrangler d1 migrations apply`, and Chaski refuses
 // to run against a database that is missing any of them.
-export const MIGRATIONS: readonly string[] = ['0000_init.sql', '0001_delivery_latency.sql'];
+export const MIGRATIONS: readonly string[] = [
+  '0000_init.sql',
+  '0001_delivery_latency.sql',
+  '0002_channel_pauses.sql',
+];
 
 const verified = new WeakMap<D1Database, string>();
 

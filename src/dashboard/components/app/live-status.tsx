@@ -1,6 +1,8 @@
+import { Link } from '@tanstack/react-router';
 import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip';
 import { useChannelsOverview } from '~/lib/channels';
 import { useLiveStatus } from '~/lib/events';
+import { CHANNEL_LABELS } from '~/lib/format';
 import { Pill } from './pill';
 
 const LIVE = {
@@ -19,8 +21,19 @@ export const LiveStatus = () => {
   const channels = useChannelsOverview();
   if (!channels.data) return null;
   const live = LIVE[status];
+  const paused = channels.data.channels.filter((channel) => channel.paused);
   return (
     <div className="flex items-center gap-2">
+      {paused.map(({ channel }) => (
+        <Tooltip key={channel}>
+          <TooltipTrigger asChild>
+            <Link to="/channels">
+              <Pill tone="warning">{CHANNEL_LABELS[channel]} paused</Pill>
+            </Link>
+          </TooltipTrigger>
+          <TooltipContent>Its deliveries wait as held until someone resumes it.</TooltipContent>
+        </Tooltip>
+      ))}
       {channels.data.dryRun ? (
         <Tooltip>
           <TooltipTrigger asChild>

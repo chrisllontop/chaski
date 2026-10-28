@@ -53,12 +53,41 @@ authorize: async (c) => {
 
 - **Overview**: notifications, sent, success rate and open rate for a period, deliveries per day,
   delivery latency and the health of each type on each channel.
-- **Deliveries**: every delivery and its status, with each attempt’s error, and a replay for the
-  failed and dead ones.
+- **Deliveries**: every delivery and its status, with each attempt’s error, a replay for the
+  failed and dead ones, and the held ones a paused channel keeps.
 - **Schedules**: pending scheduled sends, which you can cancel. One still pending a minute after
   its time shows as overdue.
 - **Templates**: the editor, with a live preview and a test send for email.
-- **Channels**: what Chaski picked up from your config.
+- **Channels**: what Chaski picked up from your config, and a pause for each channel.
+
+## Pause a channel
+
+**Pause** on the **Channels** page is the emergency brake: a provider failing, a bug sending the
+same push again and again, content that went out wrong. From then on every delivery of that
+channel waits as **held** instead of going out, transactional and scheduled ones included, and
+the header shows the channel as paused. The pause lives in Chaski’s database, so it stays until
+someone resumes the channel, deploys included.
+
+**Resume** asks what to do with what the pause held: send it all now, or keep it. Kept deliveries
+stay under the **Held** tab of **Deliveries**, where you send or discard each one, or every one of
+a channel and type. A delivery sends only once its channel runs again, and a discarded one shows as
+skipped and never goes out. An [inline send](/docs/sending#inline) on a paused channel throws
+`channel_paused`, and its email waits as held like the rest.
+
+Pausing stops password resets along with everything else, so it takes a permission of its own.
+Give `routes()` a `canPauseChannels` check; without it nobody can pause, or send or discard what a
+pause holds:
+
+```ts
+const dashboard = chaski.routes({
+  dashboard: {
+    authorize: cloudflareAccess({ teamDomain, audience }),
+    canPauseChannels: (c, actor) => OPS_TEAM.includes(actor.id),
+  },
+});
+```
+
+`chaski.ready()` lists the paused channels under `paused`, for a health check that should notice.
 
 ## Live updates
 

@@ -7,6 +7,12 @@ import type { DeliveryMessage } from './types';
 
 const log = logger('consumer');
 
+const LOG_LINES = {
+  sent: 'delivery sent',
+  held: 'delivery held',
+  ack: 'delivery skipped',
+} as const;
+
 // A batch is Chaski's only when every message carries the delivery kind; a
 // shared queue is a host misconfiguration, so a mixed batch is left alone.
 export const isChaskiBatch = (
@@ -52,7 +58,7 @@ const processDelivery = async (message: Message<DeliveryMessage>): Promise<void>
       if (outcome.status === 'failed') {
         log.warn('delivery failed', { deliveryId, channel, attempt: message.attempts });
       } else {
-        log.info(outcome.status === 'sent' ? 'delivery sent' : 'delivery skipped', {
+        log.info(LOG_LINES[outcome.status], {
           deliveryId,
           channel,
           notificationId,

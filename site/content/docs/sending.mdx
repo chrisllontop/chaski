@@ -80,7 +80,7 @@ try {
     inline: true,
   });
 } catch (error) {
-  if (isChaskiError(error) && error.code === 'delivery_failed') {
+  if (isChaskiError(error) && ['delivery_failed', 'channel_paused'].includes(error.code)) {
     return c.json({ error: 'We couldn’t send the email. Please try again.' }, 502);
   }
   throw error;
@@ -91,11 +91,12 @@ An inline send is one email that preferences can’t skip, so it needs `transact
 `channels: ['email']`. The delivery is recorded like any other, and the dashboard shows it. When
 the provider doesn’t take the email, the delivery is `failed` with the provider’s error, nothing
 retries it in the background, and `send()` throws a `ChaskiError` with the code `delivery_failed`.
-A template Liquid can’t render throws `validation`, and a recipient without an address throws
-`validation` before anything is recorded.
+With the email channel [paused](/docs/dashboard#pause-a-channel), the email waits as held and
+`send()` throws `channel_paused`. A template Liquid can’t render throws `validation`, and a
+recipient without an address throws `validation` before anything is recorded.
 
-With an `idempotencyKey`, asking again tries a failed email once more, and an email that went out
-is returned as it was: the key still never sends twice.
+With an `idempotencyKey`, asking again tries a failed or held email once more, and an email that
+went out is returned as it was: the key still never sends twice.
 
 ## Attachments
 

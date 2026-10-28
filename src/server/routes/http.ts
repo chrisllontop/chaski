@@ -14,6 +14,7 @@ const ERROR_STATUS: Record<ChaskiErrorCode, ContentfulStatusCode> = {
   not_found: 404,
   conflict: 409,
   delivery_failed: 502,
+  channel_paused: 503,
   internal: 500,
 };
 

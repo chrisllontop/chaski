@@ -1,8 +1,8 @@
-import { Hono } from 'hono';
+import { type Context, Hono } from 'hono';
 import { z } from 'zod';
 import { channelSchema, OFFSET_TIMESTAMP_REGEX } from '../../contract/contract';
 import { ChaskiError, isChaskiError } from '../../contract/errors';
-import { actorOf } from '../auth';
+import { type Actor, actorOf, mayPauseChannels } from '../auth';
 import { DELIVERY_STATUS } from '../db/schema';
 import { eventsStub } from '../durable/events';
 import { logger } from '../lib/log';
@@ -57,6 +57,18 @@ const deliveryListSchema = deliveryFiltersSchema.extend({
   page: z.coerce.number().int().min(0).default(0),
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
+
+const heldSelectionSchema = z
+  .object({
+    ids: z.array(z.string().max(64)).min(1).max(500).optional(),
+    channel: channelSchema.optional(),
+    type: z.string().max(128).optional(),
+  })
+  .refine((selection) => selection.ids || selection.channel || selection.type, {
+    message: 'name the held deliveries: ids, a channel or a type',
+  });
+
+const resumeSchema = z.object({ send: z.boolean().default(false) });
 
 const scheduleListSchema = z.object({
   recipientId: z.string().max(256).optional(),
@@ -233,7 +245,37 @@ admin.get('/events', async (c) => {
   return events.fetch(c.req.raw);
 });
 
-admin.get('/channels', (c) => c.json(ChannelService.overview()));
+// Pausing stops password resets along with everything else, so it takes the host's own say-so.
+const pauser = async (c: Context): Promise<Actor> => {
+  const actor = actorOf(c);
+  if (!actor || !(await mayPauseChannels(c))) {
+    throw new ChaskiError(
+      'forbidden',
+      'pausing channels and handling held deliveries needs canPauseChannels to allow you',
+    );
+  }
+  return actor;
+};
+
+admin.get('/channels', async (c) =>
+  c.json({ ...(await ChannelService.overview()), canPause: await mayPauseChannels(c) }),
+);
+
+admin.post('/channels/:channel/pause', async (c) => {
+  const actor = await pauser(c);
+  await ChannelService.pause(parseInput(channelSchema, c.req.param('channel')), actor);
+  return c.json({ paused: true });
+});
+
+admin.post('/channels/:channel/resume', async (c) => {
+  const actor = await pauser(c);
+  const { send } = parseInput(resumeSchema, await c.req.json());
+  return c.json(
+    await ChannelService.resume(parseInput(channelSchema, c.req.param('channel')), actor, {
+      send,
+    }),
+  );
+});
 
 admin.get('/schedules', async (c) =>
   c.json(await ScheduleService.listPage(parseInput(scheduleListSchema, c.req.query()))),
@@ -253,6 +295,20 @@ admin.get('/deliveries/counts', async (c) => {
 });
 
 admin.post('/deliveries/replay-dead', async (c) => c.json(await DeliveryAdminService.replayDead()));
+
+admin.post('/deliveries/held/send', async (c) => {
+  await pauser(c);
+  return c.json(
+    await DeliveryAdminService.sendHeld(parseInput(heldSelectionSchema, await c.req.json())),
+  );
+});
+
+admin.post('/deliveries/held/discard', async (c) => {
+  await pauser(c);
+  return c.json(
+    await DeliveryAdminService.discardHeld(parseInput(heldSelectionSchema, await c.req.json())),
+  );
+});
 
 admin.get('/deliveries/:id', async (c) =>
   c.json({ delivery: await DeliveryAdminService.get(c.req.param('id')) }),

@@ -2,7 +2,7 @@
 // strings with a UTC offset.
 
 export type Channel = 'email' | 'in_app' | 'push';
-export type DeliveryStatus = 'pending' | 'sent' | 'failed' | 'dead' | 'skipped';
+export type DeliveryStatus = 'pending' | 'sent' | 'failed' | 'dead' | 'skipped' | 'held';
 export type Period = '7d' | '30d' | '90d';
 export type Health = 'healthy' | 'at_risk' | 'blocked' | 'paused';
 
@@ -142,21 +142,27 @@ export type SchedulePage = {
   limit: number;
 };
 
+export type ChannelPause = { pausedBy: Actor; pausedAt: string };
+
 export type ChannelsOverview = {
   dryRun: boolean;
   realtime: boolean;
+  /** Whether the signed-in actor may pause channels and send or discard what they hold. */
+  canPause: boolean;
   channels: [
     {
       channel: 'email';
       enabled: boolean;
+      paused: ChannelPause | null;
       from: string | null;
       fromName: string | null;
       replyTo: string | null;
     },
-    { channel: 'in_app'; enabled: boolean },
+    { channel: 'in_app'; enabled: boolean; paused: ChannelPause | null },
     {
       channel: 'push';
       enabled: boolean;
+      paused: ChannelPause | null;
       web: { vapidPublicKey: string } | null;
       ios: { bundleId: string; environment: 'sandbox' | 'production' } | null;
     },

@@ -320,6 +320,11 @@ clear:
 
 Both helpers take the app’s Hono env, so they work under `chaski.routes<AppEnv>()` as written.
 
+Ask the user who may **pause** a channel from the dashboard, its emergency brake: a paused
+channel holds every delivery, password resets included, until someone resumes it and sends or
+discards what it held. `canPauseChannels: (c, actor) => boolean` next to `authorize` decides it,
+over the same role or list (`actor.id` is what `authorize` returned); without it nobody can pause.
+
 ### The user routes
 
 `chaski.userRoutes()` serves the signed-in user’s feed, devices and preferences to the frontend.

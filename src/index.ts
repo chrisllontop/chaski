@@ -48,7 +48,13 @@ export type {
   TemplateImportResult,
   TemplateRecord,
 } from './contract/template-file';
-export { type Actor, type Authorize, basicAuth, cloudflareAccess } from './server/auth';
+export {
+  type Actor,
+  type Authorize,
+  basicAuth,
+  type CanPauseChannels,
+  cloudflareAccess,
+} from './server/auth';
 export { type Chaski, createChaski } from './server/chaski';
 export type {
   ApnsConfig,

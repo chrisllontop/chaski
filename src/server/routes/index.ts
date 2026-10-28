@@ -1,5 +1,11 @@
 import { type Env, Hono, type MiddlewareHandler } from 'hono';
-import { type Authorize, isActor, setActor } from '../auth';
+import {
+  type Authorize,
+  type CanPauseChannels,
+  isActor,
+  setActor,
+  setPausePermission,
+} from '../auth';
 import { admin } from './admin';
 import { isApi, serveAsset, serveShell } from './dashboard';
 import { handleError, requireReady, sameOrigin } from './http';
@@ -8,12 +14,16 @@ import { tracking } from './tracking';
 export type RoutesOptions<E extends Env = Env> = {
   dashboard: {
     authorize: Authorize<E>;
+    canPauseChannels?: CanPauseChannels<E>;
   };
 };
 
 // Fail-closed: only an actor with an id lets the request through.
 const guard =
-  <E extends Env>(authorize: Authorize<E>): MiddlewareHandler<E> =>
+  <E extends Env>(
+    authorize: Authorize<E>,
+    canPauseChannels: CanPauseChannels<E> | undefined,
+  ): MiddlewareHandler<E> =>
   async (c, next) => {
     const verdict = await authorize(c);
     if (verdict instanceof Response) {
@@ -22,6 +32,7 @@ const guard =
     c.header('Cache-Control', 'no-store');
     if (isActor(verdict)) {
       setActor(c, verdict);
+      if (canPauseChannels) setPausePermission(c, () => canPauseChannels(c, verdict));
       return next();
     }
     return isApi(c)
@@ -38,7 +49,7 @@ export const mountRoutes = <E extends Env = Env>({ dashboard }: RoutesOptions<E>
   app.get('/assets/*', serveAsset);
   app.route('/t', tracking);
   app.use('/api/*', sameOrigin());
-  app.use(guard(dashboard.authorize));
+  app.use(guard(dashboard.authorize, dashboard.canPauseChannels));
   app.use('/api/*', requireReady);
   app.route('/api', admin);
   app.all('/api/*', (c) => c.json({ error: 'not_found', message: 'no such endpoint' }, 404));
