@@ -84,29 +84,38 @@ reply-to address and attachments:
 curl http://localhost:8787/cdn-cgi/local/explorer/api/local/email/sending
 ```
 
-## Sign in to the local dashboard
+## Open the local dashboard
 
 Cloudflare Access doesn’t sit in front of `wrangler dev`, so `cloudflareAccess()` answers 403 to
-every local request. `authorize` is a function of the request, so it can let a local session
-through on its own terms, such as a variable only `.dev.vars` sets:
+every local request. Name the environment in the config instead, from a variable that is `local`
+only in `.dev.vars`:
 
 ```ts title="src/index.ts"
-const access = cloudflareAccess({
-  teamDomain: 'example.cloudflareaccess.com',
-  audience: '<Access application AUD tag>',
-});
-
-app.route(
-  '/admin/notifications',
-  chaski.routes({
-    dashboard: {
-      authorize: (c) => (c.env.CHASKI_LOCAL_ADMIN === 'true' ? { id: 'local' } : access(c)),
-    },
-  }),
-);
+export const chaski = createChaski((env: Env) => ({
+  publicUrl: env.CHASKI_PUBLIC_URL,
+  bindings: { db: env.CHASKI_DB, queue: env.CHASKI_QUEUE },
+  environment: env.ENVIRONMENT,
+}));
 ```
 
-`basicAuth()` works too, with a username and password you keep in `.dev.vars`.
+```bash title=".dev.vars"
+ENVIRONMENT=local
+CHASKI_PUBLIC_URL=http://localhost:8787/admin/notifications
+```
+
+With `environment: 'local'`, the dashboard and its API open without calling `authorize`, signed
+in as **Local development**, who may also [pause a channel](/docs/dashboard#pause-a-channel)
+without `canPauseChannels`. The header shows the environment, and the log warns the first time
+each isolate opens the dashboard that way. Any other value, such as `production` or `staging`,
+only names the environment in the dashboard and in `ready()`, and `authorize` decides as usual;
+so does a config without one.
+
+Set `local` in `.dev.vars` or `.env`, which only `wrangler dev` and `vite dev` read, and never in
+the `vars` or secrets of a deployed environment. As a backstop, `local` needs a `publicUrl` on
+localhost: a deploy that picks it up by mistake still points `publicUrl` at its real host, so
+Chaski throws a `config` error instead of opening its dashboard. To try your own `authorize`
+locally, leave `ENVIRONMENT` out of `.dev.vars` for that run; `basicAuth()` works under
+`wrangler dev` as it does deployed.
 
 ## Try a send
 

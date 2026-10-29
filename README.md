@@ -452,8 +452,11 @@ Set `dryRun: true` in the config while you develop: Chaski renders and records e
 deliveries, and shows them in the dashboard, without handing them to a provider.
 
 Cloudflare Access doesn’t sit in front of `wrangler dev`, so `cloudflareAccess()` answers 403 to
-the local dashboard. [Local development](https://chaski.sh/docs/local-development) shows how to let
-a local session in, and where to read the emails `wrangler dev` sends.
+the local dashboard. Pass `environment: env.ENVIRONMENT` in the config and set `ENVIRONMENT=local`
+in `.dev.vars`, never in a deployed environment’s `vars`: the local dashboard then opens without
+`authorize`, and its header shows the environment.
+[Local development](https://chaski.sh/docs/local-development) has the details, and where to read
+the emails `wrangler dev` sends.
 
 ## Use Chaski with a coding agent
 

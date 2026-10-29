@@ -16,6 +16,7 @@ from a temporary route, or the project’s health route, to see the error. Its `
 | Message | Fix |
 | --- | --- |
 | `publicUrl must be the absolute http(s) URL where Chaski is mounted` | `CHASKI_PUBLIC_URL` is unset or relative. Locally it comes from `.dev.vars`, deployed from `vars`. |
+| `environment 'local' opens the dashboard without authorize, so publicUrl must point at localhost, not …` | Deployed: `ENVIRONMENT=local` reached its `vars` or secrets, often from copying `.dev.vars`; set the environment's own name there, or remove it. Locally: point `CHASKI_PUBLIC_URL` at `localhost`, `127.0.0.1` or a `.localhost` name. |
 | `bindings.db is missing`, `bindings.queue is missing` | The name in `env.X` doesn’t match the binding in the Wrangler config, or the binding isn’t declared. |
 | `channels.email is configured but bindings.email is missing` | Declare `send_email` and pass it as `bindings.email`, or drop `channels.email`. |
 | `channels.email.from must be an email address` | Set `from` to an address on the domain onboarded to Email Service. |
@@ -138,8 +139,9 @@ the restart fire on time, and deployed Workflows aren’t affected. Wake one of 
 ## Sign-in
 
 - **Dashboard answers 403 under `wrangler dev` with `cloudflareAccess()`.** Access doesn’t sit in
-  front of `wrangler dev`. Let a local session through with a variable only `.dev.vars` sets
-  ([setup.md](setup.md), step 5).
+  front of `wrangler dev`. Pass `environment` in the config and set `ENVIRONMENT=local` in
+  `.dev.vars` ([setup.md](setup.md), steps 5 and 7); after editing `.dev.vars`, restart the dev
+  command.
 - **Dashboard answers 403 in production with `cloudflareAccess()`.** The Access application
   doesn’t cover the mount path, `audience` isn’t that application’s AUD tag, or `teamDomain` is
   another team’s.
