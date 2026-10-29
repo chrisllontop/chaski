@@ -226,7 +226,6 @@ import {
 
 export type Env = {
   CHASKI_PUBLIC_URL: string;
-  CHASKI_DRY_RUN?: string;
   // `local` only in .dev.vars; deployed environments name themselves, or leave it unset.
   ENVIRONMENT?: string;
   // The dashboard sign-in's values (below): keep the ones it uses.
@@ -267,7 +266,6 @@ export const chaski = createChaski((env: Env) => ({
       },
     },
   },
-  dryRun: env.CHASKI_DRY_RUN === 'true',
   environment: env.ENVIRONMENT,
 }));
 ```
@@ -474,12 +472,11 @@ apns: {
 **Done when** the keys are in place and the secrets live only in `.dev.vars` and, later, the
 account. `.dev.vars` must be in `.gitignore`.
 
-## 7. Run it in dry run
+## 7. Run it locally
 
 Set the local values in `.dev.vars`, which overrides `vars` under `wrangler dev`:
 
 ```sh
-CHASKI_DRY_RUN=true
 CHASKI_PUBLIC_URL=http://localhost:8787/admin/notifications
 # Opens the local dashboard without authorize; needs CHASKI_PUBLIC_URL on localhost.
 ENVIRONMENT=local
@@ -487,25 +484,27 @@ ENVIRONMENT=local
 # With web push: VAPID_PRIVATE_KEY.
 ```
 
-Match `CHASKI_PUBLIC_URL` to the address `wrangler dev` prints and the mount path. Start the
-project’s dev command, then check each of these, in order:
+Match `CHASKI_PUBLIC_URL` to the address `wrangler dev` prints and the mount path. Under
+`wrangler dev` every email lands on disk, under `.wrangler/tmp/email/`, so nothing reaches a real
+address. Start the project’s dev command, then check each of these, in order:
 
 1. **The dashboard answers.** `curl -i http://localhost:8787/admin/notifications/` answers `200`
    and HTML, with no credentials while `ENVIRONMENT=local`. To check the sign-in itself, run once
    without it: `-u` for `basicAuth()`, the app’s session cookie (`-b 'session=…'`) for its own
    sign-in; Access answers 403 locally.
-2. **Chaski read the config.** Ask the user to open the dashboard’s **Channels** page: it says dry
-   run is on and shows the channels they picked as enabled.
+2. **Chaski read the config.** Ask the user to open the dashboard’s **Channels** page: the header
+   says **Local**, and it shows the channels they picked as enabled.
 3. **A template exists.** Sending a type without one fails. Write a `welcome` template, with a
    subject and a body for each channel the user picked, into a scratch template file,
    `.wrangler/chaski-check.json`, and load it ([sending.md](sending.md) has the format and the
    commands). The project’s `chaski-templates.json` holds the types it sends. **Templates**
    lists `welcome`.
-4. **A send goes through.** Add a temporary route that only answers in dry run, and call it:
+4. **A send goes through.** Add a temporary route that only answers in the local environment, and
+   call it:
 
    ```ts
    app.post('/dev/chaski-send', async (c) => {
-     if (c.env.CHASKI_DRY_RUN !== 'true') return c.notFound();
+     if (c.env.ENVIRONMENT !== 'local') return c.notFound();
      return c.json(
        await chaski.send({
          type: 'welcome',
@@ -520,8 +519,9 @@ project’s dev command, then check each of these, in order:
    `reason`, and [troubleshooting.md](troubleshooting.md) says what each one means; `push` skips
    with `no_device_tokens` until a browser enables push.
 5. **The delivery moved.** Ask the user to open the dashboard’s **Deliveries** page: each
-   delivery shows `sent` once the local queue consumer ran, usually within seconds. A delivery
-   stuck at `pending` means the queue handler isn’t wired.
+   delivery shows `sent` once the local queue consumer ran, usually within seconds, and the log
+   prints where the email landed. A delivery stuck at `pending` means the queue handler isn’t
+   wired.
 6. **A schedule fires**, when the user turned scheduling on. Have the temporary route call
    `chaski.schedule()` with the same send, an `idempotencyKey` and a `scheduledAt` 20 seconds
    out (`new Date(Date.now() + 20_000).toISOString()`), and return `chaski.schedules.list()`
@@ -550,11 +550,10 @@ With the migrations applied, the project’s template file loads into production
 ([sending.md](sending.md)); ask for that too.
 
 Before `deploy`, check that `CHASKI_PUBLIC_URL` in `vars` is the production URL of the mount,
-that `CHASKI_DRY_RUN` is unset in production and `ENVIRONMENT` is unset or names it (never
-`local`), that the email domain is
-onboarded to Email Service, and that the Access application, if any, covers the mount path. The
-Durable Objects and the Workflow are created by the deploy. Then open the dashboard: **Channels**
-shows what Chaski picked up.
+that `ENVIRONMENT` is unset or names it (never `local`), that the email domain is onboarded to
+Email Service, and that the Access application, if any, covers the mount path. The Durable Objects
+and the Workflow are created by the deploy. Then open the dashboard: **Channels** shows what
+Chaski picked up.
 
 ## Other Workers in the account
 

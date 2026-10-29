@@ -129,14 +129,6 @@ export class PushAdapter extends BaseService {
         { permanent: true },
       );
     }
-    if (config.dryRun) {
-      PushAdapter.log.info('push not sent (dryRun)', {
-        recipientId: notification.recipientId,
-        devices: devices.length,
-      });
-      return { providerMessageId: 'dry-run' };
-    }
-
     const { vapid, apns } = push;
     // One provider token signs the whole fan-out.
     const apnsToken =

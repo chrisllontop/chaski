@@ -28,8 +28,8 @@ the next:
 5. Mounts the dashboard behind the sign-in you choose, and the routes your frontend calls for the
    signed-in user.
 6. Adds the push keys, when you want push.
-7. Runs your Worker with `wrangler dev` in dry run, and sends a first notification you can open in
-   the dashboard.
+7. Runs your Worker with `wrangler dev`, which keeps every email on disk, and sends a first
+   notification you can open in the dashboard.
 
 All of that happens on your machine. Creating resources in your Cloudflare account, applying the
 migrations with `--remote`, setting secrets and deploying act on production, so the agent asks you

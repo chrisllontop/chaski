@@ -48,9 +48,9 @@ resolve on chaski.sh too. Only the audit’s finder has to be on disk to run:
   `dist/contract/contract.d.ts` (requests and results) and `dist/contract/api.d.ts` (the API). When
   they and this skill disagree, follow the declarations. Before it’s installed, as in an audit,
   use https://chaski.sh/docs, and list what neither settles as something to check after install.
-- **Dry run first.** `dryRun: true` renders and records email and push deliveries, and shows them
-  in the dashboard, without handing them to a provider; in-app items still reach the feed. Every
-  new setup and every newly moved type runs in dry run before anything real goes out.
+- **Local first.** Under `wrangler dev` every email lands on disk, under `.wrangler/tmp/email/`,
+  instead of in an inbox, and push only reaches browsers subscribed against the local database.
+  Every new setup and every newly moved type runs there before anything real goes out.
 - **The user’s Cloudflare account is theirs.** Creating resources, applying migrations with
   `--remote`, setting secrets and deploying all act on production. Ask before each one; locally,
   `wrangler dev` needs none of them.

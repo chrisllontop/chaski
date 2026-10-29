@@ -10,7 +10,7 @@ description: The in-process API your Worker calls, the routes Chaski mounts and 
 
 | Call | Returns | |
 | --- | --- | --- |
-| `ready()` | `{ channels, paused, dryRun, environment, templates }` | Checks the config and the applied migrations, lists the [paused](/docs/dashboard#pause-a-channel) channels, names the `environment` the config gives (`null` without one) and counts the templates, changing nothing; throws the `config` error a send would. |
+| `ready()` | `{ channels, paused, environment, templates }` | Checks the config and the applied migrations, lists the [paused](/docs/dashboard#pause-a-channel) channels, names the `environment` the config gives (`null` without one) and counts the templates, changing nothing; throws the `config` error a send would. |
 | `send(request)` | `SendResult` | Sends now; see [Sending](/docs/sending). |
 | `schedule(request)` | `ScheduleResult` | Sends at `scheduledAt`; see [Scheduling](/docs/scheduling). |
 | `schedules.list({ recipientId? })` | `ScheduledItem[]` | Pending schedules, soonest first. |

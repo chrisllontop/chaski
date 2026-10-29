@@ -1,4 +1,3 @@
-import { env } from 'cloudflare:workers';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getClient } from '../src/server/db';
 import { NotificationService } from '../src/server/services/notification.service';
@@ -191,20 +190,6 @@ describe('email channel', () => {
       status: 'pending',
       errorCode: 'internal_server_error',
       attempts: 1,
-    });
-  });
-
-  it('renders and records a dry run without calling the binding', async () => {
-    useConfig({ dryRun: true });
-    await seedTemplate('payment_received', 'email');
-    const send = vi.spyOn(env.CHASKI_EMAIL, 'send');
-
-    const result = await sendPayment();
-
-    expect(send).not.toHaveBeenCalled();
-    expect(await findEmailDelivery(result.notificationId)).toMatchObject({
-      status: 'sent',
-      providerMessageId: 'dry-run',
     });
   });
 });

@@ -51,18 +51,6 @@ export const LiveStatus = () => {
           <TooltipContent>Its deliveries wait as held until someone resumes it.</TooltipContent>
         </Tooltip>
       ))}
-      {channels.data.dryRun ? (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span>
-              <Pill tone="warning">Dry run</Pill>
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>
-            Email and push render and record, but never reach a provider.
-          </TooltipContent>
-        </Tooltip>
-      ) : null}
       <Tooltip>
         <TooltipTrigger asChild>
           <span>

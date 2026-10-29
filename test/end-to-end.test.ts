@@ -2,14 +2,14 @@ import { env } from 'cloudflare:workers';
 import { describe, expect, it, vi } from 'vitest';
 import { getClient } from '../src/server/db';
 import { chaski } from './fixture/worker';
-import { recipient, seedTemplate, useConfig } from './helpers';
+import { recipient, seedTemplate, stubEmail } from './helpers';
 
 describe('send through the real queue', () => {
-  it('delivers to the in-app feed and records a dry-run email', async () => {
+  it('delivers to the in-app feed and through the email binding', async () => {
     // Let the fixture's own consumer pick the messages up from the queue.
     vi.mocked(env.CHASKI_QUEUE.sendBatch).mockRestore();
     vi.mocked(env.CHASKI_QUEUE.send).mockRestore();
-    useConfig({ dryRun: true });
+    const sent = stubEmail();
     await seedTemplate('payment_received', 'email');
     await seedTemplate('payment_received', 'in_app');
 
@@ -39,7 +39,8 @@ describe('send through the real queue', () => {
     const email = await getClient().deliveries.findFirst({
       where: { notificationId: result.notificationId, channel: 'email' },
     });
-    expect(email?.providerMessageId).toBe('dry-run');
+    expect(email?.providerMessageId).toBe('msg_1');
+    expect(sent).toEqual([expect.objectContaining({ to: recipient().email })]);
     const feed = await chaski.feed.list({ recipientId: 'user_1' });
     expect(feed.items).toEqual([
       expect.objectContaining({ title: 'Hello Ana', body: 'Amount: 1500' }),

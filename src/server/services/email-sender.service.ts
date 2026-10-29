@@ -31,20 +31,11 @@ const PERMANENT_SEND_ERRORS = new Set([
 export class EmailSenderService extends BaseService {
   protected static override name = 'email';
 
-  // Mail only leaves through the host's send_email binding. dryRun is the one
-  // way to skip it, and it says so in the log instead of passing silently.
+  // Mail only leaves through the host's send_email binding.
   static send = async (
     message: Parameters<SendEmailBinding['send']>[0],
   ): Promise<{ messageId?: string }> => {
-    const config = EmailSenderService.config;
-    if (config.dryRun) {
-      EmailSenderService.log.info('email not sent (dryRun)', {
-        to: message.to,
-        subject: message.subject,
-      });
-      return { messageId: 'dry-run' };
-    }
-    const email = config.bindings.email;
+    const email = EmailSenderService.config.bindings.email;
     if (!email) {
       throw new DeliveryError('email_not_configured', 'the email channel is not configured', {
         permanent: true,

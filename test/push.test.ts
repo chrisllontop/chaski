@@ -219,20 +219,6 @@ describe('web push', () => {
     expect(delivery).toMatchObject({ status: 'pending', errorCode: 'provider_error', attempts: 1 });
   });
 
-  it('renders and records a dry run without calling the push service', async () => {
-    usePush({ vapid }, { dryRun: true });
-    await chaski.push.register({
-      recipient: recipient(),
-      subscription: await browserSubscription('https://push.example/sub/1'),
-    });
-    const calls = stubFetch();
-
-    const delivery = await sendPush();
-
-    expect(delivery).toMatchObject({ status: 'sent', providerMessageId: 'dry-run' });
-    expect(calls).toEqual([]);
-  });
-
   it('skips a recipient whose only device has no credentials configured', async () => {
     await chaski.push.register({ recipient: recipient(), platform: 'ios', deviceToken: IOS_TOKEN });
 
