@@ -26,7 +26,7 @@ import type { Channel, ChannelPause } from '~/lib/types';
 const Row = ({ label, children }: { label: string; children: ReactNode }) => (
   <div className="grid grid-cols-[8rem_1fr] gap-3 px-4 py-2.5 text-[13px]">
     <dt className="text-muted-foreground">{label}</dt>
-    <dd className="min-w-0 break-all">
+    <dd className="min-w-0 wrap-anywhere">
       {children ?? <span className="text-muted-foreground">–</span>}
     </dd>
   </div>
