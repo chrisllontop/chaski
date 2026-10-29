@@ -81,6 +81,8 @@ export class ScheduleService extends BaseService {
       attachments: storedAttachments.length > 0 ? JSON.stringify(storedAttachments) : null,
       emailOverrides: overrides ? JSON.stringify(overrides) : null,
       pushSilent: request.push?.silent ?? false,
+      pushCollapseId: request.push?.collapseId ?? null,
+      data: request.data ? JSON.stringify(request.data) : null,
       transactional: request.transactional,
       groupKey: request.groupKey ?? null,
       scheduledAt,
@@ -242,6 +244,8 @@ export class ScheduleService extends BaseService {
         null,
       ),
       pushSilent: row.pushSilent,
+      pushCollapseId: row.pushCollapseId,
+      data: parseJson<Record<string, string> | null>(row.data, null),
       storedAttachments: parseJson<StoredAttachment[]>(row.attachments, []),
       // Without a key of its own, the schedule id keeps a repeated fire from
       // sending twice.

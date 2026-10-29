@@ -118,7 +118,8 @@ const result = await chaski.send({
 | `channels` | Narrows the send to some of the template’s channels, such as `['email']`. A channel the config doesn’t turn on fails the send. |
 | `transactional` | `true` sends whatever the contact’s preferences say: receipts, password resets, security alerts. |
 | `email` | `fromName`, `replyTo`, and up to 10 `attachments` (`filename`, `contentType`, and base64 `content` or a `url`); attachments need the R2 binding. Chaski deletes them once the email goes out or its schedule is cancelled; a failed or dead delivery keeps them for a replay, so suggest an R2 lifecycle rule on `att/` that outlasts the farthest schedule with attachments. |
-| `push` | `silent: true` shows the push’s alert without a sound on Apple devices, on Windows and in browsers; on Android the app’s notification channel decides the sound. |
+| `push` | `silent: true` shows the push’s alert without a sound on Apple devices, on Windows and in browsers; on Android the app’s notification channel decides the sound. `collapseId` (up to 64 printable ASCII characters) replaces a push already shown with the same id, and becomes the push’s `tag`. |
+| `data` | Up to 20 string values for the host’s clients, such as its own event id: the feed item (`data`) and every push carry them as they came. Keys are letters, digits and `_`; `aps`, `href`, `tag`, `from`, `message_type`, `collapse_key` and keys starting with `google` or `gcm` are refused. |
 | `idempotencyKey` | The same key returns the first send’s result (`replayed: true`) instead of sending again. |
 | `inline` | `true` delivers the email before `send()` returns, for someone waiting on it; needs `transactional: true` and `channels: ['email']`. |
 

@@ -105,9 +105,7 @@ describe('feed', () => {
     await sendInApp('user_1');
 
     const [item] = (await chaski.feed.list({ recipientId: 'user_1' })).items;
-    await vi.waitFor(() =>
-      expect(received).toEqual([expect.objectContaining({ feedItemId: item?.id })]),
-    );
+    await vi.waitFor(() => expect(received).toEqual([{ type: 'feed_item.created', item }]));
     socket.close();
   });
 

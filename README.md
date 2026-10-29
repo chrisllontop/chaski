@@ -434,8 +434,8 @@ import { createChaskiClient } from 'chaskijs/client';
 const client = createChaskiClient({ baseUrl: '/me/notifications' });
 
 const { items } = await client.feed.list();
-const stop = client.feed.subscribe(() => {
-  // a new notification arrived: list the feed again
+const stop = client.feed.subscribe((event) => {
+  // a new item arrives whole; without an event, the feed may have changed: list it again
 });
 
 await client.push.enable(); // asks for permission and registers this browser

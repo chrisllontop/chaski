@@ -150,11 +150,19 @@ export const useFeed = (options: UseFeedOptions = {}): UseFeedResult => {
   }, []);
 
   // Keyed on the client only, so changing the query refetches without
-  // closing and reopening the socket. A read in another tab or device
-  // arrives with what it marked, so it applies without a refetch.
+  // closing and reopening the socket. A new item and a read in another tab or
+  // device arrive with what they changed, so they apply without a refetch; a
+  // signal without an event (polling, a reconnect) reads the head again.
   useEffect(() => {
     if (!enabled) return;
     return client.feed.subscribe((event) => {
+      if (event?.type === 'feed_item.created') {
+        const { item } = event;
+        setItems((current) =>
+          current.some((existing) => existing.id === item.id) ? current : [item, ...current],
+        );
+        return;
+      }
       if (event?.type !== 'feed_item.read') {
         void mergeHead();
         return;

@@ -9,6 +9,7 @@ export const MIGRATIONS: readonly string[] = [
   '0001_delivery_latency.sql',
   '0002_channel_pauses.sql',
   '0003_push_silent.sql',
+  '0004_notification_data.sql',
 ];
 
 const verified = new WeakMap<D1Database, string>();

@@ -45,10 +45,45 @@ export const typeNameSchema = z
   .max(128)
   .regex(/^[a-z0-9_.-]+$/i);
 
+// Keys Chaski's pushes already carry, and the ones APNs and FCM keep for themselves.
+const RESERVED_DATA_KEYS = new Set(['aps', 'href', 'tag', 'from', 'message_type', 'collapse_key']);
+
+// What a send hands its clients, as is: the feed item and every push carry it, so a client can
+// match a push to its feed item. FCM data and WNS launch arguments only hold strings, so the
+// values are strings, and a key that would collide in any of them is refused.
+export const notificationDataSchema = z
+  .record(
+    z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,63}$/, {
+      message: 'data keys are letters, digits and _, start with a letter and run to 64',
+    }),
+    z.string().max(1024),
+  )
+  .refine((data) => Object.keys(data).length <= 20, { message: 'data takes at most 20 keys' })
+  .refine(
+    (data) =>
+      Object.keys(data).every((key) => {
+        const lower = key.toLowerCase();
+        return !RESERVED_DATA_KEYS.has(lower) && !/^(google|gcm)/.test(lower);
+      }),
+    {
+      message:
+        'data keys may not be aps, href, tag, from, message_type, collapse_key, or start with ' +
+        'google or gcm',
+    },
+  );
+
 // A silent push still shows its alert, without a sound; on Android the app's notification
-// channel decides the sound.
+// channel decides the sound. The collapse id replaces a push already shown with the same one,
+// and becomes the push's `tag`, so an app can give its own notification of the same event that
+// id; APNs takes at most 64 bytes.
 export const pushOptionsSchema = z.object({
   silent: z.boolean().optional(),
+  collapseId: z
+    .string()
+    .regex(/^[\x21-\x7E]{1,64}$/, {
+      message: 'push.collapseId is 1 to 64 printable ASCII characters, without spaces',
+    })
+    .optional(),
 });
 
 export const sendRequestSchema = z.object({
@@ -59,6 +94,7 @@ export const sendRequestSchema = z.object({
   transactional: z.boolean().default(false),
   email: emailOptionsSchema.optional(),
   push: pushOptionsSchema.optional(),
+  data: notificationDataSchema.optional(),
   idempotencyKey: z.string().min(1).max(512).optional(),
   // Delivers the email within the call instead of through the queue, so a provider failure
   // reaches the caller; only for one transactional email (see NotificationService.send).
@@ -245,15 +281,29 @@ export const markFeedReadSchema = z.object({
 });
 export type MarkFeedReadInput = z.input<typeof markFeedReadSchema>;
 
-// Socket events carry no title or body: they tell clients to refetch, and the
-// feed API stays the source of truth. Clients ignore types they don't know, so
-// the protocol can grow without breaking older bundles. A read names the items
-// it marked (`ids`), every item created up to `before`, or both.
+export const feedItemSchema = z.object({
+  id: z.string(),
+  /** The notification the item came from: its pushes carry the same id as their `tag`. */
+  notificationId: z.string(),
+  type: z.string(),
+  title: z.string(),
+  body: z.string(),
+  href: z.string().optional(),
+  /** The send's `data`, as it came. */
+  data: z.record(z.string(), z.string()).nullable(),
+  readAt: z.string().nullable(),
+  createdAt: z.string(),
+});
+export type FeedItem = z.infer<typeof feedItemSchema>;
+
+// A new item arrives whole, as the feed lists it, so a client can show it without a request;
+// the feed API stays the source of truth for pages and reads. Clients ignore types they don't
+// know, so the protocol can grow without breaking older bundles. A read names the items it
+// marked (`ids`), every item created up to `before`, or both.
 export const feedSocketEventSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('feed_item.created'),
-    feedItemId: z.string().min(1),
-    createdAt: z.string(),
+    item: feedItemSchema,
   }),
   z.object({
     type: z.literal('feed_item.read'),
@@ -268,20 +318,12 @@ export type PushPayload = {
   title: string;
   body: string;
   href?: string;
-  /** The notification id, so a repeated push shows once instead of twice. */
+  /** The send's `push.collapseId`, or the notification id: a repeated push replaces itself. */
   tag?: string;
   /** Shows the notification without a sound. */
   silent?: boolean;
-};
-
-export type FeedItem = {
-  id: string;
-  type: string;
-  title: string;
-  body: string;
-  href?: string;
-  readAt: string | null;
-  createdAt: string;
+  /** The send's `data`, as it came. */
+  data?: Record<string, string>;
 };
 
 export type FeedPage = {

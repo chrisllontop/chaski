@@ -61,14 +61,19 @@ const { items, nextCursor } = await client.feed.list({ limit: 20 });
 const { unread } = await client.feed.unreadCount();
 await client.feed.markRead({ ids: [items[0].id] });
 
-const stop = client.feed.subscribe(() => {
-  // a new notification arrived: list the feed again
+const stop = client.feed.subscribe((event) => {
+  if (event?.type === 'feed_item.created') show(event.item);
+  else if (!event) refresh(); // the feed may have changed: list it again
 });
 ```
 
-`subscribe()` opens a WebSocket for the first listener and closes it when the last one leaves. When
-the socket drops, the client reconnects with backoff, and after five failed attempts it checks for
-new items once a minute instead. `onStatusChange()` reports which of those it’s doing.
+`subscribe()` opens a WebSocket for the first listener and closes it when the last one leaves. A
+new item arrives whole, as `feed.list()` returns it, and a read made in another tab or device
+names what it marked. When the socket drops, the client reconnects with backoff, and after five
+failed attempts it checks for new items once a minute instead. Listeners hear `undefined` when
+that check finds something, and each time the socket comes back after a drop, since items may
+have arrived while it was down; the first connection doesn’t, since the first `list()` covers
+it. `onStatusChange()` reports which of those it’s doing.
 
 A frontend on another origin passes its own `fetch` with `credentials: 'include'`, so its session
 cookie goes along:
@@ -133,7 +138,10 @@ macOS only hands a token to an app signed with the push entitlement
 APNs’s sandbox, so that build registers with `environment: 'sandbox'`. macOS shows the alert once
 the user allows the app’s notifications, which Electron asks for the first time the app uses
 `Notification`. While the app runs, each push also reaches the main process as the
-`received-apns-notification` event, with the push’s `href` and `tag` in its `userInfo`.
+`received-apns-notification` event, with the push’s `href`, `tag` and `data` in its `userInfo`.
+A click on that banner while the app runs reaches no event, since Electron only reports clicks on
+notifications it created; the push’s `userInfo` only reaches the app when the click launches it,
+in the `ready` event’s `launchInfo`. Don’t count on a push’s link opening while the app runs.
 
 ## Windows apps
 
@@ -145,6 +153,30 @@ client registers the channel’s URI, on every launch, since WNS channels expire
 ```ts
 await client.push.registerDevice({ platform: 'windows', deviceToken: channelUri });
 ```
+
+## Electron’s main process
+
+The client runs in Electron’s main process, on Node’s `fetch` and `WebSocket`, for an app whose
+renderer has no network. A `baseUrl` with the host’s full URL gives the socket a `ws:` or `wss:`
+URL. Node sends no cookies, so the app adds its credentials to every request and to the socket,
+and an `Origin` of its own scheme when `allowedOrigins` lists it:
+
+```ts
+const headers = { authorization: `Bearer ${token}`, origin: 'app://app' };
+
+const client = createChaskiClient({
+  baseUrl: 'https://app.example.com/me/notifications',
+  fetch: (input, init = {}) => fetch(input, { ...init, headers: { ...init.headers, ...headers } }),
+  feed: { socketFactory: (url) => new WebSocket(url, { headers }) },
+});
+```
+
+A renderer with network works too, as a page on its own origin. A session cookie set with
+`SameSite=None; Secure` goes along with `credentials: 'include'`, on the socket as well. A header
+can’t: the browser’s WebSocket takes none, so with header-only auth the socket never opens and the
+client falls back to checking once a minute. The renderer’s scheme must be registered as
+`standard` and `secure`, so its requests carry an `Origin` such as `app://app` rather than `null`,
+and `allowedOrigins` lists it.
 
 ## React
 

@@ -122,6 +122,21 @@ On Windows, the device token is the channel URI WNS hands the app. Chaski only a
 A send with `push: { silent: true }` shows its alert without a sound, on Apple devices, on Windows
 and in browsers. On Android, the notification channel your app creates decides the sound.
 
+Every push carries the title, the body, the link (`href`) and a `tag`: the send’s
+`push.collapseId`, or the notification id, which the [feed item](/docs/api#feed-items) also
+carries as `notificationId`. A push with the tag of one already shown replaces it, on Apple
+devices, Android and in browsers. The send’s `data` comes along as is:
+
+| Platform | Where `href`, `tag` and `data` arrive |
+| --- | --- |
+| Web push | The push’s JSON: `{ title, body, href, tag, silent, data }`. |
+| iOS and macOS | Custom keys next to `aps`, one per `data` key. |
+| Android | The message’s `data`, one per `data` key. |
+| Windows | The toast’s launch arguments, one per `data` key. |
+
+Give your app’s own notification of the same event the same id, `collapseId` or the notification
+id, and the system shows one of the two.
+
 On Android the notification shows on its own when the app is in the background; the `href` and
 `tag` of the push arrive in the intent’s extras when the user taps it.
 

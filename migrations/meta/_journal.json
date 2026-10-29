@@ -29,6 +29,13 @@
       "when": 1793315978505,
       "tag": "0003_push_silent",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1793317255900,
+      "tag": "0004_notification_data",
+      "breakpoints": true
     }
   ]
 }

@@ -32,6 +32,10 @@ Thanks, {{ recipient.name }}. We received your payment of {{ amount }}.
 `recipient` holds the fields the send gave it: `id`, and `email`, `name`, `phone`, `timezone` and
 `locale` when present. A key the payload lacks renders empty instead of failing the delivery.
 
+In Liquid only `nil` and `false` are false, so an empty string passes `{% if note %}`. A branch on
+an optional value tests `{% if note != blank %}`, which an empty string and a missing key both
+fail.
+
 The email body is HTML, so Chaski escapes every value it outputs there: a name such as `Ana <b>`
 arrives as text, not markup, and a value you already pass through `escape` isn’t escaped twice. End
 a tag with `raw` to output HTML you built yourself:

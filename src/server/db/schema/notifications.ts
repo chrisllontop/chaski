@@ -15,6 +15,9 @@ export const notifications = sqliteTable(
     attachments: text('attachments'),
     emailOverrides: text('email_overrides'),
     pushSilent: integer('push_silent', { mode: 'boolean' }).notNull().default(false),
+    pushCollapseId: text('push_collapse_id'),
+    // The send's data for its clients, read whole by the feed and the pushes.
+    data: text('data'),
     transactional: integer('transactional', { mode: 'boolean' }).notNull().default(false),
     idempotencyKey: text('idempotency_key'),
     createdAt: timestampNow('created_at'),
@@ -112,6 +115,9 @@ export const scheduledNotifications = sqliteTable(
     attachments: text('attachments'),
     emailOverrides: text('email_overrides'),
     pushSilent: integer('push_silent', { mode: 'boolean' }).notNull().default(false),
+    pushCollapseId: text('push_collapse_id'),
+    // The send's data for its clients, read whole by the feed and the pushes.
+    data: text('data'),
     transactional: integer('transactional', { mode: 'boolean' }).notNull().default(false),
     idempotencyKey: text('idempotency_key'),
     groupKey: text('group_key'),

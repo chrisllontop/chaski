@@ -27,7 +27,8 @@ export type FeedListQuery = {
 
 /**
  * Called when the feed changes: with the socket event (an item created, or items read in another
- * tab or device), or without one when polling noticed.
+ * tab or device), or without one when polling noticed or the socket came back after a drop, when
+ * items may have arrived unannounced.
  */
 export type FeedListener = (event?: FeedSocketEvent) => void;
 
@@ -80,6 +81,9 @@ export const createFeedClient = (
   let pongTimer: ReturnType<typeof setTimeout> | null = null;
   let pollTimer: ReturnType<typeof setInterval> | null = null;
   let lastUnread: number | null = null;
+  // The subscriber's own first load covers the first connection; any later one may have missed
+  // items while no socket was open.
+  let connectedBefore = false;
 
   const setStatus = (next: FeedConnectionStatus) => {
     if (status === next) return;
@@ -98,9 +102,11 @@ export const createFeedClient = (
   };
 
   const socketUrl = () => {
-    // Outside a browser there is no page to resolve against, so the factory gets the path.
-    if (typeof location === 'undefined') return `${baseUrl}/feed/socket`;
-    const url = new URL(`${baseUrl}/feed/socket`, location.href);
+    const base = typeof location === 'undefined' ? undefined : location.href;
+    // Outside a browser a relative baseUrl has no page to resolve against, so the factory gets
+    // the path.
+    if (base === undefined && !URL.canParse(baseUrl)) return `${baseUrl}/feed/socket`;
+    const url = new URL(`${baseUrl}/feed/socket`, base);
     url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
     return url.toString();
   };
@@ -202,10 +208,13 @@ export const createFeedClient = (
     }
     socket = ws;
     ws.onopen = () => {
+      const missedAny = connectedBefore || attempts > 0 || status === 'polling';
+      connectedBefore = true;
       attempts = 0;
       stopPolling();
       setStatus('open');
       startHeartbeat(ws);
+      if (missedAny) emit();
     };
     ws.onmessage = (event: MessageEvent) => {
       if (event.data === 'pong') {
@@ -240,6 +249,7 @@ export const createFeedClient = (
   const connect = () => {
     wanted = true;
     attempts = 0;
+    connectedBefore = false;
     if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisible);
     openSocket();
   };

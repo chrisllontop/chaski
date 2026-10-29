@@ -164,13 +164,15 @@ const usePush = (push: PushConfig, overrides = {}) => {
   useConfig({ channels: { ...config.channels, push }, ...overrides });
 };
 
-const sendPush = async (options: { silent?: boolean } = {}) => {
+const sendPush = async (
+  options: { push?: { silent?: boolean; collapseId?: string }; data?: Record<string, string> } = {},
+) => {
   const result = await NotificationService.send({
     type: 'payment_received',
     recipient: recipient(),
     payload: { amount: 1500 },
     channels: ['push'],
-    ...(options.silent ? { push: { silent: true } } : {}),
+    ...options,
   });
   await processDeliveries(result.notificationId);
   return getClient().deliveries.findFirst({
@@ -227,11 +229,25 @@ describe('web push', () => {
     });
     const calls = stubFetch();
 
-    await sendPush({ silent: true });
+    await sendPush({ push: { silent: true } });
 
     expect(
       await decryptAsBrowser('https://push.example/sub/1', calls[0]?.body ?? new Uint8Array()),
     ).toMatchObject({ title: 'Hello Ana', silent: true });
+  });
+
+  it('hands the service worker the send’s data and collapse id', async () => {
+    await chaski.push.register({
+      recipient: recipient(),
+      subscription: await browserSubscription('https://push.example/sub/1'),
+    });
+    const calls = stubFetch();
+
+    await sendPush({ push: { collapseId: 'evt_42' }, data: { eventId: 'evt_42' } });
+
+    expect(
+      await decryptAsBrowser('https://push.example/sub/1', calls[0]?.body ?? new Uint8Array()),
+    ).toMatchObject({ tag: 'evt_42', data: { eventId: 'evt_42' } });
   });
 
   it('fails a push too large for web push instead of retrying it', async () => {
@@ -376,11 +392,36 @@ describe('APNs', () => {
     expect(calls[1]?.headers.get('authorization')).not.toBe(calls[0]?.headers.get('authorization'));
   });
 
+  it('carries the send’s data as custom keys and its collapse id as the tag', async () => {
+    await chaski.push.register({ recipient: recipient(), platform: 'ios', deviceToken: IOS_TOKEN });
+    const calls = stubFetch(() => new Response(null, { status: 200 }));
+
+    await sendPush({ push: { collapseId: 'evt_42' }, data: { eventId: 'evt_42', kind: 'pay' } });
+
+    expect(calls[0]?.headers.get('apns-collapse-id')).toBe('evt_42');
+    expect(apnsBody(calls[0])).toEqual({
+      aps: { alert: { title: 'Hello Ana', body: 'Amount: 1500' }, sound: 'default' },
+      eventId: 'evt_42',
+      kind: 'pay',
+      href: '/payments/1500',
+      tag: 'evt_42',
+    });
+  });
+
+  it('refuses a collapse id APNs couldn’t take', async () => {
+    for (const collapseId of ['x'.repeat(65), 'two words', 'café']) {
+      await expect(sendPush({ push: { collapseId } })).rejects.toMatchObject({
+        code: 'validation',
+        message: expect.stringContaining('push.collapseId is 1 to 64 printable ASCII characters'),
+      });
+    }
+  });
+
   it('leaves the sound out of a silent push', async () => {
     await chaski.push.register({ recipient: recipient(), platform: 'ios', deviceToken: IOS_TOKEN });
     const calls = stubFetch(() => new Response(null, { status: 200 }));
 
-    await sendPush({ silent: true });
+    await sendPush({ push: { silent: true } });
 
     expect(apnsBody(calls[0])).toEqual({
       aps: { alert: { title: 'Hello Ana', body: 'Amount: 1500' } },
@@ -620,6 +661,17 @@ describe('FCM', () => {
     });
   });
 
+  it('carries the send’s data in FCM’s data and its collapse id as the tag', async () => {
+    await registerAndroid();
+    const calls = stubFcm();
+
+    await sendPush({ push: { collapseId: 'evt_42' }, data: { eventId: 'evt_42' } });
+
+    const { message } = JSON.parse(new TextDecoder().decode(calls[1]?.body));
+    expect(message.data).toEqual({ eventId: 'evt_42', href: '/payments/1500', tag: 'evt_42' });
+    expect(message.android.notification).toEqual({ tag: 'evt_42' });
+  });
+
   it('forgets a device FCM reports unregistered', async () => {
     await registerAndroid();
     stubFcm(() => fcmError(404, 'UNREGISTERED'));
@@ -784,12 +836,22 @@ describe('WNS', () => {
     });
     const calls = stubWns();
 
-    await sendPush({ silent: true });
+    await sendPush({ push: { silent: true } });
 
     const toast = toastOf(calls[1]);
     expect(toast).toContain('<toast launch="href=/pay?a%3D1%3Bb%3D2&amp;c%3D100%25;tag=');
     expect(toast).toContain('<text>5 &lt; 6 &amp; &quot;fine&quot;</text>');
     expect(toast).toContain('</visual><audio silent="true"/></toast>');
+  });
+
+  it('carries the send’s data and collapse id as launch arguments', async () => {
+    const calls = stubWns();
+
+    await sendPush({ push: { collapseId: 'evt_42' }, data: { eventId: 'evt_42' } });
+
+    expect(toastOf(calls[1])).toContain(
+      '<toast launch="eventId=evt_42;href=/payments/1500;tag=evt_42">',
+    );
   });
 
   it('forgets a channel WNS no longer knows or that expired', async () => {
