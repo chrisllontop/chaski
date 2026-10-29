@@ -26,7 +26,7 @@ from a temporary route, or the project’s health route, to see the error. Its `
 | `channels.push.vapid.publicKey must be a base64url uncompressed P-256 key (65 bytes)` | Use the `publicKey` that `npx web-push generate-vapid-keys` prints, not a PEM. An empty value means the var is unset. |
 | `channels.push.vapid.privateKey must be a base64url P-256 private key (32 bytes)` | Same, for `privateKey`. Locally the secret comes from `.dev.vars`; deployed, from `wrangler secret put`. |
 | `channels.push.apns.<field> is required`, `…environment must be 'sandbox' or 'production'`, `…privateKey must be the contents of the .p8 file` | Fill in the APNs fields; `privateKey` is the whole `.p8` text, `-----BEGIN PRIVATE KEY-----` included. |
-| `channels.push.fcm.serviceAccount must be the contents of the service account JSON file`, `…has no <field>: use the JSON key file as downloaded`, `…has a private_key that is not a PEM key` | Set the whole JSON key file as the secret, as the Firebase console downloads it: `npx wrangler secret put FCM_SERVICE_ACCOUNT < service-account.json`. |
+| `channels.push.fcm.serviceAccount must be the contents of the service account JSON file`, `…has no <field>: use the JSON key file as downloaded`, `…has a private_key that is not a PEM key` | Set the whole JSON key file as the secret, as the Firebase console downloads it: `npx wrangler secret put FCM_SERVICE_ACCOUNT < service-account.json`. In `.dev.vars`, wrap it in single quotes; double quotes break its `private_key`. |
 | `maxRetries must be a non-negative integer`, `migrationsTable must be a plain table name` | Fix the option, or leave it out for the default. |
 | `bindings.scheduler is missing; chaski.schedule() needs the ChaskiScheduler Workflow` | Bind the Workflow as `scheduler` and export `ChaskiScheduler` from the main module. |
 | `cloudflareAccess needs an audience` | Pass the Access application’s AUD tag as `audience`. |
@@ -100,6 +100,11 @@ was skipped everywhere for one of the other reasons.
 **Deliveries show `held`.** Their channel is paused under **Channels**, the dashboard’s emergency
 brake, and `chaski.ready()` lists it under `paused`. They wait until someone resumes the channel
 and sends them, or discards them; only an actor `canPauseChannels` allows can do either.
+
+**Android deliveries retry with `FCM answered 403 (SENDER_ID_MISMATCH)` or `(PERMISSION_DENIED)`.**
+The service account in `channels.push.fcm` belongs to another Firebase project than the one the
+app registers its tokens with, or it may not send. Set a key of the app’s project; Chaski keeps
+the devices until then.
 
 **Deliveries stay `pending`.** Nothing consumes the queue. Check that the Wrangler config has a
 `queues.consumers` entry for the same queue as Chaski’s producer, that the default export has a

@@ -493,6 +493,8 @@ CHASKI_PUBLIC_URL=http://localhost:8787/admin/notifications
 ENVIRONMENT=local
 # The sign-in's values, if it has any: ADMIN_USER and ADMIN_PASSWORD.
 # With web push: VAPID_PRIVATE_KEY.
+# With Android push: FCM_SERVICE_ACCOUNT='<the JSON key file>', in single quotes: double quotes
+# turn the \n escapes of its private_key into line breaks, and the JSON no longer parses.
 ```
 
 Match `CHASKI_PUBLIC_URL` to the address `wrangler dev` prints and the mount path. Under

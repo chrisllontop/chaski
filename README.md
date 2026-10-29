@@ -462,6 +462,8 @@ there, and keep the private keys from step 6 next to it.
 ```sh
 CHASKI_PUBLIC_URL=http://localhost:8787/admin/notifications
 VAPID_PRIVATE_KEY=<private key from step 6>
+# With Android push, the JSON key file in single quotes, which keep its \n escapes as they are:
+FCM_SERVICE_ACCOUNT='<the contents of service-account.json>'
 ```
 
 `wrangler dev` keeps every email Chaski sends on disk, under `.wrangler/tmp/email/`, instead of
