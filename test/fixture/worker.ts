@@ -13,6 +13,7 @@ import { seed } from './seed';
 export type FixtureEnv = {
   CHASKI_PUBLIC_URL: string;
   CHASKI_DRY_RUN: string;
+  ENVIRONMENT?: string;
   CHASKI_DB: D1Database;
   CHASKI_QUEUE: Queue<DeliveryMessage>;
   CHASKI_EMAIL: SendEmailBinding;
@@ -38,6 +39,7 @@ export const fixtureConfig = (env: FixtureEnv): ChaskiConfig => ({
     in_app: {},
   },
   dryRun: env.CHASKI_DRY_RUN === 'true',
+  environment: env.ENVIRONMENT,
 });
 
 // The host's main module re-exports Chaski's classes so its bindings, and the

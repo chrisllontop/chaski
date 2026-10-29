@@ -28,6 +28,7 @@ export const api: ChaskiApi = {
       channels: config.enabledChannels,
       paused: config.enabledChannels.filter((channel) => pauses.has(channel)),
       dryRun: config.dryRun,
+      environment: config.environment,
       templates,
     };
   },

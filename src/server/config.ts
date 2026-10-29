@@ -94,6 +94,12 @@ export type ChaskiConfig = {
   defaultMutedTypes?: string[];
   /** Render and record email and push deliveries without calling the providers. */
   dryRun?: boolean;
+  /**
+   * Where this Worker runs, as the dashboard shows it, such as `production` or `staging`. `local`
+   * is for `wrangler dev`: it opens the dashboard without `authorize` and needs a `publicUrl` on
+   * localhost. Any other value, or none, is a deployed environment.
+   */
+  environment?: string;
   /** Must match `max_retries` on the host's queue consumer; defaults to 5. */
   maxRetries?: number;
   /** Must match `migrations_table` on the host's D1 binding; defaults to `d1_migrations`. */
@@ -113,10 +119,20 @@ export type ResolvedConfig = {
   enabledChannels: Channel[];
   defaultMutedTypes: string[];
   dryRun: boolean;
+  environment: string | null;
   maxRetries: number;
   migrationsTable: string;
   onError?: (error: unknown, context: ErrorContext) => void;
 };
+
+/** The one environment that changes what Chaski does: see `ChaskiConfig.environment`. */
+export const LOCAL_ENVIRONMENT = 'local';
+
+const isLoopback = ({ hostname }: URL): boolean =>
+  hostname === 'localhost' ||
+  hostname.endsWith('.localhost') ||
+  hostname === '[::1]' ||
+  /^127(\.\d{1,3}){3}$/.test(hostname);
 
 const fail = (message: string): never => {
   throw new ChaskiError('config', `Chaski config: ${message}`);
@@ -211,6 +227,19 @@ export const validateConfig = (config: ChaskiConfig): ResolvedConfig => {
     fail('maxRetries must be a non-negative integer');
   }
 
+  if (config.environment !== undefined && typeof config.environment !== 'string') {
+    fail('environment must be a string');
+  }
+  const environment = config.environment?.trim() || null;
+  // A deploy that picks up 'local' by mistake would open its dashboard to anyone who finds it. Its
+  // publicUrl still names the real host, so the two together are refused instead.
+  if (environment === LOCAL_ENVIRONMENT && !isLoopback(publicUrl as URL)) {
+    fail(
+      `environment '${LOCAL_ENVIRONMENT}' opens the dashboard without authorize, so publicUrl ` +
+        `must point at localhost, not ${(publicUrl as URL).host}`,
+    );
+  }
+
   const migrationsTable = config.migrationsTable ?? 'd1_migrations';
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(migrationsTable)) {
     fail('migrationsTable must be a plain table name');
@@ -223,6 +252,7 @@ export const validateConfig = (config: ChaskiConfig): ResolvedConfig => {
     enabledChannels: CHANNELS.filter((channel) => resolved[channel]),
     defaultMutedTypes: config.defaultMutedTypes ?? [],
     dryRun: config.dryRun ?? false,
+    environment,
     maxRetries,
     migrationsTable,
     onError: config.onError,

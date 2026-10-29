@@ -272,6 +272,7 @@ describe('GET /api/channels', () => {
 
     expect(JSON.parse(text)).toEqual({
       dryRun: false,
+      environment: null,
       realtime: true,
       canPause: true,
       channels: [

@@ -55,13 +55,14 @@ export interface ChaskiFeedApi {
 
 /**
  * What `ready()` found: the channels the config turns on and which of them are paused, whether
- * it's a dry run, and how many templates there are; with none, every send is refused as an
- * unknown type.
+ * it's a dry run, the environment the config names, and how many templates there are; with none,
+ * every send is refused as an unknown type.
  */
 export type ChaskiReadiness = {
   channels: Channel[];
   paused: Channel[];
   dryRun: boolean;
+  environment: string | null;
   templates: number;
 };
 
