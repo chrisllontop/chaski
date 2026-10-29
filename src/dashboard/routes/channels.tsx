@@ -301,6 +301,22 @@ export const ChannelsPage = () => {
               description="How sends and this dashboard behave"
               state={null}
             >
+              <Row label="Environment">
+                <div className="flex items-start gap-2">
+                  {data.environment ? (
+                    <Pill tone="info">{data.environment}</Pill>
+                  ) : (
+                    <Pill tone="neutral">Not named</Pill>
+                  )}
+                  <span className="text-muted-foreground">
+                    {data.environment === 'local'
+                      ? 'The dashboard opens without signing in, and anyone here may pause a channel.'
+                      : data.environment
+                        ? 'The dashboard asks authorize who may use it.'
+                        : 'Set environment in the config to show where this dashboard runs.'}
+                  </span>
+                </div>
+              </Row>
               <Row label="Dry run">
                 <div className="flex items-start gap-2">
                   {data.dryRun ? <Pill tone="warning">On</Pill> : <Pill tone="neutral">Off</Pill>}

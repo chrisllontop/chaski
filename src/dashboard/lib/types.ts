@@ -146,6 +146,8 @@ export type ChannelPause = { pausedBy: Actor; pausedAt: string };
 
 export type ChannelsOverview = {
   dryRun: boolean;
+  /** The environment the host's config names; `local` opens the dashboard without signing in. */
+  environment: string | null;
   realtime: boolean;
   /** Whether the signed-in actor may pause channels and send or discard what they hold. */
   canPause: boolean;
