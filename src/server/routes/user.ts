@@ -44,6 +44,8 @@ export type UserRouteGroup = (typeof USER_ROUTE_GROUPS)[number];
 
 const recipients = new WeakMap<Request, string>();
 
+const DEVICE_ID = /^dt_[0-9A-Za-z]{16}$/;
+
 const recipientOf = (c: Context): string => {
   const recipientId = recipients.get(c.req.raw);
   if (!recipientId) throw new Error('identify did not run before a user route');
@@ -134,10 +136,19 @@ export const mountUserRoutes = <E extends Env = Env>({
       return c.json(await FeedService.markRead({ ...body, recipientId: recipientOf(c) }));
     });
 
-    // The 101 must pass through untouched, so no middleware may rewrite it.
+    // The 101 must pass through untouched, so no middleware may rewrite it. `device` names a
+    // device the client registered: while this socket is open, its pushes come through the feed.
+    // The socket belongs to the signed-in recipient, so a device of anyone else changes nothing.
     app.get('/feed/socket', async (c) => {
       if (c.req.header('upgrade')?.toLowerCase() !== 'websocket') {
         return c.json({ error: 'upgrade_required', message: 'expected a WebSocket upgrade' }, 426);
+      }
+      const device = c.req.query('device');
+      if (device !== undefined && !DEVICE_ID.test(device)) {
+        throw new ChaskiError(
+          'validation',
+          'device must be the id registering the device returned',
+        );
       }
       return feedStub(recipientOf(c)).fetch(c.req.raw);
     });

@@ -27,9 +27,10 @@ export const createChaskiClient = (options: ChaskiClientOptions): ChaskiClient =
   // Bound late, so a global fetch stubbed after this call (by a test, say) still applies.
   const fetcher = options.fetch ?? ((...args: Parameters<typeof fetch>) => fetch(...args));
   const request = createRequest(baseUrl, fetcher);
+  const feed = createFeedClient(request, baseUrl, options.feed);
   return {
-    feed: createFeedClient(request, baseUrl, options.feed),
-    push: createPushClient(request, options.push),
+    feed,
+    push: createPushClient(request, options.push, feed),
     preferences: createPreferencesClient(request),
   };
 };
@@ -52,5 +53,5 @@ export type {
 } from './feed';
 export { ChaskiRequestError } from './http';
 export type { PreferencesClient } from './preferences';
-export type { PushClient, PushOptions, PushState } from './push';
+export type { PushClient, PushOptions, PushState, RegisterDeviceOptions } from './push';
 export { CHASKI_QUERY_KEY, chaskiQueries, type QueryDescriptor } from './queries';

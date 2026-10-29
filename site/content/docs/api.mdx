@@ -133,12 +133,12 @@ returns. `chaskijs/client` calls them for you.
 | `GET /feed` | The feed; `cursor`, `limit` and `unreadOnly` as query parameters. |
 | `GET /feed/unread-count` | `{ unread }` |
 | `POST /feed/read` | Marks items read: `{ ids?, before? }`, or `{}` for the whole feed. |
-| `GET /feed/socket` | A WebSocket that announces new items, whole, and reads made in other tabs and devices. |
+| `GET /feed/socket` | A WebSocket that announces new items, whole, and reads made in other tabs and devices. `?device=<id>` names a device the client registered, whose pushes the feed takes over while the socket is open. |
 | `GET /preferences` | The user’s preferences. |
 | `PATCH /preferences` | Updates them. |
 | `GET /preferences/topics` | Template types grouped by topic. |
 | `GET /push/vapid-public-key` | `{ publicKey }` |
-| `POST /push/subscriptions` | Registers this browser’s subscription, an iOS or macOS device token, an Android FCM token or a Windows channel URI. |
+| `POST /push/subscriptions` | Registers this browser’s subscription, an iOS or macOS device token, an Android FCM token or a Windows channel URI; answers `{ id }`. |
 | `DELETE /push/subscriptions` | Drops one, by `endpoint` or `deviceToken`. |
 
 A path the mount doesn’t serve, including those of a group left out of `groups`, reaches your

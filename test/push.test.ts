@@ -1,4 +1,4 @@
-import { env } from 'cloudflare:workers';
+import { env, exports } from 'cloudflare:workers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PushConfig } from '../src';
 import { validateConfig } from '../src/server/config';
@@ -757,6 +757,89 @@ describe('FCM', () => {
 
     expect(await sendPush()).toMatchObject({ status: 'sent', providerMessageId: 'push:1/2' });
     expect(await devices()).toHaveLength(2);
+  });
+});
+
+describe('devices whose app holds the feed open', () => {
+  beforeEach(async () => {
+    usePush({ apns: { ...apns, macos } });
+    await seedTemplate('payment_received', 'in_app');
+  });
+
+  const openFeed = async (query = '') => {
+    const response = await exports.default.fetch(
+      `https://host.test/me/notifications/feed/socket${query}`,
+      { headers: { upgrade: 'websocket', 'x-fixture-user': 'user_1' } },
+    );
+    const socket = response.webSocket;
+    if (!socket) throw new Error(`no upgrade: ${response.status}`);
+    socket.accept();
+    return socket;
+  };
+
+  const sendTo = async (channels: Array<'push' | 'in_app'>) => {
+    const result = await NotificationService.send({
+      type: 'payment_received',
+      recipient: recipient(),
+      payload: { amount: 1500 },
+      channels,
+    });
+    await processDeliveries(result.notificationId);
+    return getClient().deliveries.findFirst({
+      where: { notificationId: result.notificationId, channel: 'push' },
+    });
+  };
+
+  const registerBoth = async () => {
+    const mac = await chaski.push.register({
+      recipient: recipient(),
+      platform: 'macos',
+      deviceToken: MAC_TOKEN,
+    });
+    await chaski.push.register({ recipient: recipient(), platform: 'ios', deviceToken: IOS_TOKEN });
+    return mac;
+  };
+
+  it('leaves that device to the feed and pushes to the others', async () => {
+    const mac = await registerBoth();
+    const socket = await openFeed(`?device=${mac.id}`);
+    const calls = stubFetch(() => new Response(null, { status: 200 }));
+
+    const delivery = await sendTo(['push', 'in_app']);
+
+    expect(delivery).toMatchObject({ status: 'sent', providerMessageId: 'push:1/1 feed:1' });
+    expect(calls.map((call) => call.url)).toEqual([
+      `https://api.sandbox.push.apple.com/3/device/${IOS_TOKEN.toLowerCase()}`,
+    ]);
+    socket.close();
+  });
+
+  it('pushes to every device when the notification skips the feed', async () => {
+    const mac = await registerBoth();
+    const socket = await openFeed(`?device=${mac.id}`);
+    const calls = stubFetch(() => new Response(null, { status: 200 }));
+
+    expect(await sendTo(['push'])).toMatchObject({ providerMessageId: 'push:2/2' });
+    expect(calls).toHaveLength(2);
+    socket.close();
+  });
+
+  it('pushes to every device when the open socket names none', async () => {
+    await registerBoth();
+    const socket = await openFeed();
+    stubFetch(() => new Response(null, { status: 200 }));
+
+    expect(await sendTo(['push', 'in_app'])).toMatchObject({ providerMessageId: 'push:2/2' });
+    socket.close();
+  });
+
+  it('refuses a socket that names something other than a device id', async () => {
+    const response = await exports.default.fetch(
+      'https://host.test/me/notifications/feed/socket?device=everything',
+      { headers: { upgrade: 'websocket', 'x-fixture-user': 'user_1' } },
+    );
+
+    expect(response.status).toBe(400);
   });
 });
 

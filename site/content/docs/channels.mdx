@@ -135,7 +135,9 @@ devices, Android and in browsers. The send’s `data` comes along as is:
 | Windows | The toast’s launch arguments, one per `data` key. |
 
 Give your app’s own notification of the same event the same id, `collapseId` or the notification
-id, and the system shows one of the two.
+id, and the system shows one of the two. An app that shows the feed’s items itself while it runs
+can also take its device out of push while its feed is open; see
+[Browser clients](/docs/browser-clients#while-the-app-runs).
 
 On Android the notification shows on its own when the app is in the background; the `href` and
 `tag` of the push arrive in the intent’s extras when the user taps it.
