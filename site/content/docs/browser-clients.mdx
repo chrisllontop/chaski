@@ -127,10 +127,13 @@ const deviceToken = await pushNotifications.registerForAPNSNotifications();
 await client.push.registerDevice({ platform: 'macos', deviceToken });
 ```
 
-The app has to be signed with the push entitlement, and `channels.push.apns.macos` names its bundle
-id. A development build’s token only works in APNs’s sandbox, so that build registers with
-`environment: 'sandbox'`. macOS shows the alert on its own while the app is in the background; while
-it’s in front, the app gets it through the `received-apns-notification` event instead.
+macOS only hands a token to an app signed with the push entitlement
+(`com.apple.developer.aps-environment`) and a provisioning profile that grants it, and
+`channels.push.apns.macos` names the app’s bundle id. A development build’s token only works in
+APNs’s sandbox, so that build registers with `environment: 'sandbox'`. macOS shows the alert once
+the user allows the app’s notifications, which Electron asks for the first time the app uses
+`Notification`. While the app runs, each push also reaches the main process as the
+`received-apns-notification` event, with the push’s `href` and `tag` in its `userInfo`.
 
 ## React
 
