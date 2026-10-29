@@ -51,8 +51,11 @@ describe('the local environment', () => {
     });
   });
 
-  it('needs a publicUrl on localhost', async () => {
-    const chaski = useConfig({ environment: 'local', publicUrl: 'https://app.host.test/chaski' });
+  it('needs a publicUrl on localhost, and keeps the dashboard closed without one', async () => {
+    const publicUrl = 'https://app.host.test/chaski';
+    const chaski = useConfig({ environment: 'local', publicUrl });
+    const authorize = vi.fn(() => null);
+    const dashboard = chaski.routes({ dashboard: { authorize } });
 
     await expect(chaski.ready()).rejects.toMatchObject({
       code: 'config',
@@ -60,6 +63,10 @@ describe('the local environment', () => {
         "Chaski config: environment 'local' opens the dashboard without authorize, so publicUrl " +
         'must point at localhost, not app.host.test',
     });
+    const response = await dashboard.request('/api/channels', {}, env);
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'forbidden', message: 'not allowed' });
+    expect(authorize).toHaveBeenCalledTimes(1);
   });
 
   it.each([

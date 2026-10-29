@@ -26,6 +26,16 @@ const log = logger('auth');
 const LOCAL_ACTOR: Actor = { id: 'local', name: 'Local development' };
 let warnedLocal = false;
 
+// A config that doesn't validate isn't local: authorize decides, and only then does requireReady
+// answer with the config error, so it never reaches someone the dashboard doesn't let in.
+const isLocal = (): boolean => {
+  try {
+    return resolveConfig().environment === LOCAL_ENVIRONMENT;
+  } catch {
+    return false;
+  }
+};
+
 // Fail-closed: only an actor with an id lets the request through. In the local environment
 // nobody signs in, and pausing only holds the email of this machine, so both hooks are skipped.
 const guard =
@@ -34,7 +44,7 @@ const guard =
     canPauseChannels: CanPauseChannels<E> | undefined,
   ): MiddlewareHandler<E> =>
   async (c, next) => {
-    if (resolveConfig().environment === LOCAL_ENVIRONMENT) {
+    if (isLocal()) {
       // Once per isolate, so a deploy that runs as local shows up in its logs.
       if (!warnedLocal) {
         warnedLocal = true;
