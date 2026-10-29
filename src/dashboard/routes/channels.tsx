@@ -273,7 +273,7 @@ export const ChannelsPage = () => {
             <ChannelPanel
               icon={Smartphone}
               title="Push"
-              description="Web push with VAPID, iOS through APNs, Android through FCM"
+              description="Web push, APNs for iOS and FCM for Android"
               state={stateOf(push.enabled, push.paused)}
               actions={push.enabled ? control('push', push.paused) : null}
             >
