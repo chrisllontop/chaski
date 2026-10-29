@@ -273,7 +273,7 @@ export const ChannelsPage = () => {
             <ChannelPanel
               icon={Smartphone}
               title="Push"
-              description="Web push, APNs for iOS and macOS, FCM for Android"
+              description="Web push, APNs, FCM and WNS"
               state={stateOf(push.enabled, push.paused)}
               actions={push.enabled ? control('push', push.paused) : null}
             >
@@ -296,6 +296,7 @@ export const ChannelsPage = () => {
                       : 'Not configured'}
                   </Row>
                   <Row label="Android">{push.android?.projectId ?? 'Not configured'}</Row>
+                  <Row label="Windows">{push.windows?.clientId ?? 'Not configured'}</Row>
                 </>
               ) : (
                 <SetupHint configKey="channels.push" />

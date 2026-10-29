@@ -8,15 +8,15 @@ out is a separate request from the user. Every Chaski call below is in [sending.
 
 Put every flow in one of two groups.
 
-**Moves** when it sends email, web push, iOS or macOS push, Android push or in-app notifications from code
-that runs in the Worker that hosts Chaski, or in another Worker of the same account, which calls
-Chaski through `ChaskiEntrypoint` ([setup.md](setup.md) ends with it).
+**Moves** when it sends email, web push, iOS, macOS, Android or Windows push or in-app notifications
+from code that runs in the Worker that hosts Chaski, or in another Worker of the same account,
+which calls Chaski through `ChaskiEntrypoint` ([setup.md](setup.md) ends with it).
 
 **Stays** on its current provider, with the reason written next to it:
 
 - **SMS, WhatsApp, voice, Slack, Discord and other chat apps.** Chaski has no channel for them.
-- **Expo push tokens, and FCM tokens of iOS apps.** Chaski’s push covers web push, APNs and FCM
-  for Android only.
+- **Expo push tokens, and FCM tokens of iOS apps.** Chaski’s push covers web push, APNs, WNS,
+  and FCM for Android only.
 - **Code that doesn’t run in a Cloudflare Worker**, with no Worker of the account to call. Chaski
   has no HTTP API for outside callers.
 - **Broadcasts to a list or an audience, and sequences built in a provider’s dashboard.** Chaski
@@ -131,6 +131,10 @@ Write every converted template into the template file ([sending.md](sending.md))
 - **APNs device tokens**: `chaski.push.register({ recipient: { id }, platform: 'ios', deviceToken })`,
   or `platform: 'macos'` for a Mac app, with the same bundle id and environment in
   `channels.push.apns.ios` or `.macos`. Tokens of development builds add `environment: 'sandbox'`.
+- **Windows channel URIs** from the Windows App SDK:
+  `chaski.push.register({ recipient: { id }, platform: 'windows', deviceToken: channelUri })`, with
+  the same Entra app in `channels.push.wns`. Channels made through Partner Center credentials (a
+  package SID) stay on their current sender.
 - **Android FCM tokens**:
   `chaski.push.register({ recipient: { id }, platform: 'android', deviceToken })`, with a service
   account of the same Firebase project in `channels.push.fcm`.

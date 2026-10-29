@@ -171,6 +171,7 @@ export type ChannelsOverview = {
       ios: ApnsApp | null;
       macos: ApnsApp | null;
       android: { projectId: string } | null;
+      windows: { clientId: string } | null;
     },
   ];
 };

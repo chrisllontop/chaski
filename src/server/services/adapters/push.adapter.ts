@@ -20,6 +20,14 @@ import { parseJson } from '../../lib/json';
 import { renderTemplate } from '../../lib/render';
 import { reportError } from '../../lib/report-error';
 import { encryptPushPayload, MAX_PAYLOAD_BYTES, vapidAuthorization } from '../../lib/web-push';
+import {
+  buildToast,
+  buildWnsRequest,
+  clearWnsAccessToken,
+  getWnsAccessToken,
+  MAX_TOAST_BYTES,
+  type WnsCredentials,
+} from '../../lib/wns';
 import { BaseService } from '../base.service';
 import type { ContactSnapshot } from '../contact.service';
 import {
@@ -28,6 +36,7 @@ import {
   isApnsDevice,
   PushSubscriptionService,
   type WebPushDevice,
+  type WnsPushDevice,
 } from '../push-subscription.service';
 import { TemplateService } from '../template.service';
 import type { AdapterContext, AdapterResult } from './types';
@@ -162,6 +171,30 @@ const sendFcm = async (
   throw new Error(`FCM answered ${response.status}${code ? ` (${code})` : ''}`);
 };
 
+// A 200 only says WNS took the request; X-WNS-Status says whether it passed the toast on.
+const WNS_NOT_DELIVERED = new Set(['dropped', 'channelthrottled']);
+
+const sendWns = async (
+  creds: WnsCredentials,
+  accessToken: string,
+  device: WnsPushDevice,
+  toast: string,
+): Promise<PushOutcome> => {
+  const request = buildWnsRequest({ accessToken, channelUri: device.channelUri, toast });
+  const response = await fetch(request.url, {
+    method: 'POST',
+    headers: request.headers,
+    body: request.body,
+  });
+  const status = response.headers.get('x-wns-status');
+  if (response.ok && !(status && WNS_NOT_DELIVERED.has(status))) return 'delivered';
+  // 404 is a channel WNS doesn't know, 410 one that expired: the app asks for a new one.
+  if (response.status === 404 || response.status === 410) return 'expired';
+  if (response.status === 401) clearWnsAccessToken(creds);
+  const detail = response.headers.get('x-wns-error-description') ?? status;
+  throw new Error(`WNS answered ${response.status}${detail ? ` (${detail})` : ''}`);
+};
+
 export class PushAdapter extends BaseService {
   protected static override name = 'push';
 
@@ -221,7 +254,27 @@ export class PushAdapter extends BaseService {
         { permanent: true },
       );
     }
-    const { vapid, apns, fcm } = push;
+    const { vapid, apns, fcm, wns } = push;
+    const windows = wns && devices.some((device) => device.platform === 'windows');
+    const toast = windows
+      ? buildToast({
+          title,
+          body,
+          arguments: {
+            ...(message.href ? { href: message.href } : {}),
+            ...(message.tag ? { tag: message.tag } : {}),
+          },
+          silent: message.silent,
+        })
+      : null;
+    const toastBytes = toast ? new TextEncoder().encode(toast).length : 0;
+    if (toastBytes > MAX_TOAST_BYTES) {
+      throw new DeliveryError(
+        'payload_too_large',
+        `the rendered toast is ${toastBytes} bytes; WNS carries at most ${MAX_TOAST_BYTES}`,
+        { permanent: true },
+      );
+    }
     // One provider token signs the whole fan-out, for every app of the team.
     const apnsToken = apns && devices.some(isApnsDevice) ? await getApnsAuthToken(apns) : null;
     // The FCM access token takes a request to Google, so it is not awaited
@@ -230,6 +283,8 @@ export class PushAdapter extends BaseService {
       fcm && devices.some((device) => device.platform === 'android')
         ? getFcmAccessToken(fcm)
         : null;
+    // Like FCM's, the WNS access token takes a request, so a failed exchange fails only Windows.
+    const wnsToken = windows ? getWnsAccessToken(wns) : null;
     const results = await Promise.allSettled(
       devices.map((device) => {
         if (device.platform === 'web' && vapid) return sendWebPush(vapid, device, webPayload);
@@ -239,6 +294,9 @@ export class PushAdapter extends BaseService {
         }
         if (device.platform === 'android' && fcm && fcmToken) {
           return fcmToken.then((token) => sendFcm(fcm, token, device, message));
+        }
+        if (device.platform === 'windows' && wns && wnsToken && toast) {
+          return wnsToken.then((token) => sendWns(wns, token, device, toast));
         }
         return Promise.reject(new Error(`no credentials for ${device.platform} push`));
       }),

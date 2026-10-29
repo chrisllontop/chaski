@@ -69,6 +69,7 @@ export type {
   InAppConfig,
   PushConfig,
   VapidConfig,
+  WnsConfig,
 } from './server/config';
 export { ChaskiEvents } from './server/durable/events';
 export { ChaskiFeed } from './server/durable/feed';

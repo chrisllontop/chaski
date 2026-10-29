@@ -118,7 +118,7 @@ const result = await chaski.send({
 | `channels` | Narrows the send to some of the template’s channels, such as `['email']`. A channel the config doesn’t turn on fails the send. |
 | `transactional` | `true` sends whatever the contact’s preferences say: receipts, password resets, security alerts. |
 | `email` | `fromName`, `replyTo`, and up to 10 `attachments` (`filename`, `contentType`, and base64 `content` or a `url`); attachments need the R2 binding. Chaski deletes them once the email goes out or its schedule is cancelled; a failed or dead delivery keeps them for a replay, so suggest an R2 lifecycle rule on `att/` that outlasts the farthest schedule with attachments. |
-| `push` | `silent: true` shows the push’s alert without a sound on Apple devices and in browsers; on Android the app’s notification channel decides the sound. |
+| `push` | `silent: true` shows the push’s alert without a sound on Apple devices, on Windows and in browsers; on Android the app’s notification channel decides the sound. |
 | `idempotencyKey` | The same key returns the first send’s result (`replayed: true`) instead of sending again. |
 | `inline` | `true` delivers the email before `send()` returns, for someone waiting on it; needs `transactional: true` and `channels: ['email']`. |
 
@@ -207,6 +207,7 @@ await chaski.feed.markRead({ recipientId: user.id, ids: [id] }); // or before, o
 
 await chaski.push.register({ recipient: { id: user.id }, platform: 'ios', deviceToken });
 await chaski.push.register({ recipient: { id: user.id }, platform: 'macos', deviceToken });
+await chaski.push.register({ recipient: { id: user.id }, platform: 'windows', deviceToken: channelUri });
 await chaski.push.register({ recipient: { id: user.id }, platform: 'android', deviceToken }); // FCM
 await chaski.push.register({ recipient: { id: user.id }, subscription }); // a web push subscription
 await chaski.push.unregister({ deviceToken });

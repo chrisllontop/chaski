@@ -130,10 +130,27 @@ export const fcmTokenSchema = opaqueTokenSchema.regex(/^\S+$/, {
   message: 'deviceToken must be an FCM registration token',
 });
 
-// Unregistering doesn't name the platform, so it takes either kind of token;
+// Chaski posts its WNS access token to the channel URI, so a URI on any host other than
+// Microsoft's notify.windows.com, whose subdomains change, is refused. Registration is the only
+// way a channel reaches the database.
+const isWnsChannelUri = (value: string): boolean => {
+  if (!URL.canParse(value)) return false;
+  const { protocol, hostname } = new URL(value);
+  return (
+    protocol === 'https:' &&
+    (hostname === 'notify.windows.com' || hostname.endsWith('.notify.windows.com'))
+  );
+};
+
+const wnsChannelUriSchema = z.string().max(2048).refine(isWnsChannelUri, {
+  message: 'deviceToken must be a WNS channel URI on notify.windows.com',
+});
+
+// Unregistering doesn't name the platform, so it takes any kind of token;
 // an APNs hex token has the shape of an FCM one.
 const anyDeviceTokenSchema = opaqueTokenSchema.regex(/^\S+$/, {
-  message: 'deviceToken must be an APNs device token or an FCM registration token',
+  message:
+    'deviceToken must be an APNs device token, an FCM registration token or a WNS channel URI',
 });
 
 // A token belongs to the APNs environment of the build that made it: a development build's
@@ -150,12 +167,17 @@ const androidDeviceSchema = z.object({
   platform: z.literal('android'),
   deviceToken: fcmTokenSchema,
 });
+const windowsDeviceSchema = z.object({
+  platform: z.literal('windows'),
+  deviceToken: wnsChannelUriSchema,
+});
 
-/** A device token from an app: APNs for iOS and macOS, FCM for Android. */
+/** A device token from an app: APNs for iOS and macOS, FCM for Android, WNS for Windows. */
 export const nativeDeviceSchema = z.discriminatedUnion('platform', [
   iosDeviceSchema,
   macosDeviceSchema,
   androidDeviceSchema,
+  windowsDeviceSchema,
 ]);
 export type NativeDevice = z.input<typeof nativeDeviceSchema>;
 
@@ -171,6 +193,7 @@ export const registerPushSubscriptionSchema = z.union([
     iosDeviceSchema.extend(registrationFields),
     macosDeviceSchema.extend(registrationFields),
     androidDeviceSchema.extend(registrationFields),
+    windowsDeviceSchema.extend(registrationFields),
   ]),
   z.object({ ...registrationFields, subscription: webPushSubscriptionSchema }),
 ]);

@@ -1,6 +1,6 @@
 ---
 title: Channels
-description: Email, in-app and push, web, iOS, macOS and Android. A channel is on when the config has an entry for it.
+description: Email, in-app and push, web, iOS, macOS, Android and Windows. A channel is on when the config has an entry for it.
 ---
 
 A channel is on when `channels` in the config has an entry for it, and each type’s template turns
@@ -46,8 +46,8 @@ through `chaski.userRoutes()`, as [Browser clients](/docs/browser-clients) shows
 
 ## Push
 
-Push reaches browsers through web push, Apple devices through APNs and Android devices through
-FCM. Configure any of them:
+Push reaches browsers through web push, Apple devices through APNs, Android devices through FCM
+and Windows devices through WNS. Configure any of them:
 
 ```ts
 channels: {
@@ -67,6 +67,11 @@ channels: {
     fcm: {
       serviceAccount: env.FCM_SERVICE_ACCOUNT,
     },
+    wns: {
+      tenantId: '<directory (tenant) id>',
+      clientId: '<application (client) id>',
+      clientSecret: env.WNS_CLIENT_SECRET,
+    },
   },
 },
 ```
@@ -80,15 +85,18 @@ channels: {
 - `fcm` takes the contents of a service account’s JSON key file, from **Project settings → Service
   accounts** in the Firebase console. The project it names must be the one your Android app
   registers its tokens with.
+- `wns` takes the Microsoft Entra app registration your Windows app creates its push channel with,
+  through the Windows App SDK’s `PushNotificationManager`: its tenant id, its client id and one of
+  its client secrets.
 
 A contact receives push on the devices registered to them. Browsers register with
-`client.push.enable()` from `chaskijs/client`; your app can register an iOS or macOS device token or
-an Android FCM token from the server:
+`client.push.enable()` from `chaskijs/client`; your app can register an iOS or macOS device token,
+an Android FCM token or a Windows channel URI from the server:
 
 ```ts
 await chaski.push.register({
   recipient: { id: user.id },
-  platform: 'android', // or 'ios', 'macos'
+  platform: 'android', // or 'ios', 'macos', 'windows'
   deviceToken,
 });
 ```
@@ -104,8 +112,15 @@ An Electron app on macOS gets its token from `pushNotifications.registerForAPNSN
 in the main process, and registers it with `client.push.registerDevice({ platform: 'macos',
 deviceToken })`, as [Browser clients](/docs/browser-clients) shows.
 
-A send with `push: { silent: true }` shows its alert without a sound, on Apple devices and in
-browsers. On Android, the notification channel your app creates decides the sound.
+On Windows, the device token is the channel URI WNS hands the app. Chaski only accepts one on
+`notify.windows.com`, since it sends its access token there. The push arrives as a toast whose
+`launch` arguments carry the `href` and `tag`, which the Windows App SDK hands the app as
+`AppNotificationActivatedEventArgs.Arguments` when the user clicks it. WNS channels expire after
+30 days, so the app registers its channel again on every launch; Chaski forgets one WNS answers
+404 or 410 for.
+
+A send with `push: { silent: true }` shows its alert without a sound, on Apple devices, on Windows
+and in browsers. On Android, the notification channel your app creates decides the sound.
 
 On Android the notification shows on its own when the app is in the background; the `href` and
 `tag` of the push arrive in the intent’s extras when the user taps it.

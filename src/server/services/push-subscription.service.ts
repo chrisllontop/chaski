@@ -37,7 +37,13 @@ export type FcmPushDevice = {
   deviceToken: string;
 };
 
-export type PushDevice = WebPushDevice | ApnsPushDevice | FcmPushDevice;
+export type WnsPushDevice = {
+  id: string;
+  platform: 'windows';
+  channelUri: string;
+};
+
+export type PushDevice = WebPushDevice | ApnsPushDevice | FcmPushDevice | WnsPushDevice;
 
 export const isApnsDevice = (device: PushDevice): device is ApnsPushDevice =>
   isApnsPlatform(device.platform);
@@ -58,10 +64,10 @@ const storedDevice = (
       meta: { keys: request.subscription.keys, userAgent: request.userAgent },
     };
   }
-  // FCM tokens are case-sensitive, so they are kept as they came.
-  if (request.platform === 'android') {
+  // FCM tokens and WNS channel URIs are case-sensitive, so they are kept as they came.
+  if (request.platform === 'android' || request.platform === 'windows') {
     return {
-      platform: 'android',
+      platform: request.platform,
       token: request.deviceToken,
       meta: { userAgent: request.userAgent },
     };
@@ -115,7 +121,7 @@ export class PushSubscriptionService extends BaseService {
     if (query.recipientId) conditions.push(eq(deviceTokens.recipientId, query.recipientId));
     if (query.endpoint) conditions.push(eq(deviceTokens.token, query.endpoint));
     // The query doesn't name the platform: an APNs token is stored lowercased,
-    // an FCM token as it was registered.
+    // an FCM token or a WNS channel URI as it was registered.
     if (query.deviceToken) {
       const { deviceToken } = query;
       conditions.push(inArray(deviceTokens.token, [deviceToken, deviceToken.toLowerCase()]));
@@ -132,6 +138,9 @@ export class PushSubscriptionService extends BaseService {
     return rows.flatMap((row): PushDevice[] => {
       if (row.platform === 'android') {
         return [{ id: row.id, platform: 'android', deviceToken: row.token }];
+      }
+      if (row.platform === 'windows') {
+        return [{ id: row.id, platform: 'windows', channelUri: row.token }];
       }
       const meta = parseJson<StoredMeta>(row.meta, {});
       if (isApnsPlatform(row.platform)) {
@@ -163,6 +172,7 @@ export class PushSubscriptionService extends BaseService {
     if (push?.vapid) platforms.push('web');
     for (const platform of APNS_PLATFORMS) if (push?.apns?.[platform]) platforms.push(platform);
     if (push?.fcm) platforms.push('android');
+    if (push?.wns) platforms.push('windows');
     return platforms;
   };
 

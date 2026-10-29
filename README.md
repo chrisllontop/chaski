@@ -17,7 +17,8 @@ Chaski lives inside your Worker. You mount it on a route of your app, and it run
 Cloudflare resources. It deploys with your Worker, and your data stays in your account.
 
 - **Email, push, and in-app.** Email through Cloudflare Email Service, web push, push to iOS and
-  macOS through APNs and to Android through FCM, and an in-app feed that updates live.
+  macOS through APNs, to Android through FCM and to Windows through WNS, and an in-app feed that
+  updates live.
 - **Templates** for the content of every notification, written in Liquid and edited in the
   dashboard with a live preview.
 - **Preferences** that let each contact mute the notifications they don’t want.
@@ -34,7 +35,8 @@ Cloudflare resources. It deploys with your Worker, and your data stays in your a
 - For email, the Workers Paid plan and a domain onboarded to
   [Email Service](https://developers.cloudflare.com/email-service/get-started/send-emails/).
 - For web push, a VAPID key pair. For iOS and macOS, an APNs key from your Apple developer account.
-  For Android, a service account key from your Firebase project.
+  For Android, a service account key from your Firebase project. For Windows, a Microsoft Entra app
+  registration with a client secret.
 
 Chaski runs only on the bindings you declare. This guide declares all of them, and step 3 says which
 ones you can leave out. Resource and binding names are yours to choose; only the class names are
@@ -291,6 +293,23 @@ push: {
 npx wrangler secret put FCM_SERVICE_ACCOUNT < service-account.json
 ```
 
+For Windows, add `wns` with the Microsoft Entra app your Windows app creates its push channel with
+(the Windows App SDK’s `PushNotificationManager`), and one of its client secrets:
+
+```ts
+push: {
+  wns: {
+    tenantId: '<directory (tenant) id>',
+    clientId: '<application (client) id>',
+    clientSecret: env.WNS_CLIENT_SECRET,
+  },
+},
+```
+
+```sh
+npx wrangler secret put WNS_CLIENT_SECRET
+```
+
 ### 7. Deploy
 
 ```sh
@@ -443,6 +462,10 @@ const deviceToken = await pushNotifications.registerForAPNSNotifications();
 await client.push.registerDevice({ platform: 'macos', deviceToken });
 ```
 
+On Windows, the app registers the channel URI the Windows App SDK gives it, again on every launch,
+since WNS channels expire after 30 days:
+`client.push.registerDevice({ platform: 'windows', deviceToken: channelUri })`.
+
 With React, `chaskijs/react` wraps the client in hooks:
 
 ```tsx
@@ -478,6 +501,8 @@ CHASKI_PUBLIC_URL=http://localhost:8787/admin/notifications
 VAPID_PRIVATE_KEY=<private key from step 6>
 # With Android push, the JSON key file in single quotes, which keep its \n escapes as they are:
 FCM_SERVICE_ACCOUNT='<the contents of service-account.json>'
+# With Windows push:
+WNS_CLIENT_SECRET=<client secret from step 6>
 ```
 
 `wrangler dev` keeps every email Chaski sends on disk, under `.wrangler/tmp/email/`, instead of
