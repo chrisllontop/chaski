@@ -6,7 +6,7 @@ web push and in-app notifications, with templates, scheduling, retries and a das
 (MIT), published on npm as `chaskijs`.
 
 **Current stage: the engine, the browser clients, the dashboard and the setup guide in the README.**
-`createChaski()` takes the host's config; Chaski sends email, web push, APNs and in-app
+`createChaski()` takes the host's config; Chaski sends email, web push, APNs, FCM and in-app
 notifications through the host's queue, with templates, preferences, scheduled sends, retries and
 realtime events. `chaski.routes()` mounts the dashboard and its admin API, and `chaski.userRoutes()`
 the endpoints the host's frontend calls for the signed-in user, which `chaskijs/client`,

@@ -8,14 +8,15 @@ out is a separate request from the user. Every Chaski call below is in [sending.
 
 Put every flow in one of two groups.
 
-**Moves** when it sends email, web push, iOS push or in-app notifications from code that runs in
-the Worker that hosts Chaski, or in another Worker of the same account, which calls Chaski through
-`ChaskiEntrypoint` ([setup.md](setup.md) ends with it).
+**Moves** when it sends email, web push, iOS push, Android push or in-app notifications from code
+that runs in the Worker that hosts Chaski, or in another Worker of the same account, which calls
+Chaski through `ChaskiEntrypoint` ([setup.md](setup.md) ends with it).
 
 **Stays** on its current provider, with the reason written next to it:
 
 - **SMS, WhatsApp, voice, Slack, Discord and other chat apps.** Chaski has no channel for them.
-- **Android native push and Expo push tokens.** Chaski’s push covers web push and APNs only.
+- **Expo push tokens, and FCM tokens of iOS apps.** Chaski’s push covers web push, APNs and FCM
+  for Android only.
 - **Code that doesn’t run in a Cloudflare Worker**, with no Worker of the account to call. Chaski
   has no HTTP API for outside callers.
 - **Broadcasts to a list or an audience, and sequences built in a provider’s dashboard.** Chaski
@@ -129,6 +130,9 @@ Write every converted template into the template file ([sending.md](sending.md))
   path still sends pushes of another shape, the service worker has to show both.
 - **APNs device tokens**: `chaski.push.register({ recipient: { id }, platform: 'ios', deviceToken })`,
   with the same bundle id and environment in `channels.push.apns`.
+- **Android FCM tokens**:
+  `chaski.push.register({ recipient: { id }, platform: 'android', deviceToken })`, with a service
+  account of the same Firebase project in `channels.push.fcm`.
 - **In-app history.** Chaski’s feed starts empty and has no import; earlier items stay in the
   host’s table. Agree with the user whether the UI shows both for a while or lets the old ones go.
 - **Notification services** (Knock, Novu, Courier, OneSignal, MagicBell): each workflow becomes a

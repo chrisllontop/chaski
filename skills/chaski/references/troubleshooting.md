@@ -21,11 +21,12 @@ from a temporary route, or the project’s health route, to see the error. Its `
 | `channels.email is configured but bindings.email is missing` | Declare `send_email` and pass it as `bindings.email`, or drop `channels.email`. |
 | `channels.email.from must be an email address` | Set `from` to an address on the domain onboarded to Email Service. |
 | `channels.in_app is configured but bindings.feed is missing` | Bind the `ChaskiFeed` Durable Object and pass it as `bindings.feed`. |
-| `channels.push needs vapid (web push), apns (iOS) or both` | Fill in `vapid`, `apns` or both, or drop `channels.push`. |
+| `channels.push needs vapid (web push), apns (iOS), fcm (Android) or several of them` | Fill in `vapid`, `apns`, `fcm` or several of them, or drop `channels.push`. |
 | `channels.push.vapid.subject must be a mailto: or https: URL` | Use `mailto:you@example.com` or an `https://` URL. |
 | `channels.push.vapid.publicKey must be a base64url uncompressed P-256 key (65 bytes)` | Use the `publicKey` that `npx web-push generate-vapid-keys` prints, not a PEM. An empty value means the var is unset. |
 | `channels.push.vapid.privateKey must be a base64url P-256 private key (32 bytes)` | Same, for `privateKey`. Locally the secret comes from `.dev.vars`; deployed, from `wrangler secret put`. |
 | `channels.push.apns.<field> is required`, `…environment must be 'sandbox' or 'production'`, `…privateKey must be the contents of the .p8 file` | Fill in the APNs fields; `privateKey` is the whole `.p8` text, `-----BEGIN PRIVATE KEY-----` included. |
+| `channels.push.fcm.serviceAccount must be the contents of the service account JSON file`, `…has no <field>: use the JSON key file as downloaded`, `…has a private_key that is not a PEM key` | Set the whole JSON key file as the secret, as the Firebase console downloads it: `npx wrangler secret put FCM_SERVICE_ACCOUNT < service-account.json`. |
 | `maxRetries must be a non-negative integer`, `migrationsTable must be a plain table name` | Fix the option, or leave it out for the default. |
 | `bindings.scheduler is missing; chaski.schedule() needs the ChaskiScheduler Workflow` | Bind the Workflow as `scheduler` and export `ChaskiScheduler` from the main module. |
 | `cloudflareAccess needs an audience` | Pass the Access application’s AUD tag as `audience`. |

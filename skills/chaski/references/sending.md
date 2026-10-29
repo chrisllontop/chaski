@@ -205,6 +205,7 @@ await chaski.feed.unreadCount(user.id);                         // { unread }
 await chaski.feed.markRead({ recipientId: user.id, ids: [id] }); // or before, or neither for all
 
 await chaski.push.register({ recipient: { id: user.id }, platform: 'ios', deviceToken });
+await chaski.push.register({ recipient: { id: user.id }, platform: 'android', deviceToken }); // FCM
 await chaski.push.register({ recipient: { id: user.id }, subscription }); // a web push subscription
 await chaski.push.unregister({ deviceToken });
 ```
