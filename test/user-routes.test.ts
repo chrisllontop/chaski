@@ -148,6 +148,21 @@ describe('push devices', () => {
     expect(response.status).toBe(201);
   });
 
+  it('registers an Android device and unregisters it by its token', async () => {
+    const deviceToken = `cQ1:APA91bF${'Zx-9_Yw'.repeat(20)}`;
+    const register = await me('/push/subscriptions', {
+      method: 'POST',
+      body: JSON.stringify({ platform: 'android', deviceToken }),
+    });
+    const unregister = await me('/push/subscriptions', {
+      method: 'DELETE',
+      body: JSON.stringify({ deviceToken }),
+    });
+
+    expect(register.status).toBe(201);
+    expect(await json(unregister)).toEqual({ unregistered: 1 });
+  });
+
   it('only unregisters the signed-in user devices', async () => {
     await me('/push/subscriptions', { method: 'POST', body: JSON.stringify(SUBSCRIPTION) });
 

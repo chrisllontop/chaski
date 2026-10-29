@@ -38,6 +38,33 @@ const apns = {
   privateKey: `-----BEGIN PRIVATE KEY-----\n${btoa(String.fromCharCode(...pkcs8))}\n-----END PRIVATE KEY-----`,
 };
 
+const fcmPair = (await crypto.subtle.generateKey(
+  {
+    name: 'RSASSA-PKCS1-v1_5',
+    modulusLength: 2048,
+    publicExponent: new Uint8Array([1, 0, 1]),
+    hash: 'SHA-256',
+  },
+  true,
+  ['sign', 'verify'],
+)) as CryptoKeyPair;
+const fcmPkcs8 = new Uint8Array(
+  (await crypto.subtle.exportKey('pkcs8', fcmPair.privateKey)) as ArrayBuffer,
+);
+
+// The JSON key file the Firebase console downloads. Each test gets its own key
+// id, so an access token cached by one test never answers for the next.
+const serviceAccount = (fields: Record<string, unknown> = {}) =>
+  JSON.stringify({
+    type: 'service_account',
+    project_id: 'host-app',
+    private_key_id: crypto.randomUUID(),
+    private_key: `-----BEGIN PRIVATE KEY-----\n${btoa(String.fromCharCode(...fcmPkcs8))}\n-----END PRIVATE KEY-----\n`,
+    client_email: 'chaski@host-app.iam.gserviceaccount.com',
+    token_uri: 'https://oauth2.googleapis.com/token',
+    ...fields,
+  });
+
 // What a browser's pushManager.subscribe() hands back: its own ECDH key and an
 // auth secret. The browser keeps both to decrypt what arrives.
 const browsers = new Map<string, { pair: CryptoKeyPair; auth: Uint8Array }>();
@@ -96,6 +123,8 @@ const decryptAsBrowser = async (endpoint: string, body: Uint8Array) => {
 };
 
 const IOS_TOKEN = 'A1B2C3D4'.repeat(8);
+// FCM tokens are case-sensitive, so this one mixes cases on purpose.
+const ANDROID_TOKEN = `dQw4w9WgXcQ:APA91bH${'Kx7_Lm-Pq2Rs'.repeat(12)}`;
 
 type Call = { url: string; headers: Headers; body: Uint8Array };
 
@@ -324,6 +353,154 @@ describe('APNs', () => {
   });
 });
 
+describe('FCM', () => {
+  beforeEach(() => usePush({ fcm: { serviceAccount: serviceAccount() } }));
+
+  const TOKEN_URL = 'https://oauth2.googleapis.com/token';
+  const SEND_URL = 'https://fcm.googleapis.com/v1/projects/host-app/messages:send';
+
+  // Google hands out a new access token on every exchange.
+  const stubFcm = (
+    respond: () => Response = () => Response.json({ name: 'projects/host-app/messages/1' }),
+  ) => {
+    let issued = 0;
+    return stubFetch((url) =>
+      url === TOKEN_URL
+        ? Response.json({ access_token: `ya29.${++issued}`, expires_in: 3599 })
+        : respond(),
+    );
+  };
+
+  const fcmError = (status: number, errorCode: string) =>
+    Response.json(
+      {
+        error: {
+          code: status,
+          details: [{ '@type': 'type.googleapis.com/google.firebase.fcm.v1.FcmError', errorCode }],
+        },
+      },
+      { status },
+    );
+
+  const registerAndroid = () =>
+    chaski.push.register({
+      recipient: recipient(),
+      platform: 'android',
+      deviceToken: ANDROID_TOKEN,
+    });
+
+  const verifyAssertion = async (assertion: string | null) => {
+    const [header, claims, signature] = (assertion ?? '').split('.');
+    const valid = await crypto.subtle.verify(
+      'RSASSA-PKCS1-v1_5',
+      fcmPair.publicKey,
+      decodeBase64Url(signature ?? '') ?? new Uint8Array(),
+      new TextEncoder().encode(`${header}.${claims}`),
+    );
+    const decode = (part = '') =>
+      JSON.parse(new TextDecoder().decode(decodeBase64Url(part) ?? undefined));
+    return { valid, header: decode(header), claims: decode(claims) };
+  };
+
+  it('trades a signed service account assertion for an access token it reuses', async () => {
+    await registerAndroid();
+    const calls = stubFcm();
+
+    await sendPush();
+    await sendPush();
+
+    expect(calls.map((call) => call.url)).toEqual([TOKEN_URL, SEND_URL, SEND_URL]);
+    const form = new URLSearchParams(new TextDecoder().decode(calls[0]?.body));
+    expect(form.get('grant_type')).toBe('urn:ietf:params:oauth:grant-type:jwt-bearer');
+    expect(await verifyAssertion(form.get('assertion'))).toMatchObject({
+      valid: true,
+      header: { alg: 'RS256' },
+      claims: {
+        iss: 'chaski@host-app.iam.gserviceaccount.com',
+        scope: 'https://www.googleapis.com/auth/firebase.messaging',
+        aud: TOKEN_URL,
+      },
+    });
+    expect(calls[1]?.headers.get('authorization')).toBe('Bearer ya29.1');
+    expect(calls[2]?.headers.get('authorization')).toBe('Bearer ya29.1');
+  });
+
+  it('sends the notification FCM expects, with the link and a collapse key', async () => {
+    await registerAndroid();
+    const calls = stubFcm();
+
+    const delivery = await sendPush();
+
+    expect(delivery).toMatchObject({ status: 'sent', providerMessageId: 'push:1/1' });
+    expect(JSON.parse(new TextDecoder().decode(calls[1]?.body))).toEqual({
+      message: {
+        token: ANDROID_TOKEN,
+        notification: { title: 'Hello Ana', body: 'Amount: 1500' },
+        data: { href: '/payments/1500', tag: delivery?.notificationId },
+        android: {
+          priority: 'HIGH',
+          ttl: '3600s',
+          collapse_key: delivery?.notificationId,
+          notification: { tag: delivery?.notificationId },
+        },
+      },
+    });
+  });
+
+  it('forgets a device FCM reports unregistered', async () => {
+    await registerAndroid();
+    stubFcm(() => fcmError(404, 'UNREGISTERED'));
+
+    expect(await sendPush()).toMatchObject({ status: 'failed', errorCode: 'no_device_tokens' });
+    expect(await devices()).toEqual([]);
+  });
+
+  it('forgets a device registered to another Firebase project', async () => {
+    await registerAndroid();
+    stubFcm(() => fcmError(403, 'SENDER_ID_MISMATCH'));
+
+    expect(await sendPush()).toMatchObject({ status: 'failed', errorCode: 'no_device_tokens' });
+    expect(await devices()).toEqual([]);
+  });
+
+  it('retries, keeping the device, when FCM is unavailable', async () => {
+    await registerAndroid();
+    stubFcm(() => fcmError(503, 'UNAVAILABLE'));
+
+    expect(await sendPush()).toMatchObject({ status: 'pending', errorCode: 'provider_error' });
+    expect(await devices()).toHaveLength(1);
+  });
+
+  it('trades for a new access token after FCM rejects the cached one', async () => {
+    await registerAndroid();
+    let rejected = false;
+    const calls = stubFcm(() => {
+      if (rejected) return Response.json({ name: 'projects/host-app/messages/1' });
+      rejected = true;
+      return Response.json({ error: { code: 401, status: 'UNAUTHENTICATED' } }, { status: 401 });
+    });
+
+    expect(await sendPush()).toMatchObject({ status: 'pending', errorCode: 'provider_error' });
+    expect(await sendPush()).toMatchObject({ status: 'sent' });
+    expect(calls.map((call) => call.url)).toEqual([TOKEN_URL, SEND_URL, TOKEN_URL, SEND_URL]);
+    expect(calls[3]?.headers.get('authorization')).toBe('Bearer ya29.2');
+  });
+
+  it('still reaches the other devices when Google refuses the service account', async () => {
+    usePush({ apns, fcm: { serviceAccount: serviceAccount() } });
+    await registerAndroid();
+    await chaski.push.register({ recipient: recipient(), platform: 'ios', deviceToken: IOS_TOKEN });
+    stubFetch((url) =>
+      url === TOKEN_URL
+        ? Response.json({ error: 'invalid_grant' }, { status: 400 })
+        : new Response(null, { status: 200 }),
+    );
+
+    expect(await sendPush()).toMatchObject({ status: 'sent', providerMessageId: 'push:1/2' });
+    expect(await devices()).toHaveLength(2);
+  });
+});
+
 describe('push subscriptions', () => {
   beforeEach(() => usePush({ vapid }));
 
@@ -353,6 +530,21 @@ describe('push subscriptions', () => {
     await expect(chaski.push.unregister({})).rejects.toMatchObject({ code: 'validation' });
   });
 
+  it('keeps an FCM token as registered and unregisters it as sent', async () => {
+    await chaski.push.register({
+      recipient: recipient(),
+      platform: 'android',
+      deviceToken: ANDROID_TOKEN,
+    });
+
+    expect(await devices()).toEqual([
+      expect.objectContaining({ platform: 'android', token: ANDROID_TOKEN }),
+    ]);
+    expect(await chaski.push.unregister({ deviceToken: ANDROID_TOKEN })).toEqual({
+      unregistered: 1,
+    });
+  });
+
   it('reports the VAPID public key, or null without one', async () => {
     expect(await chaski.push.vapidPublicKey()).toEqual({ publicKey: vapid.publicKey });
 
@@ -367,7 +559,7 @@ describe('push config', () => {
     return () => validateConfig({ ...config, channels: { ...config.channels, push } });
   };
 
-  it('needs VAPID, APNs or both', () => {
+  it('needs VAPID, APNs, FCM or several of them', () => {
     expect(withPush({})).toThrowError(/channels.push needs vapid/);
   });
 
@@ -388,5 +580,24 @@ describe('push config', () => {
     expect(withPush({ apns: { ...apns, teamId: '' } })).toThrowError(
       'Chaski config: channels.push.apns.teamId is required',
     );
+  });
+
+  it('reads the FCM credentials from the service account JSON', () => {
+    const account = serviceAccount();
+    expect(withPush({ fcm: { serviceAccount: account } })().channels.push?.fcm).toEqual({
+      projectId: 'host-app',
+      clientEmail: 'chaski@host-app.iam.gserviceaccount.com',
+      privateKeyId: JSON.parse(account).private_key_id,
+      privateKeyPem: JSON.parse(account).private_key,
+    });
+  });
+
+  it('rejects an FCM service account that is not the JSON key file', () => {
+    expect(withPush({ fcm: { serviceAccount: 'AIzaSy-not-a-key-file' } })).toThrowError(
+      'channels.push.fcm.serviceAccount must be the contents of the service account JSON file',
+    );
+    expect(
+      withPush({ fcm: { serviceAccount: serviceAccount({ private_key: undefined }) } }),
+    ).toThrowError('channels.push.fcm.serviceAccount has no private_key');
   });
 });

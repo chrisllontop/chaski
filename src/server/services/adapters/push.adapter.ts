@@ -7,12 +7,20 @@ import {
   getApnsAuthToken,
 } from '../../lib/apns';
 import { DeliveryError } from '../../lib/errors';
+import {
+  buildFcmRequest,
+  clearFcmAccessToken,
+  type FcmCredentials,
+  type FcmError,
+  getFcmAccessToken,
+  readFcmError,
+} from '../../lib/fcm';
 import { parseJson } from '../../lib/json';
 import { renderTemplate } from '../../lib/render';
 import { encryptPushPayload, MAX_PAYLOAD_BYTES, vapidAuthorization } from '../../lib/web-push';
 import { BaseService } from '../base.service';
 import type { ContactSnapshot } from '../contact.service';
-import type { ApnsPushDevice, WebPushDevice } from '../push-subscription.service';
+import type { ApnsPushDevice, FcmPushDevice, WebPushDevice } from '../push-subscription.service';
 import { PushSubscriptionService } from '../push-subscription.service';
 import { TemplateService } from '../template.service';
 import type { AdapterContext, AdapterResult } from './types';
@@ -22,6 +30,19 @@ type PushOutcome = 'delivered' | 'expired';
 // Apple answers 400 with these for tokens that will never work again; with
 // 410 Unregistered they are the signals to forget a device.
 const APNS_PRUNE_REASONS = new Set(['BadDeviceToken', 'DeviceTokenNotForTopic', 'ExpiredToken']);
+
+// What a failed FCM send means for the device and for the access token:
+// 'expired' forgets the device, 'renew' drops the cached access token and
+// retries, 'retry' only retries.
+type FcmVerdict = 'expired' | 'renew' | 'retry';
+
+const classifyFcmError = (status: number, error: FcmError): FcmVerdict => {
+  // TODO: map FCM's answers to a verdict. error.errorCode is FCM's code
+  // (UNREGISTERED, SENDER_ID_MISMATCH, INVALID_ARGUMENT, QUOTA_EXCEEDED,
+  // UNAVAILABLE, INTERNAL, or Google's generic UNAUTHENTICATED), and
+  // error.field names what a 400 is about ('message.token' for a bad token).
+  return 'retry';
+};
 
 const sendWebPush = async (
   vapid: NonNullable<ResolvedPush['vapid']>,
@@ -74,6 +95,40 @@ const sendApns = async (
   if (response.status === 400 && reason && APNS_PRUNE_REASONS.has(reason)) return 'expired';
   if (response.status === 403 && reason === 'ExpiredProviderToken') clearApnsAuthToken(creds);
   throw new Error(`APNs answered ${response.status}${reason ? ` (${reason})` : ''}`);
+};
+
+const sendFcm = async (
+  creds: FcmCredentials,
+  accessToken: string,
+  device: FcmPushDevice,
+  payload: PushPayload,
+): Promise<PushOutcome> => {
+  const request = buildFcmRequest({
+    accessToken,
+    projectId: creds.projectId,
+    deviceToken: device.deviceToken,
+    notification: { title: payload.title, body: payload.body },
+    // FCM only carries strings in data.
+    data: {
+      ...(payload.href ? { href: payload.href } : {}),
+      ...(payload.tag ? { tag: payload.tag } : {}),
+    },
+    collapseId: payload.tag,
+  });
+  const response = await fetch(request.url, {
+    method: 'POST',
+    headers: request.headers,
+    body: request.body,
+  });
+  if (response.ok) return 'delivered';
+
+  const error = await readFcmError(response);
+  const verdict = classifyFcmError(response.status, error);
+  if (verdict === 'expired') return 'expired';
+  if (verdict === 'renew') clearFcmAccessToken(creds);
+  throw new Error(
+    `FCM answered ${response.status}${error.errorCode ? ` (${error.errorCode})` : ''}`,
+  );
 };
 
 export class PushAdapter extends BaseService {
@@ -129,17 +184,26 @@ export class PushAdapter extends BaseService {
         { permanent: true },
       );
     }
-    const { vapid, apns } = push;
+    const { vapid, apns, fcm } = push;
     // One provider token signs the whole fan-out.
     const apnsToken =
       apns && devices.some((device) => device.platform === 'ios')
         ? await getApnsAuthToken(apns)
+        : null;
+    // The FCM access token takes a request to Google, so it is not awaited
+    // here: a failed exchange fails the Android devices and no other.
+    const fcmToken =
+      fcm && devices.some((device) => device.platform === 'android')
+        ? getFcmAccessToken(fcm)
         : null;
     const results = await Promise.allSettled(
       devices.map((device) => {
         if (device.platform === 'web' && vapid) return sendWebPush(vapid, device, webPayload);
         if (device.platform === 'ios' && apns && apnsToken) {
           return sendApns(apns, apnsToken, device, message);
+        }
+        if (device.platform === 'android' && fcm && fcmToken) {
+          return fcmToken.then((token) => sendFcm(fcm, token, device, message));
         }
         return Promise.reject(new Error(`no credentials for ${device.platform} push`));
       }),
