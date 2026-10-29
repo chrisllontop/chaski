@@ -104,8 +104,8 @@ export const mountUserRoutes = <E extends Env = Env>({
       }
       const userAgent = c.req.header('user-agent')?.slice(0, 512);
       const request =
-        'deviceToken' in device
-          ? { recipient, platform: device.platform, deviceToken: device.deviceToken, userAgent }
+        'platform' in device
+          ? { ...device, recipient, userAgent }
           : { recipient, subscription: device, userAgent };
       return c.json(await PushSubscriptionService.register(request), 201);
     });

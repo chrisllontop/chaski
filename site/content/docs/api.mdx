@@ -21,7 +21,7 @@ description: The in-process API your Worker calls, the routes Chaski mounts and 
 | `preferences.get(recipientId)` | `ChaskiPreferences` | |
 | `preferences.set(recipientId, update)` | `ChaskiPreferences` | Merges channels; `mutedTypes` overwrites the list. |
 | `preferences.topics()` | `{ topic, types }[]` | Template types grouped by topic. |
-| `push.register(request)` | `{ id }` | Registers a web push subscription, an iOS device token or an Android FCM token. |
+| `push.register(request)` | `{ id }` | Registers a web push subscription, an iOS or macOS device token or an Android FCM token. |
 | `push.unregister(query)` | `{ unregistered }` | By `recipientId`, `endpoint` or `deviceToken`. |
 | `push.vapidPublicKey()` | `{ publicKey }` | The key for `pushManager.subscribe()`, or `null`. |
 | `templates.import(file, { preview? })` | `TemplateImportResult` | Creates or updates templates by type from a [template file](/docs/templates#keep-templates-in-a-file); `preview` only reports. |
@@ -62,6 +62,8 @@ type SendRequest = {
   channels?: Array<'email' | 'in_app' | 'push'>;
   transactional?: boolean;
   email?: { fromName?: string; replyTo?: string; attachments?: AttachmentInput[] };
+  // Shows the push without a sound, on Apple devices and in browsers.
+  push?: { silent?: boolean };
   idempotencyKey?: string;
   // Delivers the one transactional email before send() returns; see Sending.
   inline?: boolean;
@@ -127,7 +129,7 @@ returns. `chaskijs/client` calls them for you.
 | `PATCH /preferences` | Updates them. |
 | `GET /preferences/topics` | Template types grouped by topic. |
 | `GET /push/vapid-public-key` | `{ publicKey }` |
-| `POST /push/subscriptions` | Registers this browser’s subscription, an iOS device token or an Android FCM token. |
+| `POST /push/subscriptions` | Registers this browser’s subscription, an iOS or macOS device token or an Android FCM token. |
 | `DELETE /push/subscriptions` | Drops one, by `endpoint` or `deviceToken`. |
 
 A path the mount doesn’t serve, including those of a group left out of `groups`, reaches your

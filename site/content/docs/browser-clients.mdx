@@ -114,6 +114,24 @@ it, or opens the link in a new window, and open windows get a message to refresh
 window the service worker doesn’t control yet, such as the page that just turned push on, can’t be
 navigated, so the link opens in a new one until that page reloads.
 
+## Electron on macOS
+
+An Electron app gets its push through APNs, as a native Mac app, not through web push. The main
+process asks macOS for the device token, and the client registers it for the signed-in user with
+`registerDevice()`; `unregisterDevice()` drops it when they sign out:
+
+```ts
+import { pushNotifications } from 'electron';
+
+const deviceToken = await pushNotifications.registerForAPNSNotifications();
+await client.push.registerDevice({ platform: 'macos', deviceToken });
+```
+
+The app has to be signed with the push entitlement, and `channels.push.apns.macos` names its bundle
+id. A development build’s token only works in APNs’s sandbox, so that build registers with
+`environment: 'sandbox'`. macOS shows the alert on its own while the app is in the background; while
+it’s in front, the app gets it through the `received-apns-notification` event instead.
+
 ## React
 
 `chaskijs/react` wraps the client in hooks. Give them a client once, near the root:

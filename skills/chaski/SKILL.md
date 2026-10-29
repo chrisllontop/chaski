@@ -8,8 +8,8 @@ license: MIT
 
 Chaski is a library, not a hosted service. A Cloudflare Worker, the **host**, mounts it on a route
 of its Hono app, and Chaski runs on the host’s own D1 database, queue, Durable Objects and Workflow.
-It sends email through Cloudflare Email Service, web push, push to iOS through APNs and to Android
-through FCM, and keeps an in-app feed per user, with templates, preferences, scheduled sends,
+It sends email through Cloudflare Email Service, web push, push to iOS and macOS through APNs and to
+Android through FCM, and keeps an in-app feed per user, with templates, preferences, scheduled sends,
 retries and a dashboard.
 Docs: https://chaski.sh/docs.
 
@@ -33,8 +33,8 @@ resolve on chaski.sh too. Only the audit’s finder has to be on disk to run:
 
 - **Fit.** Chaski runs only inside a Cloudflare Worker, and its routes are Hono 4.8+ apps. Code
   that runs anywhere else (a Node server, Vercel, Lambda) can’t host it, and Chaski has no HTTP API
-  for sending from outside Cloudflare. Its channels are email, web push, iOS push, Android push and
-  in-app: SMS, WhatsApp, chat apps and Expo push tokens stay on the provider the project uses
+  for sending from outside Cloudflare. Its channels are email, web push, iOS and macOS push, Android
+  push and in-app: SMS, WhatsApp, chat apps and Expo push tokens stay on the provider the project uses
   today.
 - **Bindings decide features.** Only the `db` (D1) and `queue` bindings are required. The email
   channel needs `email` (a `send_email` binding), the in-app channel needs `feed` (the `ChaskiFeed`

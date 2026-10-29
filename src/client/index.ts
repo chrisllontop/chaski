@@ -39,6 +39,7 @@ export type {
   FeedItem,
   FeedPage,
   FeedSocketEvent,
+  NativeDevice,
   PreferencesUpdate,
 } from '../contract/contract';
 export type { ChaskiErrorCode } from '../contract/errors';

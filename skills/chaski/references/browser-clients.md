@@ -203,6 +203,16 @@ using the app’s own session, or the host calls
 `chaski.push.register({ recipient: { id }, platform: 'ios', deviceToken })` from an endpoint of its
 own. The config needs `channels.push.apns`.
 
+## An Electron app on macOS
+
+Electron’s main process gets the APNs device token from
+`pushNotifications.registerForAPNSNotifications()`, and the client registers it for the signed-in
+user with `client.push.registerDevice({ platform: 'macos', deviceToken })`; a development build adds
+`environment: 'sandbox'`. On sign-out, `client.push.unregisterDevice(deviceToken)`. The config needs
+`channels.push.apns.macos` with the Mac app’s bundle id, and the app must be signed with the push
+entitlement (`com.apple.developer.aps-environment`) and a provisioning profile, or macOS gives it no
+token. `client.push.enable()` is web push, which Electron doesn’t offer: don’t use it there.
+
 ## A native Android app
 
 The app registers its FCM registration token (`FirebaseMessaging.getInstance().token`) for the

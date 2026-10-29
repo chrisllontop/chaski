@@ -30,6 +30,7 @@ dashboard shows it as it moves.
 | `channels` | Narrows the send to some of the template’s channels, such as `['email']`. |
 | `transactional` | Sends regardless of the contact’s preferences, for receipts and password resets. |
 | `email` | Per-send email options: `fromName`, `replyTo` and up to 10 `attachments`. |
+| `push` | Per-send push options: `silent: true` shows the alert without a sound. |
 | `idempotencyKey` | Makes the send safe to repeat: the same key returns the first send’s result. |
 | `inline` | Delivers the email before `send()` returns, for someone waiting on it; see [below](#inline). |
 

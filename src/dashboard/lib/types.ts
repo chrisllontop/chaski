@@ -144,6 +144,9 @@ export type SchedulePage = {
 
 export type ChannelPause = { pausedBy: Actor; pausedAt: string };
 
+/** An Apple app push reaches: its bundle id and the APNs environment of its tokens. */
+export type ApnsApp = { bundleId: string; environment: 'sandbox' | 'production' };
+
 export type ChannelsOverview = {
   /** The environment the host's config names; `local` opens the dashboard without signing in. */
   environment: string | null;
@@ -165,7 +168,8 @@ export type ChannelsOverview = {
       enabled: boolean;
       paused: ChannelPause | null;
       web: { vapidPublicKey: string } | null;
-      ios: { bundleId: string; environment: 'sandbox' | 'production' } | null;
+      ios: ApnsApp | null;
+      macos: ApnsApp | null;
       android: { projectId: string } | null;
     },
   ];

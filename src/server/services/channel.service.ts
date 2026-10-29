@@ -41,9 +41,8 @@ export class ChannelService extends BaseService {
           enabled: Boolean(push),
           paused: pauseOf('push'),
           web: push?.vapid ? { vapidPublicKey: push.vapid.publicKey } : null,
-          ios: push?.apns
-            ? { bundleId: push.apns.bundleId, environment: push.apns.environment }
-            : null,
+          ios: push?.apns?.ios ?? null,
+          macos: push?.apns?.macos ?? null,
           android: push?.fcm ? { projectId: push.fcm.projectId } : null,
         },
       ],

@@ -1,6 +1,7 @@
 import type { PushPayload } from '../../../contract/contract';
 import type { ResolvedPush } from '../../config';
 import {
+  type ApnsApp,
   type ApnsCredentials,
   buildApnsRequest,
   clearApnsAuthToken,
@@ -17,19 +18,37 @@ import {
 } from '../../lib/fcm';
 import { parseJson } from '../../lib/json';
 import { renderTemplate } from '../../lib/render';
+import { reportError } from '../../lib/report-error';
 import { encryptPushPayload, MAX_PAYLOAD_BYTES, vapidAuthorization } from '../../lib/web-push';
 import { BaseService } from '../base.service';
 import type { ContactSnapshot } from '../contact.service';
-import type { ApnsPushDevice, FcmPushDevice, WebPushDevice } from '../push-subscription.service';
-import { PushSubscriptionService } from '../push-subscription.service';
+import {
+  type ApnsPushDevice,
+  type FcmPushDevice,
+  isApnsDevice,
+  PushSubscriptionService,
+  type WebPushDevice,
+} from '../push-subscription.service';
 import { TemplateService } from '../template.service';
 import type { AdapterContext, AdapterResult } from './types';
 
-type PushOutcome = 'delivered' | 'expired';
+// 'expired' forgets a device quietly: it was uninstalled or its token rotated. A refused device
+// is forgotten too, but the refusal can point at the config, so it is reported.
+type PushOutcome = 'delivered' | 'expired' | { refused: string };
 
-// Apple answers 400 with these for tokens that will never work again; with
-// 410 Unregistered they are the signals to forget a device.
-const APNS_PRUNE_REASONS = new Set(['BadDeviceToken', 'DeviceTokenNotForTopic', 'ExpiredToken']);
+// What Apple's 400 reasons for a token that will never work again say about the cause. A token
+// of another environment or another app reads the same as a broken one, so each names the
+// setting to check before the device registers again.
+const APNS_REFUSALS: Record<string, (device: ApnsPushDevice, app: ApnsApp) => string> = {
+  BadDeviceToken: (device, app) =>
+    `APNs refused the ${device.platform} device ${device.id} in ` +
+    `${device.environment ?? app.environment} (BadDeviceToken): a development build's token ` +
+    "only works in sandbox, so register it with environment: 'sandbox'",
+  DeviceTokenNotForTopic: (device, app) =>
+    `APNs refused the ${device.platform} device ${device.id} for ${app.bundleId} ` +
+    `(DeviceTokenNotForTopic): the token belongs to another app; check ` +
+    `channels.push.apns.${device.platform}.bundleId and the platform the app registers with`,
+};
 
 // What a failed FCM send means for the device and for the access token:
 // 'expired' forgets the device, 'renew' drops the cached access token and
@@ -74,6 +93,7 @@ const sendWebPush = async (
 
 const sendApns = async (
   creds: ApnsCredentials,
+  app: ApnsApp,
   authToken: string,
   device: ApnsPushDevice,
   payload: PushPayload,
@@ -81,10 +101,13 @@ const sendApns = async (
   const request = buildApnsRequest({
     authToken,
     deviceToken: device.deviceToken,
-    bundleId: creds.bundleId,
-    environment: creds.environment,
+    topic: app.bundleId,
+    environment: device.environment ?? app.environment,
     payload: {
-      aps: { alert: { title: payload.title, body: payload.body }, sound: 'default' },
+      aps: {
+        alert: { title: payload.title, body: payload.body },
+        ...(payload.silent ? {} : { sound: 'default' }),
+      },
       ...(payload.href ? { href: payload.href } : {}),
       ...(payload.tag ? { tag: payload.tag } : {}),
     },
@@ -99,7 +122,9 @@ const sendApns = async (
 
   const reason = ((await response.json().catch(() => ({}))) as { reason?: string }).reason;
   if (response.status === 410) return 'expired';
-  if (response.status === 400 && reason && APNS_PRUNE_REASONS.has(reason)) return 'expired';
+  if (response.status === 400 && reason === 'ExpiredToken') return 'expired';
+  const refusal = response.status === 400 && reason ? APNS_REFUSALS[reason] : undefined;
+  if (refusal) return { refused: refusal(device, app) };
   if (response.status === 403 && reason === 'ExpiredProviderToken') clearApnsAuthToken(creds);
   throw new Error(`APNs answered ${response.status}${reason ? ` (${reason})` : ''}`);
 };
@@ -181,7 +206,13 @@ export class PushAdapter extends BaseService {
       });
     }
 
-    const message: PushPayload = { title, body, href: href || undefined, tag: notification.id };
+    const message: PushPayload = {
+      title,
+      body,
+      href: href || undefined,
+      tag: notification.id,
+      ...(notification.pushSilent ? { silent: true } : {}),
+    };
     const webPayload = new TextEncoder().encode(JSON.stringify(message));
     if (webPayload.length > MAX_PAYLOAD_BYTES) {
       throw new DeliveryError(
@@ -191,11 +222,8 @@ export class PushAdapter extends BaseService {
       );
     }
     const { vapid, apns, fcm } = push;
-    // One provider token signs the whole fan-out.
-    const apnsToken =
-      apns && devices.some((device) => device.platform === 'ios')
-        ? await getApnsAuthToken(apns)
-        : null;
+    // One provider token signs the whole fan-out, for every app of the team.
+    const apnsToken = apns && devices.some(isApnsDevice) ? await getApnsAuthToken(apns) : null;
     // The FCM access token takes a request to Google, so it is not awaited
     // here: a failed exchange fails the Android devices and no other.
     const fcmToken =
@@ -205,8 +233,9 @@ export class PushAdapter extends BaseService {
     const results = await Promise.allSettled(
       devices.map((device) => {
         if (device.platform === 'web' && vapid) return sendWebPush(vapid, device, webPayload);
-        if (device.platform === 'ios' && apns && apnsToken) {
-          return sendApns(apns, apnsToken, device, message);
+        if (isApnsDevice(device)) {
+          const app = apns?.[device.platform];
+          if (apns && app && apnsToken) return sendApns(apns, app, apnsToken, device, message);
         }
         if (device.platform === 'android' && fcm && fcmToken) {
           return fcmToken.then((token) => sendFcm(fcm, token, device, message));
@@ -219,15 +248,34 @@ export class PushAdapter extends BaseService {
       const result = results[i];
       return result?.status === 'fulfilled' ? result.value : null;
     };
-    const expiredIds = devices.filter((_, i) => outcome(i) === 'expired').map((d) => d.id);
-    await PushSubscriptionService.removeByIds(expiredIds);
+    const refusals = devices.flatMap((_, i) => {
+      const value = outcome(i);
+      return typeof value === 'object' && value !== null ? [value.refused] : [];
+    });
+    for (const refusal of refusals) {
+      PushAdapter.log.warn('device refused', { deliveryId: ctx.delivery.id, refusal });
+      reportError(new Error(refusal), {
+        source: 'queue',
+        deliveryId: ctx.delivery.id,
+        notificationId: notification.id,
+        channel: 'push',
+      });
+    }
+    const droppedIds = devices
+      .filter((_, i) => outcome(i) !== null && outcome(i) !== 'delivered')
+      .map((d) => d.id);
+    await PushSubscriptionService.removeByIds(droppedIds);
 
     const delivered = devices.filter((_, i) => outcome(i) === 'delivered').length;
     if (delivered > 0) return { providerMessageId: `push:${delivered}/${devices.length}` };
-    if (expiredIds.length === devices.length) {
-      throw new DeliveryError('no_device_tokens', 'every device of the recipient had expired', {
-        permanent: true,
-      });
+    if (droppedIds.length === devices.length) {
+      throw new DeliveryError(
+        'no_device_tokens',
+        refusals.length > 0
+          ? `every device of the recipient was dropped: ${refusals.join('; ')}`
+          : 'every device of the recipient had expired',
+        { permanent: true },
+      );
     }
     const rejection = results.find((r): r is PromiseRejectedResult => r.status === 'rejected');
     const reason =

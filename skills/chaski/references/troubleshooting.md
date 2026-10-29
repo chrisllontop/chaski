@@ -21,11 +21,12 @@ from a temporary route, or the project’s health route, to see the error. Its `
 | `channels.email is configured but bindings.email is missing` | Declare `send_email` and pass it as `bindings.email`, or drop `channels.email`. |
 | `channels.email.from must be an email address` | Set `from` to an address on the domain onboarded to Email Service. |
 | `channels.in_app is configured but bindings.feed is missing` | Bind the `ChaskiFeed` Durable Object and pass it as `bindings.feed`. |
-| `channels.push needs vapid (web push), apns (iOS), fcm (Android) or several of them` | Fill in `vapid`, `apns`, `fcm` or several of them, or drop `channels.push`. |
+| `channels.push needs vapid (web push), apns (iOS, macOS), fcm (Android) or several of them` | Fill in `vapid`, `apns`, `fcm` or several of them, or drop `channels.push`. |
 | `channels.push.vapid.subject must be a mailto: or https: URL` | Use `mailto:you@example.com` or an `https://` URL. |
 | `channels.push.vapid.publicKey must be a base64url uncompressed P-256 key (65 bytes)` | Use the `publicKey` that `npx web-push generate-vapid-keys` prints, not a PEM. An empty value means the var is unset. |
 | `channels.push.vapid.privateKey must be a base64url P-256 private key (32 bytes)` | Same, for `privateKey`. Locally the secret comes from `.dev.vars`; deployed, from `wrangler secret put`. |
-| `channels.push.apns.<field> is required`, `…environment must be 'sandbox' or 'production'`, `…privateKey must be the contents of the .p8 file` | Fill in the APNs fields; `privateKey` is the whole `.p8` text, `-----BEGIN PRIVATE KEY-----` included. |
+| `channels.push.apns.<field> is required`, `…privateKey must be the contents of the .p8 file` | Fill in the APNs fields; `privateKey` is the whole `.p8` text, `-----BEGIN PRIVATE KEY-----` included. |
+| `channels.push.apns needs ios, macos or both`, `channels.push.apns.<ios or macos>.bundleId is required`, `…environment must be 'sandbox' or 'production'` | Name each app under the key: `ios: { bundleId, environment }`, `macos: { bundleId, environment }`. |
 | `channels.push.fcm.serviceAccount must be the contents of the service account JSON file`, `…has no <field>: use the JSON key file as downloaded`, `…has a private_key that is not a PEM key` | Set the whole JSON key file as the secret, as the Firebase console downloads it: `npx wrangler secret put FCM_SERVICE_ACCOUNT < service-account.json`. In `.dev.vars`, wrap it in single quotes; double quotes break its `private_key`. |
 | `maxRetries must be a non-negative integer`, `migrationsTable must be a plain table name` | Fix the option, or leave it out for the default. |
 | `bindings.scheduler is missing; chaski.schedule() needs the ChaskiScheduler Workflow` | Bind the Workflow as `scheduler` and export `ChaskiScheduler` from the main module. |
@@ -96,6 +97,17 @@ A delivery skipped at send time carries its reason:
 
 A send whose `outcome` is `suppressed` was skipped everywhere by preferences; `undeliverable`
 was skipped everywhere for one of the other reasons.
+
+A push delivery that failed with `no_device_tokens` and `every device of the recipient was
+dropped: APNs refused …` lost its devices to APNs, and the same message reached `onError`:
+
+| APNs said | Fix |
+| --- | --- |
+| `BadDeviceToken` in `production` | The token comes from a development build: register it with `environment: 'sandbox'`, or set the app’s `environment` to `'sandbox'` for a config only development builds use. |
+| `BadDeviceToken` in `sandbox` | The token comes from a release build: drop the device’s `environment`, or set the app’s to `'production'`. |
+| `DeviceTokenNotForTopic` | The token belongs to another app: check the app’s `bundleId` under `channels.push.apns`, and that a Mac app registers as `macos` and an iPhone app as `ios`. |
+
+The device comes back the next time the app registers its token, once the config or the registration is right.
 
 **Deliveries show `held`.** Their channel is paused under **Channels**, the dashboard’s emergency
 brake, and `chaski.ready()` lists it under `paused`. They wait until someone resumes the channel

@@ -1,3 +1,4 @@
+import type { NativeDevice } from '../contract/contract';
 import type { Request } from './http';
 
 export type PushOptions = {
@@ -22,6 +23,13 @@ export type PushClient = {
   enable(): Promise<void>;
   /** Unregisters this browser and drops its subscription. */
   disable(): Promise<void>;
+  /**
+   * Registers an app's device token for the signed-in user, such as the APNs token Electron's
+   * `pushNotifications.registerForAPNSNotifications()` resolves with.
+   */
+  registerDevice(device: NativeDevice): Promise<void>;
+  /** Unregisters a device token of the signed-in user, when they sign out of the app. */
+  unregisterDevice(deviceToken: string): Promise<void>;
 };
 
 const isPushSupported = () =>
@@ -132,6 +140,12 @@ export const createPushClient = (request: Request, options: PushOptions = {}): P
       if (!subscription) return;
       await request('DELETE', '/push/subscriptions', { endpoint: subscription.endpoint });
       await subscription.unsubscribe();
+    },
+    registerDevice: async (device) => {
+      await request('POST', '/push/subscriptions', device);
+    },
+    unregisterDevice: async (deviceToken) => {
+      await request('DELETE', '/push/subscriptions', { deviceToken });
     },
   };
 };

@@ -170,6 +170,28 @@ describe('push client', () => {
     expect(current.unsubscribe).toHaveBeenCalled();
   });
 
+  it('registers and unregisters an app device token without touching web push', async () => {
+    const fake = browser();
+    const { push, network } = client();
+
+    await push.registerDevice({ platform: 'macos', deviceToken: 'ab'.repeat(32) });
+    await push.unregisterDevice('ab'.repeat(32));
+
+    expect(network.calls).toEqual([
+      {
+        method: 'POST',
+        url: '/me/notifications/push/subscriptions',
+        body: { platform: 'macos', deviceToken: 'ab'.repeat(32) },
+      },
+      {
+        method: 'DELETE',
+        url: '/me/notifications/push/subscriptions',
+        body: { deviceToken: 'ab'.repeat(32) },
+      },
+    ]);
+    expect(fake.serviceWorker.register).not.toHaveBeenCalled();
+  });
+
   it('reports a browser without push', async () => {
     const { push } = client();
 

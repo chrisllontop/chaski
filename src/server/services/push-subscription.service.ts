@@ -1,15 +1,20 @@
 import { and, eq, inArray } from 'drizzle-orm';
+import type { z } from 'zod';
 import {
   registerPushSubscriptionSchema,
   unregisterPushSubscriptionSchema,
 } from '../../contract/contract';
 import { ChaskiError } from '../../contract/errors';
 import { type DevicePlatform, deviceTokens } from '../db/schema';
+import { APNS_PLATFORMS, type ApnsEnvironment, type ApnsPlatform } from '../lib/apns';
 import { newId } from '../lib/ids';
 import { parseJson } from '../lib/json';
 import { parseInput } from '../lib/validate';
 import { BaseService } from './base.service';
 import { ContactService } from './contact.service';
+
+const isApnsPlatform = (platform: string): platform is ApnsPlatform =>
+  (APNS_PLATFORMS as readonly string[]).includes(platform);
 
 export type WebPushDevice = {
   id: string;
@@ -20,8 +25,10 @@ export type WebPushDevice = {
 
 export type ApnsPushDevice = {
   id: string;
-  platform: 'ios';
+  platform: ApnsPlatform;
   deviceToken: string;
+  /** The environment the device registered with, over its app's in the config. */
+  environment?: ApnsEnvironment;
 };
 
 export type FcmPushDevice = {
@@ -32,15 +39,45 @@ export type FcmPushDevice = {
 
 export type PushDevice = WebPushDevice | ApnsPushDevice | FcmPushDevice;
 
+export const isApnsDevice = (device: PushDevice): device is ApnsPushDevice =>
+  isApnsPlatform(device.platform);
+
 type StoredMeta = {
   keys?: { p256dh?: string; auth?: string };
   userAgent?: string;
+  environment?: ApnsEnvironment;
+};
+
+const storedDevice = (
+  request: z.output<typeof registerPushSubscriptionSchema>,
+): { platform: DevicePlatform; token: string; meta: StoredMeta } => {
+  if ('subscription' in request) {
+    return {
+      platform: 'web',
+      token: request.subscription.endpoint,
+      meta: { keys: request.subscription.keys, userAgent: request.userAgent },
+    };
+  }
+  // FCM tokens are case-sensitive, so they are kept as they came.
+  if (request.platform === 'android') {
+    return {
+      platform: 'android',
+      token: request.deviceToken,
+      meta: { userAgent: request.userAgent },
+    };
+  }
+  // APNs tokens are case-insensitive hex.
+  return {
+    platform: request.platform,
+    token: request.deviceToken.toLowerCase(),
+    meta: { userAgent: request.userAgent, environment: request.environment },
+  };
 };
 
 export class PushSubscriptionService extends BaseService {
   protected static override name = 'push';
 
-  // The endpoint (web) or device token (iOS, Android) is the row's identity: it names
+  // The endpoint (web) or device token (apps) is the row's identity: it names
   // one installation, which one recipient owns at a time. Registering a token
   // that exists hands it to the new recipient, so a user who signed out
   // without unregistering stops getting pushes on the next user's device.
@@ -48,23 +85,7 @@ export class PushSubscriptionService extends BaseService {
     const request = parseInput(registerPushSubscriptionSchema, rawRequest);
     await ContactService.upsertFromRecipient(request.recipient);
 
-    const device =
-      'subscription' in request
-        ? {
-            platform: 'web' as const,
-            token: request.subscription.endpoint,
-            meta: {
-              keys: request.subscription.keys,
-              userAgent: request.userAgent,
-            } satisfies StoredMeta,
-          }
-        : {
-            platform: request.platform,
-            // APNs tokens are case-insensitive hex; FCM tokens are kept as they came.
-            token:
-              request.platform === 'ios' ? request.deviceToken.toLowerCase() : request.deviceToken,
-            meta: { userAgent: request.userAgent } satisfies StoredMeta,
-          };
+    const device = storedDevice(request);
 
     await PushSubscriptionService.client.deviceTokens.upsertMany({
       data: [
@@ -109,13 +130,20 @@ export class PushSubscriptionService extends BaseService {
       where: { recipientId },
     });
     return rows.flatMap((row): PushDevice[] => {
-      if (row.platform === 'ios') {
-        return [{ id: row.id, platform: 'ios', deviceToken: row.token }];
-      }
       if (row.platform === 'android') {
         return [{ id: row.id, platform: 'android', deviceToken: row.token }];
       }
       const meta = parseJson<StoredMeta>(row.meta, {});
+      if (isApnsPlatform(row.platform)) {
+        return [
+          {
+            id: row.id,
+            platform: row.platform,
+            deviceToken: row.token,
+            environment: meta.environment,
+          },
+        ];
+      }
       if (row.platform !== 'web' || !meta.keys?.p256dh || !meta.keys?.auth) return [];
       return [
         {
@@ -133,13 +161,13 @@ export class PushSubscriptionService extends BaseService {
     const push = PushSubscriptionService.config.channels.push;
     const platforms: DevicePlatform[] = [];
     if (push?.vapid) platforms.push('web');
-    if (push?.apns) platforms.push('ios');
+    for (const platform of APNS_PLATFORMS) if (push?.apns?.[platform]) platforms.push(platform);
     if (push?.fcm) platforms.push('android');
     return platforms;
   };
 
-  // A web device without VAPID, an iOS device without APNs or an Android
-  // device without FCM can't be reached, so it does not count.
+  // A device whose platform has no credentials, such as a Mac when APNs only names the iOS
+  // app, can't be reached, so it does not count.
   static hasReachableDevice = (recipientId: string): Promise<boolean> =>
     PushSubscriptionService.client.deviceTokens.exists({
       where: { recipientId, platform: { in: PushSubscriptionService.configuredPlatforms() } },

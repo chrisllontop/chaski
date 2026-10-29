@@ -43,6 +43,19 @@ describe('handlePushEvents', () => {
     expect(clients[0]?.postMessage).toHaveBeenCalledWith({ type: 'chaski:push' });
   });
 
+  it('shows a silent push without a sound', async () => {
+    const { fake, dispatch } = scope();
+
+    await dispatch('push', {
+      data: { json: () => ({ title: 'Paid', body: '1500', silent: true }) },
+    });
+
+    expect(fake.registration.showNotification).toHaveBeenCalledWith(
+      'Paid',
+      expect.objectContaining({ silent: true }),
+    );
+  });
+
   it('still shows a push that is not JSON', async () => {
     const { fake, dispatch } = scope();
 

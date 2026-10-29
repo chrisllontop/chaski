@@ -5,6 +5,7 @@ import { validateConfig } from '../src/server/config';
 import { getClient } from '../src/server/db';
 import { decodeBase64Url, encodeBase64Url } from '../src/server/lib/base64';
 import { NotificationService } from '../src/server/services/notification.service';
+import { ScheduleService } from '../src/server/services/schedule.service';
 import { chaski, fixtureConfig } from './fixture/worker';
 import { processDeliveries, recipient, seedTemplate, useConfig } from './helpers';
 
@@ -33,10 +34,12 @@ const pkcs8 = new Uint8Array(
 const apns = {
   teamId: 'TEAM123456',
   keyId: 'KEY1234567',
-  bundleId: 'com.host.app',
-  environment: 'sandbox' as const,
   privateKey: `-----BEGIN PRIVATE KEY-----\n${btoa(String.fromCharCode(...pkcs8))}\n-----END PRIVATE KEY-----`,
+  ios: { bundleId: 'com.host.app', environment: 'sandbox' as const },
 };
+
+// The desktop app of the same team, signed with the same key.
+const macos = { bundleId: 'com.host.desktop', environment: 'production' as const };
 
 const fcmPair = (await crypto.subtle.generateKey(
   {
@@ -123,6 +126,7 @@ const decryptAsBrowser = async (endpoint: string, body: Uint8Array) => {
 };
 
 const IOS_TOKEN = 'A1B2C3D4'.repeat(8);
+const MAC_TOKEN = 'F0E1D2C3'.repeat(8);
 // FCM tokens are case-sensitive, so this one mixes cases on purpose.
 const ANDROID_TOKEN = `dQw4w9WgXcQ:APA91bH${'Kx7_Lm-Pq2Rs'.repeat(12)}`;
 
@@ -150,12 +154,13 @@ const usePush = (push: PushConfig, overrides = {}) => {
   useConfig({ channels: { ...config.channels, push }, ...overrides });
 };
 
-const sendPush = async () => {
+const sendPush = async (options: { silent?: boolean } = {}) => {
   const result = await NotificationService.send({
     type: 'payment_received',
     recipient: recipient(),
     payload: { amount: 1500 },
     channels: ['push'],
+    ...(options.silent ? { push: { silent: true } } : {}),
   });
   await processDeliveries(result.notificationId);
   return getClient().deliveries.findFirst({
@@ -164,6 +169,9 @@ const sendPush = async () => {
 };
 
 const devices = () => getClient().deviceTokens.findMany({ where: {} });
+
+const apnsBody = (call: Call | undefined) =>
+  JSON.parse(new TextDecoder().decode(call?.body ?? new Uint8Array()));
 
 beforeEach(async () => {
   await seedTemplate('payment_received', 'push');
@@ -200,6 +208,20 @@ describe('web push', () => {
       href: '/payments/1500',
       tag: delivery?.notificationId,
     });
+  });
+
+  it('tells the service worker to show a silent push without a sound', async () => {
+    await chaski.push.register({
+      recipient: recipient(),
+      subscription: await browserSubscription('https://push.example/sub/1'),
+    });
+    const calls = stubFetch();
+
+    await sendPush({ silent: true });
+
+    expect(
+      await decryptAsBrowser('https://push.example/sub/1', calls[0]?.body ?? new Uint8Array()),
+    ).toMatchObject({ title: 'Hello Ana', silent: true });
   });
 
   it('fails a push too large for web push instead of retrying it', async () => {
@@ -344,12 +366,144 @@ describe('APNs', () => {
     expect(calls[1]?.headers.get('authorization')).not.toBe(calls[0]?.headers.get('authorization'));
   });
 
-  it('forgets a device Apple reports as a bad token', async () => {
+  it('leaves the sound out of a silent push', async () => {
+    await chaski.push.register({ recipient: recipient(), platform: 'ios', deviceToken: IOS_TOKEN });
+    const calls = stubFetch(() => new Response(null, { status: 200 }));
+
+    await sendPush({ silent: true });
+
+    expect(apnsBody(calls[0])).toEqual({
+      aps: { alert: { title: 'Hello Ana', body: 'Amount: 1500' } },
+      href: '/payments/1500',
+      tag: expect.any(String),
+    });
+  });
+
+  it('keeps a scheduled push silent when it fires', async () => {
+    await chaski.push.register({ recipient: recipient(), platform: 'ios', deviceToken: IOS_TOKEN });
+    const calls = stubFetch(() => new Response(null, { status: 200 }));
+
+    const { scheduledId } = await chaski.schedule({
+      type: 'payment_received',
+      recipient: recipient(),
+      payload: { amount: 1500 },
+      channels: ['push'],
+      push: { silent: true },
+      scheduledAt: new Date(Date.now() + 3_600_000).toISOString(),
+    });
+    await ScheduleService.fire(scheduledId);
+    const notification = await getClient().notifications.findFirst({ where: {} });
+    await processDeliveries(notification?.id ?? '');
+
+    expect(apnsBody(calls[0]).aps).not.toHaveProperty('sound');
+  });
+
+  it('reports and forgets a token Apple refuses in its environment', async () => {
+    const onError = vi.fn();
+    usePush({ apns }, { onError });
     await chaski.push.register({ recipient: recipient(), platform: 'ios', deviceToken: IOS_TOKEN });
     stubFetch(() => Response.json({ reason: 'BadDeviceToken' }, { status: 400 }));
 
-    expect(await sendPush()).toMatchObject({ status: 'failed', errorCode: 'no_device_tokens' });
+    const delivery = await sendPush();
+
+    expect(delivery).toMatchObject({ status: 'failed', errorCode: 'no_device_tokens' });
+    expect(delivery?.lastError).toMatch(
+      /^every device of the recipient was dropped: APNs refused the ios device dt_\w+ in sandbox \(BadDeviceToken\)/,
+    );
+    expect(onError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringContaining("environment: 'sandbox'") }),
+      expect.objectContaining({ source: 'queue', channel: 'push', deliveryId: delivery?.id }),
+    );
     expect(await devices()).toEqual([]);
+  });
+});
+
+describe('APNs for macOS', () => {
+  beforeEach(() => usePush({ apns: { ...apns, macos } }));
+
+  it('sends to each app with its own topic and environment, under one provider token', async () => {
+    await chaski.push.register({ recipient: recipient(), platform: 'ios', deviceToken: IOS_TOKEN });
+    await chaski.push.register({
+      recipient: recipient(),
+      platform: 'macos',
+      deviceToken: MAC_TOKEN,
+    });
+    const calls = stubFetch(() => new Response(null, { status: 200 }));
+
+    expect(await sendPush()).toMatchObject({ status: 'sent', providerMessageId: 'push:2/2' });
+
+    const byUrl = Object.fromEntries(calls.map((call) => [call.url, call]));
+    const mac = byUrl[`https://api.push.apple.com/3/device/${MAC_TOKEN.toLowerCase()}`];
+    const phone = byUrl[`https://api.sandbox.push.apple.com/3/device/${IOS_TOKEN.toLowerCase()}`];
+    expect(mac?.headers.get('apns-topic')).toBe('com.host.desktop');
+    expect(phone?.headers.get('apns-topic')).toBe('com.host.app');
+    expect(mac?.headers.get('authorization')).toBe(phone?.headers.get('authorization'));
+    expect(apnsBody(mac).aps).toEqual({
+      alert: { title: 'Hello Ana', body: 'Amount: 1500' },
+      sound: 'default',
+    });
+  });
+
+  it('sends to the environment a device registered with', async () => {
+    await chaski.push.register({
+      recipient: recipient(),
+      platform: 'macos',
+      deviceToken: MAC_TOKEN,
+      environment: 'sandbox',
+    });
+    const calls = stubFetch(() => new Response(null, { status: 200 }));
+
+    await sendPush();
+
+    expect(calls.map((call) => call.url)).toEqual([
+      `https://api.sandbox.push.apple.com/3/device/${MAC_TOKEN.toLowerCase()}`,
+    ]);
+  });
+
+  it('reports a token of another app and still delivers to the rest', async () => {
+    const onError = vi.fn();
+    usePush({ apns: { ...apns, macos } }, { onError });
+    await chaski.push.register({ recipient: recipient(), platform: 'ios', deviceToken: IOS_TOKEN });
+    await chaski.push.register({
+      recipient: recipient(),
+      platform: 'macos',
+      deviceToken: MAC_TOKEN,
+    });
+    stubFetch((url) =>
+      url.includes(MAC_TOKEN.toLowerCase())
+        ? Response.json({ reason: 'DeviceTokenNotForTopic' }, { status: 400 })
+        : new Response(null, { status: 200 }),
+    );
+
+    expect(await sendPush()).toMatchObject({ status: 'sent', providerMessageId: 'push:1/2' });
+    expect(onError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining(
+          'for com.host.desktop (DeviceTokenNotForTopic): the token belongs to another app',
+        ),
+      }),
+      expect.objectContaining({ source: 'queue', channel: 'push' }),
+    );
+    expect(await devices()).toEqual([expect.objectContaining({ platform: 'ios' })]);
+  });
+
+  it('skips a Mac when APNs names only the iOS app', async () => {
+    usePush({ apns });
+    await chaski.push.register({
+      recipient: recipient(),
+      platform: 'macos',
+      deviceToken: MAC_TOKEN,
+    });
+
+    const result = await NotificationService.send({
+      type: 'payment_received',
+      recipient: recipient(),
+      channels: ['push'],
+    });
+
+    expect(result.deliveries).toEqual([
+      expect.objectContaining({ channel: 'push', status: 'skipped', reason: 'no_device_tokens' }),
+    ]);
   });
 });
 
@@ -626,6 +780,28 @@ describe('push config', () => {
   it('names the missing APNs field', () => {
     expect(withPush({ apns: { ...apns, teamId: '' } })).toThrowError(
       'Chaski config: channels.push.apns.teamId is required',
+    );
+    expect(withPush({ apns: { ...apns, macos: { ...macos, bundleId: '' } } })).toThrowError(
+      'Chaski config: channels.push.apns.macos.bundleId is required',
+    );
+  });
+
+  it('needs the iOS app, the macOS app or both', () => {
+    expect(withPush({ apns: { ...apns, ios: undefined } })).toThrowError(
+      'channels.push.apns needs ios, macos or both',
+    );
+    expect(withPush({ apns: { ...apns, ios: undefined, macos } })().channels.push?.apns).toEqual({
+      teamId: 'TEAM123456',
+      keyId: 'KEY1234567',
+      privateKeyPem: apns.privateKey,
+      macos,
+    });
+  });
+
+  it('rejects an app environment other than sandbox or production', () => {
+    const development = { ...macos, environment: 'development' as 'sandbox' };
+    expect(withPush({ apns: { ...apns, macos: development } })).toThrowError(
+      "channels.push.apns.macos.environment must be 'sandbox' or 'production'",
     );
   });
 

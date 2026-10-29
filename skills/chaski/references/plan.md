@@ -8,7 +8,7 @@ out is a separate request from the user. Every Chaski call below is in [sending.
 
 Put every flow in one of two groups.
 
-**Moves** when it sends email, web push, iOS push, Android push or in-app notifications from code
+**Moves** when it sends email, web push, iOS or macOS push, Android push or in-app notifications from code
 that runs in the Worker that hosts Chaski, or in another Worker of the same account, which calls
 Chaski through `ChaskiEntrypoint` ([setup.md](setup.md) ends with it).
 
@@ -129,7 +129,8 @@ Write every converted template into the template file ([sending.md](sending.md))
   `granted`, `enable()` replaces the subscription without asking. Chaski’s pushes carry `{ title, body, href, tag }`; while the old
   path still sends pushes of another shape, the service worker has to show both.
 - **APNs device tokens**: `chaski.push.register({ recipient: { id }, platform: 'ios', deviceToken })`,
-  with the same bundle id and environment in `channels.push.apns`.
+  or `platform: 'macos'` for a Mac app, with the same bundle id and environment in
+  `channels.push.apns.ios` or `.macos`. Tokens of development builds add `environment: 'sandbox'`.
 - **Android FCM tokens**:
   `chaski.push.register({ recipient: { id }, platform: 'android', deviceToken })`, with a service
   account of the same Firebase project in `channels.push.fcm`.

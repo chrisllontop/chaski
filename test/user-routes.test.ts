@@ -148,6 +148,35 @@ describe('push devices', () => {
     expect(response.status).toBe(201);
   });
 
+  it('registers a Mac with the APNs environment of its build', async () => {
+    const response = await me('/push/subscriptions', {
+      method: 'POST',
+      body: JSON.stringify({
+        platform: 'macos',
+        deviceToken: 'CD'.repeat(32),
+        environment: 'sandbox',
+      }),
+    });
+    const invalid = await me('/push/subscriptions', {
+      method: 'POST',
+      body: JSON.stringify({
+        platform: 'macos',
+        deviceToken: 'CD'.repeat(32),
+        environment: 'development',
+      }),
+    });
+
+    expect(response.status).toBe(201);
+    expect(await getClient().deviceTokens.findMany({ where: {} })).toEqual([
+      expect.objectContaining({
+        platform: 'macos',
+        token: 'cd'.repeat(32),
+        meta: expect.stringContaining('"environment":"sandbox"'),
+      }),
+    ]);
+    expect(invalid.status).toBe(400);
+  });
+
   it('registers an Android device and unregisters it by its token', async () => {
     const deviceToken = `cQ1:APA91bF${'Zx-9_Yw'.repeat(20)}`;
     const register = await me('/push/subscriptions', {
