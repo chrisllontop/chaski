@@ -317,16 +317,6 @@ export const ChannelsPage = () => {
                   </span>
                 </div>
               </Row>
-              <Row label="Dry run">
-                <div className="flex items-start gap-2">
-                  {data.dryRun ? <Pill tone="warning">On</Pill> : <Pill tone="neutral">Off</Pill>}
-                  <span className="text-muted-foreground">
-                    {data.dryRun
-                      ? 'Email and push render and record without reaching their providers.'
-                      : 'Email and push reach their providers.'}
-                  </span>
-                </div>
-              </Row>
               <Row label="Live updates">
                 <div className="flex items-start gap-2">
                   {data.realtime ? <Pill tone="success">On</Pill> : <Pill tone="neutral">Off</Pill>}

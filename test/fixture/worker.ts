@@ -12,7 +12,6 @@ import { seed } from './seed';
 
 export type FixtureEnv = {
   CHASKI_PUBLIC_URL: string;
-  CHASKI_DRY_RUN: string;
   ENVIRONMENT?: string;
   CHASKI_DB: D1Database;
   CHASKI_QUEUE: Queue<DeliveryMessage>;
@@ -38,7 +37,6 @@ export const fixtureConfig = (env: FixtureEnv): ChaskiConfig => ({
     email: { from: 'notifications@host.test', fromName: 'Fixture host' },
     in_app: {},
   },
-  dryRun: env.CHASKI_DRY_RUN === 'true',
   environment: env.ENVIRONMENT,
 });
 
@@ -84,9 +82,10 @@ const teamNotifications = chaski.userRoutes({
 
 const app = new Hono<{ Bindings: FixtureEnv }>()
   .get('/', (c) => c.text('Host home'))
-  // Fills the local database for `pnpm dev`; only in dry run, so nothing reaches a provider.
+  // Fills the local database for `pnpm dev`, where wrangler keeps every email on disk; only in the
+  // local environment, so nothing reaches a provider.
   .post('/dev/seed', async (c) => {
-    if (c.env.CHASKI_DRY_RUN !== 'true')
+    if (c.env.ENVIRONMENT !== 'local')
       return c.json({ error: 'not_found', message: 'no such endpoint' }, 404);
     return c.json(await seed(chaski));
   })

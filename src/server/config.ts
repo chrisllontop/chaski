@@ -92,8 +92,6 @@ export type ChaskiConfig = {
   };
   /** Type mutes every recipient has until they save preferences of their own. */
   defaultMutedTypes?: string[];
-  /** Render and record email and push deliveries without calling the providers. */
-  dryRun?: boolean;
   /**
    * Where this Worker runs, as the dashboard shows it, such as `production` or `staging`. `local`
    * is for `wrangler dev`: it opens the dashboard without `authorize` and needs a `publicUrl` on
@@ -118,7 +116,6 @@ export type ResolvedConfig = {
   };
   enabledChannels: Channel[];
   defaultMutedTypes: string[];
-  dryRun: boolean;
   environment: string | null;
   maxRetries: number;
   migrationsTable: string;
@@ -251,7 +248,6 @@ export const validateConfig = (config: ChaskiConfig): ResolvedConfig => {
     channels: resolved,
     enabledChannels: CHANNELS.filter((channel) => resolved[channel]),
     defaultMutedTypes: config.defaultMutedTypes ?? [],
-    dryRun: config.dryRun ?? false,
     environment,
     maxRetries,
     migrationsTable,

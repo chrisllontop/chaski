@@ -145,7 +145,6 @@ export type SchedulePage = {
 export type ChannelPause = { pausedBy: Actor; pausedAt: string };
 
 export type ChannelsOverview = {
-  dryRun: boolean;
   /** The environment the host's config names; `local` opens the dashboard without signing in. */
   environment: string | null;
   realtime: boolean;

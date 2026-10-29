@@ -18,8 +18,8 @@ the endpoints the host's frontend calls for the signed-in user, which `chaskijs/
 - `pnpm i` installs the dependencies (Node 24 and pnpm 12). `devEngines` holds contributors to
   Node 24 without putting that constraint on the people who install `chaskijs`.
 - `pnpm dev` builds the dashboard and runs the fixture host (`test/fixture`) with Wrangler, in
-  dry run so no email or push leaves the machine, and in the `local` environment, so the dashboard
-  opens without `authorize`. It mounts the dashboard at `/chaski` and
+  the `local` environment, so the dashboard opens without `authorize`; Wrangler keeps every email
+  on disk, under `test/fixture/.wrangler/tmp/email/`. It mounts the dashboard at `/chaski` and
   `/admin/notifications`, the user routes at `/me/notifications` and a shared inbox at
   `/me/team-notifications`; there is no hot reload, so rerun it after a dashboard change. Apply
   the migrations to the local D1 first:
