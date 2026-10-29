@@ -1,6 +1,6 @@
 ---
 title: Channels
-description: Email, in-app and push, web and iOS. A channel is on when the config has an entry for it.
+description: Email, in-app and push, web, iOS and Android. A channel is on when the config has an entry for it.
 ---
 
 A channel is on when `channels` in the config has an entry for it, and each type’s template turns
@@ -46,7 +46,8 @@ through `chaski.userRoutes()`, as [Browser clients](/docs/browser-clients) shows
 
 ## Push
 
-Push reaches browsers through web push and Apple devices through APNs. Configure either or both:
+Push reaches browsers through web push, Apple devices through APNs and Android devices through
+FCM. Configure any of them:
 
 ```ts
 channels: {
@@ -63,6 +64,9 @@ channels: {
       environment: 'production',
       privateKey: env.APNS_PRIVATE_KEY,
     },
+    fcm: {
+      serviceAccount: env.FCM_SERVICE_ACCOUNT,
+    },
   },
 },
 ```
@@ -72,18 +76,24 @@ channels: {
   can reach you at.
 - `apns` takes your team id, the key’s id, your app’s bundle id, `sandbox` or `production`, and the
   contents of the `.p8` file.
+- `fcm` takes the contents of a service account’s JSON key file, from **Project settings → Service
+  accounts** in the Firebase console. The project it names must be the one your Android app
+  registers its tokens with.
 
 A contact receives push on the devices registered to them. Browsers register with
-`client.push.enable()` from `chaskijs/client`; your app can register an iOS device token from the
-server:
+`client.push.enable()` from `chaskijs/client`; your app can register an iOS device token or an
+Android FCM token from the server:
 
 ```ts
 await chaski.push.register({
   recipient: { id: user.id },
-  platform: 'ios',
+  platform: 'android', // or 'ios'
   deviceToken,
 });
 ```
+
+On Android the notification shows on its own when the app is in the background; the `href` and
+`tag` of the push arrive in the intent’s extras when the user taps it.
 
 A contact without a registered device skips the channel with `no_device_tokens`.
 

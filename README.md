@@ -17,7 +17,7 @@ Chaski lives inside your Worker. You mount it on a route of your app, and it run
 Cloudflare resources. It deploys with your Worker, and your data stays in your account.
 
 - **Email, push, and in-app.** Email through Cloudflare Email Service, web push, push to iOS through
-  APNs, and an in-app feed that updates live.
+  APNs and to Android through FCM, and an in-app feed that updates live.
 - **Templates** for the content of every notification, written in Liquid and edited in the
   dashboard with a live preview.
 - **Preferences** that let each contact mute the notifications they don’t want.
@@ -33,7 +33,8 @@ Cloudflare resources. It deploys with your Worker, and your data stays in your a
   mount on yours.
 - For email, the Workers Paid plan and a domain onboarded to
   [Email Service](https://developers.cloudflare.com/email-service/get-started/send-emails/).
-- For web push, a VAPID key pair. For iOS, an APNs key from your Apple developer account.
+- For web push, a VAPID key pair. For iOS, an APNs key from your Apple developer account. For
+  Android, a service account key from your Firebase project.
 
 Chaski runs only on the bindings you declare. This guide declares all of them, and step 3 says which
 ones you can leave out. Resource and binding names are yours to choose; only the class names are
@@ -271,6 +272,21 @@ push: {
 npx wrangler secret put APNS_PRIVATE_KEY < AuthKey_XXXXXXXXXX.p8
 ```
 
+For Android, add `fcm` with a service account key from your Firebase project (**Project settings
+→ Service accounts → Generate new private key**):
+
+```ts
+push: {
+  fcm: {
+    serviceAccount: env.FCM_SERVICE_ACCOUNT, // the contents of the JSON key file
+  },
+},
+```
+
+```sh
+npx wrangler secret put FCM_SERVICE_ACCOUNT < service-account.json
+```
+
 ### 7. Deploy
 
 ```sh
@@ -446,6 +462,8 @@ there, and keep the private keys from step 6 next to it.
 ```sh
 CHASKI_PUBLIC_URL=http://localhost:8787/admin/notifications
 VAPID_PRIVATE_KEY=<private key from step 6>
+# With Android push, the JSON key file in single quotes, which keep its \n escapes as they are:
+FCM_SERVICE_ACCOUNT='<the contents of service-account.json>'
 ```
 
 `wrangler dev` keeps every email Chaski sends on disk, under `.wrangler/tmp/email/`, instead of

@@ -63,6 +63,7 @@ export type {
   EmailConfig,
   ErrorContext,
   ErrorSource,
+  FcmConfig,
   InAppConfig,
   PushConfig,
   VapidConfig,

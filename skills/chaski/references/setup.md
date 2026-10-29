@@ -67,7 +67,7 @@ Agree with the user on what to turn on, then declare only what that needs:
 | Always | `CHASKI_DB` (D1), `CHASKI_QUEUE` (queue producer and consumer) | |
 | Email | `send_email` | The Workers Paid plan and a domain onboarded to [Email Service](https://developers.cloudflare.com/email-service/get-started/send-emails/) |
 | In-app feed | `ChaskiFeed` Durable Object | |
-| Web push, iOS push | none | Keys (step 6) |
+| Web push, iOS push, Android push | none | Keys (step 6) |
 | `chaski.schedule()` | `ChaskiScheduler` Workflow | |
 | Live dashboard | `ChaskiEvents` Durable Object | |
 | Email attachments | R2 bucket | |
@@ -469,6 +469,17 @@ apns: {
 },
 ```
 
+**Android push** needs a service account key from the user’s Firebase project, the one the app
+registers its tokens with: **Project settings → Service accounts → Generate new private key**
+downloads a JSON file. Add `fcm` next to `vapid`, and set the whole file as the
+`FCM_SERVICE_ACCOUNT` secret (`npx wrangler secret put FCM_SERVICE_ACCOUNT < service-account.json`):
+
+```ts
+fcm: {
+  serviceAccount: env.FCM_SERVICE_ACCOUNT, // the contents of the JSON key file
+},
+```
+
 **Done when** the keys are in place and the secrets live only in `.dev.vars` and, later, the
 account. `.dev.vars` must be in `.gitignore`.
 
@@ -482,6 +493,8 @@ CHASKI_PUBLIC_URL=http://localhost:8787/admin/notifications
 ENVIRONMENT=local
 # The sign-in's values, if it has any: ADMIN_USER and ADMIN_PASSWORD.
 # With web push: VAPID_PRIVATE_KEY.
+# With Android push: FCM_SERVICE_ACCOUNT='<the JSON key file>', in single quotes: double quotes
+# turn the \n escapes of its private_key into line breaks, and the JSON no longer parses.
 ```
 
 Match `CHASKI_PUBLIC_URL` to the address `wrangler dev` prints and the mount path. Under

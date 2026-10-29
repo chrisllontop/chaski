@@ -166,6 +166,7 @@ export type ChannelsOverview = {
       paused: ChannelPause | null;
       web: { vapidPublicKey: string } | null;
       ios: { bundleId: string; environment: 'sandbox' | 'production' } | null;
+      android: { projectId: string } | null;
     },
   ];
 };

@@ -22,7 +22,7 @@ export const preferences = sqliteTable('preferences', {
   updatedAt: timestampNow('updated_at'),
 });
 
-export const DEVICE_PLATFORMS = ['web', 'ios'] as const;
+export const DEVICE_PLATFORMS = ['web', 'ios', 'android'] as const;
 export type DevicePlatform = (typeof DEVICE_PLATFORMS)[number];
 
 export const deviceTokens = sqliteTable(

@@ -116,20 +116,41 @@ export const apnsDeviceTokenSchema = z
   .max(512)
   .regex(/^[0-9a-fA-F]+$/, { message: 'deviceToken must be a hex string' });
 
-// The iOS shape comes first so its `platform` literal drives the error a
-// malformed iOS registration gets.
+const opaqueTokenSchema = z.string().min(32).max(4096);
+
+// FCM registration tokens are opaque and, unlike APNs tokens, case-sensitive.
+export const fcmTokenSchema = opaqueTokenSchema.regex(/^\S+$/, {
+  message: 'deviceToken must be an FCM registration token',
+});
+
+// Unregistering doesn't name the platform, so it takes either kind of token;
+// an APNs hex token has the shape of an FCM one.
+const anyDeviceTokenSchema = opaqueTokenSchema.regex(/^\S+$/, {
+  message: 'deviceToken must be an APNs device token or an FCM registration token',
+});
+
+const iosDeviceSchema = z.object({
+  platform: z.literal('ios'),
+  deviceToken: apnsDeviceTokenSchema,
+});
+const androidDeviceSchema = z.object({
+  platform: z.literal('android'),
+  deviceToken: fcmTokenSchema,
+});
+
+const registrationFields = {
+  recipient: recipientSchema,
+  userAgent: z.string().max(512).optional(),
+};
+
+// The native shapes come first so their `platform` literal drives the error a
+// malformed native registration gets.
 export const registerPushSubscriptionSchema = z.union([
-  z.object({
-    recipient: recipientSchema,
-    platform: z.literal('ios'),
-    deviceToken: apnsDeviceTokenSchema,
-    userAgent: z.string().max(512).optional(),
-  }),
-  z.object({
-    recipient: recipientSchema,
-    subscription: webPushSubscriptionSchema,
-    userAgent: z.string().max(512).optional(),
-  }),
+  z.discriminatedUnion('platform', [
+    iosDeviceSchema.extend(registrationFields),
+    androidDeviceSchema.extend(registrationFields),
+  ]),
+  z.object({ ...registrationFields, subscription: webPushSubscriptionSchema }),
 ]);
 export type RegisterPushSubscriptionRequest = z.input<typeof registerPushSubscriptionSchema>;
 
@@ -137,7 +158,7 @@ export const unregisterPushSubscriptionSchema = z
   .object({
     recipientId: z.string().min(1).max(256).optional(),
     endpoint: z.string().url().max(2048).optional(),
-    deviceToken: apnsDeviceTokenSchema.optional(),
+    deviceToken: anyDeviceTokenSchema.optional(),
   })
   .refine((q) => q.recipientId || q.endpoint || q.deviceToken, {
     message: 'one of recipientId, endpoint or deviceToken is required',
@@ -234,7 +255,7 @@ export const markFeedReadBodySchema = markFeedReadSchema.omit({ recipientId: tru
 export type MarkFeedReadBody = z.input<typeof markFeedReadBodySchema>;
 
 export const deviceSubscriptionSchema = z.union([
-  z.object({ platform: z.literal('ios'), deviceToken: apnsDeviceTokenSchema }),
+  z.discriminatedUnion('platform', [iosDeviceSchema, androidDeviceSchema]),
   webPushSubscriptionSchema,
 ]);
 export type DeviceSubscription = z.input<typeof deviceSubscriptionSchema>;
@@ -242,7 +263,7 @@ export type DeviceSubscription = z.input<typeof deviceSubscriptionSchema>;
 export const deviceUnsubscriptionSchema = z
   .object({
     endpoint: z.string().url().max(2048).optional(),
-    deviceToken: apnsDeviceTokenSchema.optional(),
+    deviceToken: anyDeviceTokenSchema.optional(),
   })
   .refine((q) => q.endpoint || q.deviceToken, {
     message: 'one of endpoint or deviceToken is required',

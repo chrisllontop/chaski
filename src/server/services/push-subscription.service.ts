@@ -24,7 +24,13 @@ export type ApnsPushDevice = {
   deviceToken: string;
 };
 
-export type PushDevice = WebPushDevice | ApnsPushDevice;
+export type FcmPushDevice = {
+  id: string;
+  platform: 'android';
+  deviceToken: string;
+};
+
+export type PushDevice = WebPushDevice | ApnsPushDevice | FcmPushDevice;
 
 type StoredMeta = {
   keys?: { p256dh?: string; auth?: string };
@@ -34,7 +40,7 @@ type StoredMeta = {
 export class PushSubscriptionService extends BaseService {
   protected static override name = 'push';
 
-  // The endpoint (web) or device token (iOS) is the row's identity: it names
+  // The endpoint (web) or device token (iOS, Android) is the row's identity: it names
   // one installation, which one recipient owns at a time. Registering a token
   // that exists hands it to the new recipient, so a user who signed out
   // without unregistering stops getting pushes on the next user's device.
@@ -43,20 +49,21 @@ export class PushSubscriptionService extends BaseService {
     await ContactService.upsertFromRecipient(request.recipient);
 
     const device =
-      'deviceToken' in request
+      'subscription' in request
         ? {
-            platform: 'ios' as const,
-            // APNs tokens are case-insensitive hex.
-            token: request.deviceToken.toLowerCase(),
-            meta: { userAgent: request.userAgent } satisfies StoredMeta,
-          }
-        : {
             platform: 'web' as const,
             token: request.subscription.endpoint,
             meta: {
               keys: request.subscription.keys,
               userAgent: request.userAgent,
             } satisfies StoredMeta,
+          }
+        : {
+            platform: request.platform,
+            // APNs tokens are case-insensitive hex; FCM tokens are kept as they came.
+            token:
+              request.platform === 'ios' ? request.deviceToken.toLowerCase() : request.deviceToken,
+            meta: { userAgent: request.userAgent } satisfies StoredMeta,
           };
 
     await PushSubscriptionService.client.deviceTokens.upsertMany({
@@ -86,8 +93,11 @@ export class PushSubscriptionService extends BaseService {
     const conditions = [];
     if (query.recipientId) conditions.push(eq(deviceTokens.recipientId, query.recipientId));
     if (query.endpoint) conditions.push(eq(deviceTokens.token, query.endpoint));
+    // The query doesn't name the platform: an APNs token is stored lowercased,
+    // an FCM token as it was registered.
     if (query.deviceToken) {
-      conditions.push(eq(deviceTokens.token, query.deviceToken.toLowerCase()));
+      const { deviceToken } = query;
+      conditions.push(inArray(deviceTokens.token, [deviceToken, deviceToken.toLowerCase()]));
     }
 
     const result = await PushSubscriptionService.db.delete(deviceTokens).where(and(...conditions));
@@ -101,6 +111,9 @@ export class PushSubscriptionService extends BaseService {
     return rows.flatMap((row): PushDevice[] => {
       if (row.platform === 'ios') {
         return [{ id: row.id, platform: 'ios', deviceToken: row.token }];
+      }
+      if (row.platform === 'android') {
+        return [{ id: row.id, platform: 'android', deviceToken: row.token }];
       }
       const meta = parseJson<StoredMeta>(row.meta, {});
       if (row.platform !== 'web' || !meta.keys?.p256dh || !meta.keys?.auth) return [];
@@ -121,11 +134,12 @@ export class PushSubscriptionService extends BaseService {
     const platforms: DevicePlatform[] = [];
     if (push?.vapid) platforms.push('web');
     if (push?.apns) platforms.push('ios');
+    if (push?.fcm) platforms.push('android');
     return platforms;
   };
 
-  // A web device without VAPID or an iOS device without APNs can't be
-  // reached, so it does not count.
+  // A web device without VAPID, an iOS device without APNs or an Android
+  // device without FCM can't be reached, so it does not count.
   static hasReachableDevice = (recipientId: string): Promise<boolean> =>
     PushSubscriptionService.client.deviceTokens.exists({
       where: { recipientId, platform: { in: PushSubscriptionService.configuredPlatforms() } },

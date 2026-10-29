@@ -63,7 +63,7 @@ No options yet: `in_app: {}` turns the channel on.
 
 ### push
 
-Configure `vapid` for web push, `apns` for iOS, or both.
+Configure `vapid` for web push, `apns` for iOS, `fcm` for Android, or several of them.
 
 | `vapid` | |
 | --- | --- |
@@ -78,6 +78,10 @@ Configure `vapid` for web push, `apns` for iOS, or both.
 | `bundleId` | Your app’s bundle id. |
 | `environment` | `'sandbox'` or `'production'`. |
 | `privateKey` | The contents of the `.p8` file. |
+
+| `fcm` | |
+| --- | --- |
+| `serviceAccount` | The contents of the service account’s JSON key file, from the Firebase console. |
 
 ## onError
 

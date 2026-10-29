@@ -203,6 +203,16 @@ using the app’s own session, or the host calls
 `chaski.push.register({ recipient: { id }, platform: 'ios', deviceToken })` from an endpoint of its
 own. The config needs `channels.push.apns`.
 
+## A native Android app
+
+The app registers its FCM registration token (`FirebaseMessaging.getInstance().token`) for the
+signed-in user with `POST <user routes>/push/subscriptions` and the body
+`{ "platform": "android", "deviceToken": "<token>" }`, and again from `onNewToken` when FCM
+rotates it, or the host calls
+`chaski.push.register({ recipient: { id }, platform: 'android', deviceToken })` from an endpoint of
+its own. The config needs `channels.push.fcm`. Android shows the notification on its own while the
+app is in the background; the push’s `href` and `tag` arrive in the intent’s extras.
+
 ## Content-Security-Policy on the frontend
 
 Same origin, `connect-src 'self'` covers the requests and, in current browsers, the socket. From

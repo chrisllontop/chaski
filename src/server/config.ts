@@ -5,6 +5,7 @@ import type { ChaskiEvents } from './durable/events';
 import type { ChaskiFeed } from './durable/feed';
 import type { ApnsCredentials } from './lib/apns';
 import { decodeBase64Url, encodeBase64Url } from './lib/base64';
+import type { FcmCredentials } from './lib/fcm';
 import type { DeliveryMessage, ScheduleParams, SendEmailBinding } from './types';
 
 export type ChaskiBindings = {
@@ -52,15 +53,22 @@ export type ApnsConfig = {
   privateKey: string;
 };
 
-/** Web push needs `vapid`, iOS needs `apns`; configure either or both. */
+export type FcmConfig = {
+  /** The contents of the service account's JSON key file, from the Firebase console. */
+  serviceAccount: string;
+};
+
+/** Web push needs `vapid`, iOS needs `apns`, Android needs `fcm`; configure any of them. */
 export type PushConfig = {
   vapid?: VapidConfig;
   apns?: ApnsConfig;
+  fcm?: FcmConfig;
 };
 
 export type ResolvedPush = {
   vapid?: { subject: string; publicKey: string; privateJwk: string };
   apns?: ApnsCredentials;
+  fcm?: FcmCredentials;
 };
 
 export type ErrorSource =
@@ -182,6 +190,35 @@ const resolveApns = (apns: ApnsConfig): ApnsCredentials => {
   };
 };
 
+const SERVICE_ACCOUNT_FIELDS = ['project_id', 'client_email', 'private_key_id', 'private_key'];
+
+const resolveFcm = (fcm: FcmConfig): FcmCredentials => {
+  let account: unknown = null;
+  try {
+    account = JSON.parse(fcm.serviceAccount ?? '');
+  } catch {
+    // Reported below, with the same message as JSON that isn't an object.
+  }
+  if (!account || typeof account !== 'object') {
+    fail('channels.push.fcm.serviceAccount must be the contents of the service account JSON file');
+  }
+  const fields = account as Record<string, unknown>;
+  for (const field of SERVICE_ACCOUNT_FIELDS) {
+    if (typeof fields[field] !== 'string' || !fields[field]) {
+      fail(`channels.push.fcm.serviceAccount has no ${field}: use the JSON key file as downloaded`);
+    }
+  }
+  if (!String(fields.private_key).includes('PRIVATE KEY')) {
+    fail('channels.push.fcm.serviceAccount has a private_key that is not a PEM key');
+  }
+  return {
+    projectId: String(fields.project_id),
+    clientEmail: String(fields.client_email),
+    privateKeyId: String(fields.private_key_id),
+    privateKeyPem: String(fields.private_key),
+  };
+};
+
 export const validateConfig = (config: ChaskiConfig): ResolvedConfig => {
   let publicUrl: URL | null = null;
   try {
@@ -210,12 +247,13 @@ export const validateConfig = (config: ChaskiConfig): ResolvedConfig => {
     resolved.in_app = {};
   }
   if (channels.push) {
-    if (!channels.push.vapid && !channels.push.apns) {
-      fail('channels.push needs vapid (web push), apns (iOS) or both');
+    if (!channels.push.vapid && !channels.push.apns && !channels.push.fcm) {
+      fail('channels.push needs vapid (web push), apns (iOS), fcm (Android) or several of them');
     }
     resolved.push = {
       vapid: channels.push.vapid ? resolveVapid(channels.push.vapid) : undefined,
       apns: channels.push.apns ? resolveApns(channels.push.apns) : undefined,
+      fcm: channels.push.fcm ? resolveFcm(channels.push.fcm) : undefined,
     };
   }
 

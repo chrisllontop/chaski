@@ -44,6 +44,7 @@ export class ChannelService extends BaseService {
           ios: push?.apns
             ? { bundleId: push.apns.bundleId, environment: push.apns.environment }
             : null,
+          android: push?.fcm ? { projectId: push.fcm.projectId } : null,
         },
       ],
     };
