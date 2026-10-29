@@ -89,7 +89,7 @@ export const buildFcmRequest = (input: {
   deviceToken: string;
   notification: { title: string; body: string };
   data: Record<string, string>;
-  collapseId?: string;
+  tag?: string;
 }): { url: string; headers: Record<string, string>; body: string } => {
   const message = {
     token: input.deviceToken,
@@ -98,11 +98,10 @@ export const buildFcmRequest = (input: {
     android: {
       priority: 'HIGH',
       ttl: '3600s',
-      // collapse_key keeps one pending message per notification on a device
-      // that is offline; the tag replaces one already on screen.
-      ...(input.collapseId
-        ? { collapse_key: input.collapseId, notification: { tag: input.collapseId } }
-        : {}),
+      // The tag replaces a repeat on screen. No collapse_key: FCM holds only
+      // four collapse keys per offline device, so one per notification would
+      // drop all but four of what waits for a phone to come back.
+      ...(input.tag ? { notification: { tag: input.tag } } : {}),
     },
   };
   return {

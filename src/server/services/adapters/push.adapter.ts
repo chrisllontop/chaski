@@ -37,14 +37,13 @@ const APNS_PRUNE_REASONS = new Set(['BadDeviceToken', 'DeviceTokenNotForTopic', 
 type FcmVerdict = 'expired' | 'renew' | 'retry';
 
 // Only FCM's own codes condemn a device: a 403 PERMISSION_DENIED or a 404
-// NOT_FOUND without one is the service account or the project, not the token.
+// NOT_FOUND without one is the service account or the project, not the token,
+// and so is SENDER_ID_MISMATCH, a service account of another Firebase project.
 // Firebase reads INVALID_ARGUMENT as a dead token only when the payload is
 // valid; Chaski builds a fixed payload and checks its size before sending, so
 // the token is to blame unless the 400 names another field.
 const classifyFcmError = (status: number, error: FcmError): FcmVerdict => {
-  if (error.errorCode === 'UNREGISTERED' || error.errorCode === 'SENDER_ID_MISMATCH') {
-    return 'expired';
-  }
+  if (error.errorCode === 'UNREGISTERED') return 'expired';
   if (error.errorCode === 'INVALID_ARGUMENT' && (!error.field || error.field === 'message.token')) {
     return 'expired';
   }
@@ -121,7 +120,7 @@ const sendFcm = async (
       ...(payload.href ? { href: payload.href } : {}),
       ...(payload.tag ? { tag: payload.tag } : {}),
     },
-    collapseId: payload.tag,
+    tag: payload.tag,
   });
   const response = await fetch(request.url, {
     method: 'POST',

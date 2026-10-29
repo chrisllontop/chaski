@@ -435,7 +435,7 @@ describe('FCM', () => {
     expect(calls[2]?.headers.get('authorization')).toBe('Bearer ya29.1');
   });
 
-  it('sends the notification FCM expects, with the link and a collapse key', async () => {
+  it('sends the notification FCM expects, with the link and a tag', async () => {
     await registerAndroid();
     const calls = stubFcm();
 
@@ -450,7 +450,6 @@ describe('FCM', () => {
         android: {
           priority: 'HIGH',
           ttl: '3600s',
-          collapse_key: delivery?.notificationId,
           notification: { tag: delivery?.notificationId },
         },
       },
@@ -465,12 +464,17 @@ describe('FCM', () => {
     expect(await devices()).toEqual([]);
   });
 
-  it('forgets a device registered to another Firebase project', async () => {
+  // The service account of another Firebase project is a config mistake, and
+  // the devices must outlive it.
+  it('keeps the device when the service account is of another Firebase project', async () => {
     await registerAndroid();
     stubFcm(() => fcmError(403, 'SENDER_ID_MISMATCH'));
 
-    expect(await sendPush()).toMatchObject({ status: 'failed', errorCode: 'no_device_tokens' });
-    expect(await devices()).toEqual([]);
+    const delivery = await sendPush();
+
+    expect(delivery).toMatchObject({ status: 'pending', errorCode: 'provider_error' });
+    expect(delivery?.lastError).toContain('SENDER_ID_MISMATCH');
+    expect(await devices()).toHaveLength(1);
   });
 
   it('forgets a device FCM calls an invalid token', async () => {
@@ -581,6 +585,10 @@ describe('push subscriptions', () => {
     ]);
     expect(await chaski.push.unregister({ deviceToken: ANDROID_TOKEN })).toEqual({
       unregistered: 1,
+    });
+    await expect(chaski.push.unregister({ deviceToken: 'not a token' })).rejects.toMatchObject({
+      code: 'validation',
+      message: expect.stringContaining('deviceToken must be an APNs device token or an FCM'),
     });
   });
 

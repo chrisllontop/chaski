@@ -116,15 +116,18 @@ export const apnsDeviceTokenSchema = z
   .max(512)
   .regex(/^[0-9a-fA-F]+$/, { message: 'deviceToken must be a hex string' });
 
-// FCM registration tokens are opaque and, unlike APNs tokens, case-sensitive.
-export const fcmTokenSchema = z
-  .string()
-  .min(32)
-  .max(4096)
-  .regex(/^\S+$/, { message: 'deviceToken must be an FCM registration token' });
+const opaqueTokenSchema = z.string().min(32).max(4096);
 
-// Unregistering doesn't name the platform, so it takes either kind of token.
-const anyDeviceTokenSchema = z.union([apnsDeviceTokenSchema, fcmTokenSchema]);
+// FCM registration tokens are opaque and, unlike APNs tokens, case-sensitive.
+export const fcmTokenSchema = opaqueTokenSchema.regex(/^\S+$/, {
+  message: 'deviceToken must be an FCM registration token',
+});
+
+// Unregistering doesn't name the platform, so it takes either kind of token;
+// an APNs hex token has the shape of an FCM one.
+const anyDeviceTokenSchema = opaqueTokenSchema.regex(/^\S+$/, {
+  message: 'deviceToken must be an APNs device token or an FCM registration token',
+});
 
 const iosDeviceSchema = z.object({
   platform: z.literal('ios'),
