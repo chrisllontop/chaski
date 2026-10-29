@@ -1,6 +1,6 @@
 ---
 title: Local development
-description: Run Chaski on your machine with wrangler dev, against a local database and without reaching a provider.
+description: Run Chaski on your machine with wrangler dev, against a local database, with every email kept on disk.
 ---
 
 `wrangler dev` runs everything Chaski uses on your machine: the database, the queue and its
@@ -18,28 +18,6 @@ npx wrangler d1 migrations apply CHASKI_DB --local
 
 Chaski refuses to run against a database that misses one of its migrations, and the error names
 the ones to apply.
-
-## Send without sending
-
-Set `dryRun: true` in the config while you develop. Chaski renders and records email and push
-deliveries, and shows them in the dashboard, without handing them to a provider. In-app
-notifications still reach the feed, since they never leave your Worker.
-
-```ts title="src/index.ts"
-export const chaski = createChaski((env: Env) => ({
-  publicUrl: env.CHASKI_PUBLIC_URL,
-  bindings: { db: env.CHASKI_DB, queue: env.CHASKI_QUEUE },
-  dryRun: env.CHASKI_DRY_RUN === 'true',
-}));
-```
-
-```bash title=".dev.vars"
-CHASKI_DRY_RUN=true
-CHASKI_PUBLIC_URL=http://localhost:8787/admin/notifications
-```
-
-The config function runs on every call, so values from `.dev.vars` apply locally and your
-production vars apply once deployed.
 
 ## Seed the templates
 
@@ -75,14 +53,17 @@ is the schedule’s: `scheduledId` from `chaski.schedule()`, `id` from `chaski.s
 
 ## Read the emails
 
-Without `dryRun`, `wrangler dev` stands in for Email Service: each email Chaski sends lands on
-disk instead of in an inbox. The log prints where its HTML, its text and each attachment went,
+`wrangler dev` stands in for Email Service: each email Chaski sends lands on disk instead of in an
+inbox, so nothing reaches a real address. The log prints where its HTML, its text and each attachment went,
 under `.wrangler/tmp/email/`, and the local explorer lists every one with its sender, recipients,
 reply-to address and attachments:
 
 ```bash
 curl http://localhost:8787/cdn-cgi/local/explorer/api/local/email/sending
 ```
+
+Web push is different: it goes to the push service of each browser subscribed against the local
+database, which is only ever a browser you turned push on in yourself.
 
 ## Open the local dashboard
 
@@ -102,6 +83,9 @@ export const chaski = createChaski((env: Env) => ({
 ENVIRONMENT=local
 CHASKI_PUBLIC_URL=http://localhost:8787/admin/notifications
 ```
+
+The config function runs on every call, so values from `.dev.vars` apply locally and each
+environment’s own vars apply once deployed.
 
 With `environment: 'local'`, the dashboard and its API open without calling `authorize`, signed
 in as **Local development**, who may also [pause a channel](/docs/dashboard#pause-a-channel)

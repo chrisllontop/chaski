@@ -116,9 +116,9 @@ rows can stay `pending` after the queue gave up on them.
 delivery read it: an R2 lifecycle rule deleted it before the schedule fired or the replay sent.
 Lengthen the rule, then send again.
 
-**Nothing arrives, yet deliveries show `sent`.** `dryRun` is on: in dry run Chaski records email
-and push without handing them to a provider. The dashboard’s **Channels** page says
-whether dry run is on. In-app items reach the feed in dry run too.
+**Nothing arrives, yet deliveries show `sent`.** Under `wrangler dev`, email never leaves the
+machine: each one lands under `.wrangler/tmp/email/`, and the log prints where. Deployed, `sent`
+means Email Service accepted it: look in the recipient’s spam folder.
 
 **Web push stopped reaching browsers after a key change.** A subscription belongs to the VAPID key
 it was made with. Put the earlier pair back, or have users turn push on again.

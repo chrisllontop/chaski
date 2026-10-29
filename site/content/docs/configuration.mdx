@@ -30,7 +30,6 @@ Chaski checks the config on every call, and a mistake throws a `config` error th
 | `bindings` | `ChaskiBindings` | Required. The resources Chaski runs on; see below. |
 | `channels` | `object` | The channels to turn on. A channel is on when it has an entry. |
 | `defaultMutedTypes` | `string[]` | Types every contact has muted until they save preferences of their own. |
-| `dryRun` | `boolean` | Renders and records email and push deliveries without calling the providers. Defaults to `false`. |
 | `environment` | `string` | Where the Worker runs, such as `production`, shown in the dashboard and returned by `ready()`. `local` opens the dashboard without `authorize` and needs a `publicUrl` on localhost; see [Local development](/docs/local-development#open-the-local-dashboard). Unrelated to `channels.push.apns.environment`, which picks the APNs server. |
 | `maxRetries` | `number` | Must match `max_retries` on your queue consumer. Defaults to `5`. |
 | `migrationsTable` | `string` | Must match `migrations_table` on your D1 binding. Defaults to `d1_migrations`. |
