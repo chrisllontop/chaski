@@ -15,15 +15,32 @@ const LIVE = {
   },
 } as const;
 
-/** Whether the dashboard follows changes live, and whether sends reach anyone. */
+const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
+
+/** Where this dashboard runs, whether it follows changes live, and whether sends reach anyone. */
 export const LiveStatus = () => {
   const status = useLiveStatus();
   const channels = useChannelsOverview();
   if (!channels.data) return null;
   const live = LIVE[status];
+  const { environment } = channels.data;
   const paused = channels.data.channels.filter((channel) => channel.paused);
   return (
     <div className="flex items-center gap-2">
+      {environment ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span>
+              <Pill tone="info">{capitalize(environment)}</Pill>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            {environment === 'local'
+              ? 'Opens without signing in, and anyone here may pause a channel.'
+              : 'The environment your Chaski config names.'}
+          </TooltipContent>
+        </Tooltip>
+      ) : null}
       {paused.map(({ channel }) => (
         <Tooltip key={channel}>
           <TooltipTrigger asChild>
@@ -34,18 +51,6 @@ export const LiveStatus = () => {
           <TooltipContent>Its deliveries wait as held until someone resumes it.</TooltipContent>
         </Tooltip>
       ))}
-      {channels.data.dryRun ? (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span>
-              <Pill tone="warning">Dry run</Pill>
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>
-            Email and push render and record, but never reach a provider.
-          </TooltipContent>
-        </Tooltip>
-      ) : null}
       <Tooltip>
         <TooltipTrigger asChild>
           <span>

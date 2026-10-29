@@ -40,7 +40,9 @@ Chaski ships two:
 - `basicAuth({ username, password })` asks the browser for one username and password, compared in
   constant time; read them from secrets.
 
-Your own sign-in works the same way: return the user it finds, or `null`.
+Your own sign-in works the same way: return the user it finds, or `null`. Under `wrangler dev`,
+`environment: 'local'` in the config opens the dashboard without `authorize`; see
+[Local development](/docs/local-development#open-the-local-dashboard).
 
 ```ts
 authorize: async (c) => {
@@ -76,7 +78,7 @@ skipped and never goes out. An [inline send](/docs/sending#inline) on a paused c
 
 Pausing stops password resets along with everything else, so it takes a permission of its own.
 Give `routes()` a `canPauseChannels` check; without it nobody can pause, or send or discard what a
-pause holds:
+pause holds, except in the `local` environment, where pausing only holds this machine’s email:
 
 ```ts
 const dashboard = chaski.routes({

@@ -1,11 +1,14 @@
 import { type Env, Hono, type MiddlewareHandler } from 'hono';
 import {
+  type Actor,
   type Authorize,
   type CanPauseChannels,
   isActor,
   setActor,
   setPausePermission,
 } from '../auth';
+import { LOCAL_ENVIRONMENT, resolveConfig } from '../config';
+import { logger } from '../lib/log';
 import { admin } from './admin';
 import { isApi, serveAsset, serveShell } from './dashboard';
 import { handleError, requireReady, sameOrigin } from './http';
@@ -18,13 +21,40 @@ export type RoutesOptions<E extends Env = Env> = {
   };
 };
 
-// Fail-closed: only an actor with an id lets the request through.
+const log = logger('auth');
+
+const LOCAL_ACTOR: Actor = { id: 'local', name: 'Local development' };
+let warnedLocal = false;
+
+// A config that doesn't validate isn't local: authorize decides, and only then does requireReady
+// answer with the config error, so it never reaches someone the dashboard doesn't let in.
+const isLocal = (): boolean => {
+  try {
+    return resolveConfig().environment === LOCAL_ENVIRONMENT;
+  } catch {
+    return false;
+  }
+};
+
+// Fail-closed: only an actor with an id lets the request through. In the local environment
+// nobody signs in, and pausing only holds the email of this machine, so both hooks are skipped.
 const guard =
   <E extends Env>(
     authorize: Authorize<E>,
     canPauseChannels: CanPauseChannels<E> | undefined,
   ): MiddlewareHandler<E> =>
   async (c, next) => {
+    if (isLocal()) {
+      // Once per isolate, so a deploy that runs as local shows up in its logs.
+      if (!warnedLocal) {
+        warnedLocal = true;
+        log.warn("dashboard open without authorize: the environment is 'local'");
+      }
+      c.header('Cache-Control', 'no-store');
+      setActor(c, LOCAL_ACTOR);
+      setPausePermission(c, () => true);
+      return next();
+    }
     const verdict = await authorize(c);
     if (verdict instanceof Response) {
       return verdict;

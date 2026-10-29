@@ -226,9 +226,9 @@ import {
 
 export type Env = {
   CHASKI_PUBLIC_URL: string;
-  CHASKI_DRY_RUN?: string;
+  // `local` only in .dev.vars; deployed environments name themselves, or leave it unset.
+  ENVIRONMENT?: string;
   // The dashboard sign-in's values (below): keep the ones it uses.
-  CHASKI_LOCAL_ADMIN?: string;
   ADMIN_USER?: string;
   ADMIN_PASSWORD?: string;
   VAPID_PUBLIC_KEY: string;
@@ -266,9 +266,15 @@ export const chaski = createChaski((env: Env) => ({
       },
     },
   },
-  dryRun: env.CHASKI_DRY_RUN === 'true',
+  environment: env.ENVIRONMENT,
 }));
 ```
+
+When the project already names its environment in a variable, pass that one as `environment`
+instead of adding `ENVIRONMENT`. Chaski acts only on the exact value `local`, which opens the
+dashboard without `authorize`, so check that only `.dev.vars` (or `.env`) produces it; when the
+project's local value is another word, such as `development`, and a deployed environment shares
+it, add `ENVIRONMENT` rather than mapping that word to `local`.
 
 When the project already has an `Env` type, from `wrangler types` or by hand, add the fields to it
 and use it here instead. An `Env` declared in the main module moves into `src/chaski.ts` (or a
@@ -299,16 +305,14 @@ clear:
 
 - **The team uses Cloudflare Access:** `cloudflareAccess({ teamDomain, audience })` checks the
   token of an Access application that covers the mount path; `audience` is that application’s AUD
-  tag. Access doesn’t sit in front of `wrangler dev`, so let a local session through with a
-  variable only `.dev.vars` sets, and never set it in production:
+  tag. Access doesn’t sit in front of `wrangler dev`; `environment: 'local'` (step 7) opens the
+  local dashboard without it, so `authorize` needs no local branch:
 
   ```ts
-  const access = cloudflareAccess({
+  authorize: cloudflareAccess({
     teamDomain: 'example.cloudflareaccess.com',
     audience: '<Access application AUD tag>',
-  });
-
-  authorize: (c) => (c.env.CHASKI_LOCAL_ADMIN === 'true' ? { id: 'local' } : access(c)),
+  }),
   ```
 
 - **Neither:** `basicAuth({ username, password })`, with both kept as secrets. Build it inside
@@ -324,7 +328,8 @@ Both helpers take the app’s Hono env, so they work under `chaski.routes<AppEnv
 Ask the user who may **pause** a channel from the dashboard, its emergency brake: a paused
 channel holds every delivery, password resets included, until someone resumes it and sends or
 discards what it held. `canPauseChannels: (c, actor) => boolean` next to `authorize` decides it,
-over the same role or list (`actor.id` is what `authorize` returned); without it nobody can pause.
+over the same role or list (`actor.id` is what `authorize` returned); without it nobody can pause,
+except in the `local` environment.
 
 ### The user routes
 
@@ -467,35 +472,39 @@ apns: {
 **Done when** the keys are in place and the secrets live only in `.dev.vars` and, later, the
 account. `.dev.vars` must be in `.gitignore`.
 
-## 7. Run it in dry run
+## 7. Run it locally
 
 Set the local values in `.dev.vars`, which overrides `vars` under `wrangler dev`:
 
 ```sh
-CHASKI_DRY_RUN=true
 CHASKI_PUBLIC_URL=http://localhost:8787/admin/notifications
-# The sign-in's values, if it has any: CHASKI_LOCAL_ADMIN=true, or ADMIN_USER and ADMIN_PASSWORD.
+# Opens the local dashboard without authorize; needs CHASKI_PUBLIC_URL on localhost.
+ENVIRONMENT=local
+# The sign-in's values, if it has any: ADMIN_USER and ADMIN_PASSWORD.
 # With web push: VAPID_PRIVATE_KEY.
 ```
 
-Match `CHASKI_PUBLIC_URL` to the address `wrangler dev` prints and the mount path. Start the
-project’s dev command, then check each of these, in order:
+Match `CHASKI_PUBLIC_URL` to the address `wrangler dev` prints and the mount path. Under
+`wrangler dev` every email lands on disk, under `.wrangler/tmp/email/`, so nothing reaches a real
+address. Start the project’s dev command, then check each of these, in order:
 
-1. **The dashboard answers.** `curl -i http://localhost:8787/admin/notifications/` with the local
-   sign-in answers `200` and HTML: `-u` for `basicAuth()`, the app’s session cookie
-   (`-b 'session=…'`) for its own sign-in, nothing with the local Access bypass.
-2. **Chaski read the config.** Ask the user to open the dashboard’s **Channels** page: it says dry
-   run is on and shows the channels they picked as enabled.
+1. **The dashboard answers.** `curl -i http://localhost:8787/admin/notifications/` answers `200`
+   and HTML, with no credentials while `ENVIRONMENT=local`. To check the sign-in itself, run once
+   without it: `-u` for `basicAuth()`, the app’s session cookie (`-b 'session=…'`) for its own
+   sign-in; Access answers 403 locally.
+2. **Chaski read the config.** Ask the user to open the dashboard’s **Channels** page: the header
+   says **Local**, and it shows the channels they picked as enabled.
 3. **A template exists.** Sending a type without one fails. Write a `welcome` template, with a
    subject and a body for each channel the user picked, into a scratch template file,
    `.wrangler/chaski-check.json`, and load it ([sending.md](sending.md) has the format and the
    commands). The project’s `chaski-templates.json` holds the types it sends. **Templates**
    lists `welcome`.
-4. **A send goes through.** Add a temporary route that only answers in dry run, and call it:
+4. **A send goes through.** Add a temporary route that only answers in the local environment, and
+   call it:
 
    ```ts
    app.post('/dev/chaski-send', async (c) => {
-     if (c.env.CHASKI_DRY_RUN !== 'true') return c.notFound();
+     if (c.env.ENVIRONMENT !== 'local') return c.notFound();
      return c.json(
        await chaski.send({
          type: 'welcome',
@@ -510,8 +519,9 @@ project’s dev command, then check each of these, in order:
    `reason`, and [troubleshooting.md](troubleshooting.md) says what each one means; `push` skips
    with `no_device_tokens` until a browser enables push.
 5. **The delivery moved.** Ask the user to open the dashboard’s **Deliveries** page: each
-   delivery shows `sent` once the local queue consumer ran, usually within seconds. A delivery
-   stuck at `pending` means the queue handler isn’t wired.
+   delivery shows `sent` once the local queue consumer ran, usually within seconds, and the log
+   prints where the email landed. A delivery stuck at `pending` means the queue handler isn’t
+   wired.
 6. **A schedule fires**, when the user turned scheduling on. Have the temporary route call
    `chaski.schedule()` with the same send, an `idempotencyKey` and a `scheduledAt` 20 seconds
    out (`new Date(Date.now() + 20_000).toISOString()`), and return `chaski.schedules.list()`
@@ -532,7 +542,7 @@ npx wrangler queues create my-app-deliveries
 npx wrangler queues create my-app-deliveries-dlq
 npx wrangler r2 bucket create my-app-attachments   # only for attachments
 npx wrangler d1 migrations apply CHASKI_DB --remote
-npx wrangler secret put VAPID_PRIVATE_KEY            # and every other secret from .dev.vars
+npx wrangler secret put VAPID_PRIVATE_KEY            # and the other secrets, never ENVIRONMENT
 npx wrangler deploy
 ```
 
@@ -540,10 +550,10 @@ With the migrations applied, the project’s template file loads into production
 ([sending.md](sending.md)); ask for that too.
 
 Before `deploy`, check that `CHASKI_PUBLIC_URL` in `vars` is the production URL of the mount,
-that `CHASKI_DRY_RUN` and `CHASKI_LOCAL_ADMIN` are unset in production, that the email domain is
-onboarded to Email Service, and that the Access application, if any, covers the mount path. The
-Durable Objects and the Workflow are created by the deploy. Then open the dashboard: **Channels**
-shows what Chaski picked up.
+that `ENVIRONMENT` is unset or names it (never `local`), that the email domain is onboarded to
+Email Service, and that the Access application, if any, covers the mount path. The Durable Objects
+and the Workflow are created by the deploy. Then open the dashboard: **Channels** shows what
+Chaski picked up.
 
 ## Other Workers in the account
 

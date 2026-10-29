@@ -74,7 +74,7 @@
     }
   },
   "scripts": {
-    "dev": "pnpm build:dashboard && wrangler dev -c test/fixture/wrangler.jsonc --var CHASKI_DRY_RUN:true",
+    "dev": "pnpm build:dashboard && wrangler dev -c test/fixture/wrangler.jsonc --var ENVIRONMENT:local",
     "build:dashboard": "vite build",
     "build:types": "tsc -p tsconfig.json --noEmit false --declaration --emitDeclarationOnly --outDir dist --rootDir src && tsc -p tsconfig.browser.json --noEmit false --declaration --emitDeclarationOnly --outDir dist --rootDir src && node scripts/fix-declaration-imports.ts dist",
     "build": "pnpm build:dashboard && tsdown && pnpm build:types",

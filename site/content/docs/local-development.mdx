@@ -1,6 +1,6 @@
 ---
 title: Local development
-description: Run Chaski on your machine with wrangler dev, against a local database and without reaching a provider.
+description: Run Chaski on your machine with wrangler dev, against a local database, with every email kept on disk.
 ---
 
 `wrangler dev` runs everything Chaski uses on your machine: the database, the queue and its
@@ -18,28 +18,6 @@ npx wrangler d1 migrations apply CHASKI_DB --local
 
 Chaski refuses to run against a database that misses one of its migrations, and the error names
 the ones to apply.
-
-## Send without sending
-
-Set `dryRun: true` in the config while you develop. Chaski renders and records email and push
-deliveries, and shows them in the dashboard, without handing them to a provider. In-app
-notifications still reach the feed, since they never leave your Worker.
-
-```ts title="src/index.ts"
-export const chaski = createChaski((env: Env) => ({
-  publicUrl: env.CHASKI_PUBLIC_URL,
-  bindings: { db: env.CHASKI_DB, queue: env.CHASKI_QUEUE },
-  dryRun: env.CHASKI_DRY_RUN === 'true',
-}));
-```
-
-```bash title=".dev.vars"
-CHASKI_DRY_RUN=true
-CHASKI_PUBLIC_URL=http://localhost:8787/admin/notifications
-```
-
-The config function runs on every call, so values from `.dev.vars` apply locally and your
-production vars apply once deployed.
 
 ## Seed the templates
 
@@ -75,8 +53,8 @@ is the schedule’s: `scheduledId` from `chaski.schedule()`, `id` from `chaski.s
 
 ## Read the emails
 
-Without `dryRun`, `wrangler dev` stands in for Email Service: each email Chaski sends lands on
-disk instead of in an inbox. The log prints where its HTML, its text and each attachment went,
+`wrangler dev` stands in for Email Service: each email Chaski sends lands on disk instead of in an
+inbox, so nothing reaches a real address. The log prints where its HTML, its text and each attachment went,
 under `.wrangler/tmp/email/`, and the local explorer lists every one with its sender, recipients,
 reply-to address and attachments:
 
@@ -84,29 +62,44 @@ reply-to address and attachments:
 curl http://localhost:8787/cdn-cgi/local/explorer/api/local/email/sending
 ```
 
-## Sign in to the local dashboard
+Web push is different: it goes to the push service of each browser subscribed against the local
+database, which is only ever a browser you turned push on in yourself.
+
+## Open the local dashboard
 
 Cloudflare Access doesn’t sit in front of `wrangler dev`, so `cloudflareAccess()` answers 403 to
-every local request. `authorize` is a function of the request, so it can let a local session
-through on its own terms, such as a variable only `.dev.vars` sets:
+every local request. Name the environment in the config instead, from a variable that is `local`
+only in `.dev.vars`:
 
 ```ts title="src/index.ts"
-const access = cloudflareAccess({
-  teamDomain: 'example.cloudflareaccess.com',
-  audience: '<Access application AUD tag>',
-});
-
-app.route(
-  '/admin/notifications',
-  chaski.routes({
-    dashboard: {
-      authorize: (c) => (c.env.CHASKI_LOCAL_ADMIN === 'true' ? { id: 'local' } : access(c)),
-    },
-  }),
-);
+export const chaski = createChaski((env: Env) => ({
+  publicUrl: env.CHASKI_PUBLIC_URL,
+  bindings: { db: env.CHASKI_DB, queue: env.CHASKI_QUEUE },
+  environment: env.ENVIRONMENT,
+}));
 ```
 
-`basicAuth()` works too, with a username and password you keep in `.dev.vars`.
+```bash title=".dev.vars"
+ENVIRONMENT=local
+CHASKI_PUBLIC_URL=http://localhost:8787/admin/notifications
+```
+
+The config function runs on every call, so values from `.dev.vars` apply locally and each
+environment’s own vars apply once deployed.
+
+With `environment: 'local'`, the dashboard and its API open without calling `authorize`, signed
+in as **Local development**, who may also [pause a channel](/docs/dashboard#pause-a-channel)
+without `canPauseChannels`. The header shows the environment, and the log warns the first time
+each isolate opens the dashboard that way. Any other value, such as `production` or `staging`,
+only names the environment in the dashboard and in `ready()`, and `authorize` decides as usual;
+so does a config without one.
+
+Set `local` in `.dev.vars` or `.env`, which only `wrangler dev` and `vite dev` read, and never in
+the `vars` or secrets of a deployed environment. As a backstop, `local` needs a `publicUrl` on
+localhost: a deploy that picks it up by mistake still points `publicUrl` at its real host, so
+Chaski throws a `config` error instead of opening its dashboard. To try your own `authorize`
+locally, leave `ENVIRONMENT` out of `.dev.vars` for that run; `basicAuth()` works under
+`wrangler dev` as it does deployed.
 
 ## Try a send
 

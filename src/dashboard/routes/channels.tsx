@@ -26,7 +26,7 @@ import type { Channel, ChannelPause } from '~/lib/types';
 const Row = ({ label, children }: { label: string; children: ReactNode }) => (
   <div className="grid grid-cols-[8rem_1fr] gap-3 px-4 py-2.5 text-[13px]">
     <dt className="text-muted-foreground">{label}</dt>
-    <dd className="min-w-0 break-all">
+    <dd className="min-w-0 wrap-anywhere">
       {children ?? <span className="text-muted-foreground">–</span>}
     </dd>
   </div>
@@ -301,13 +301,19 @@ export const ChannelsPage = () => {
               description="How sends and this dashboard behave"
               state={null}
             >
-              <Row label="Dry run">
+              <Row label="Environment">
                 <div className="flex items-start gap-2">
-                  {data.dryRun ? <Pill tone="warning">On</Pill> : <Pill tone="neutral">Off</Pill>}
+                  {data.environment ? (
+                    <Pill tone="info">{data.environment}</Pill>
+                  ) : (
+                    <Pill tone="neutral">Not named</Pill>
+                  )}
                   <span className="text-muted-foreground">
-                    {data.dryRun
-                      ? 'Email and push render and record without reaching their providers.'
-                      : 'Email and push reach their providers.'}
+                    {data.environment === 'local'
+                      ? 'The dashboard opens without signing in, and anyone here may pause a channel.'
+                      : data.environment
+                        ? 'The dashboard asks authorize who may use it.'
+                        : 'Set environment in the config to show where this dashboard runs.'}
                   </span>
                 </div>
               </Row>

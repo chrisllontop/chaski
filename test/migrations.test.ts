@@ -48,19 +48,19 @@ describe('migrations', () => {
 
 // A host's health check asks Chaski whether it can run, without sending anything.
 describe('chaski.ready()', () => {
-  it('reports the channels and dry run, in process and over RPC', async () => {
+  it('reports the channels and the environment, in process and over RPC', async () => {
     const chaski = useConfig();
 
     expect(await chaski.ready()).toEqual({
       channels: ['email', 'in_app'],
       paused: [],
-      dryRun: false,
+      environment: null,
       templates: 0,
     });
     expect(await exports.ChaskiEntrypoint.ready()).toEqual({
       channels: ['email', 'in_app'],
       paused: [],
-      dryRun: false,
+      environment: null,
       templates: 0,
     });
   });

@@ -448,12 +448,15 @@ CHASKI_PUBLIC_URL=http://localhost:8787/admin/notifications
 VAPID_PRIVATE_KEY=<private key from step 6>
 ```
 
-Set `dryRun: true` in the config while you develop: Chaski renders and records email and push
-deliveries, and shows them in the dashboard, without handing them to a provider.
+`wrangler dev` keeps every email Chaski sends on disk, under `.wrangler/tmp/email/`, instead of
+delivering it.
 
 Cloudflare Access doesn’t sit in front of `wrangler dev`, so `cloudflareAccess()` answers 403 to
-the local dashboard. [Local development](https://chaski.sh/docs/local-development) shows how to let
-a local session in, and where to read the emails `wrangler dev` sends.
+the local dashboard. Pass `environment: env.ENVIRONMENT` in the config and set `ENVIRONMENT=local`
+in `.dev.vars`, never in a deployed environment’s `vars`: the local dashboard then opens without
+`authorize`, and its header shows the environment.
+[Local development](https://chaski.sh/docs/local-development) has the details, and where to read
+the emails `wrangler dev` sends.
 
 ## Use Chaski with a coding agent
 
@@ -491,7 +494,7 @@ You need Node 24 and pnpm 12.
 pnpm i
 pnpm build:dashboard   # once, on a fresh clone
 pnpm wrangler d1 migrations apply CHASKI_DB --local -c test/fixture/wrangler.jsonc
-pnpm dev               # a sample Worker with Chaski mounted, in dry run
+pnpm dev               # a sample Worker with Chaski mounted, in the local environment
 curl -X POST localhost:8787/dev/seed   # sample templates and sends
 ```
 

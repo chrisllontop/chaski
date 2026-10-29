@@ -9,7 +9,7 @@ const STEPS = [
   { text: 'Declared a database and a queue', meta: 'wrangler.jsonc' },
   { text: 'Mounted the dashboard, for admins only', meta: '/admin/notifications' },
   { text: 'Created the tables locally', meta: '--local' },
-  { text: 'Sent a welcome email in dry run', meta: 'delivered', metaClass: 'text-success' },
+  { text: 'Sent a welcome email locally', meta: 'delivered', metaClass: 'text-success' },
 ];
 
 const ASKS = { text: 'Deploy to your account, once you say so', meta: 'asks first' };

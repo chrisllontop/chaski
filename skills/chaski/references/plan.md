@@ -154,7 +154,7 @@ over or a reason it stays.
 
 Write the stages into the plan in this order:
 
-1. **Chaski in dry run.** Set it up on a branch ([setup.md](setup.md)) with the bindings the
+1. **Chaski, locally.** Set it up on a branch ([setup.md](setup.md)) with the bindings the
    moving flows need. Load the template file into the local database ([sending.md](sending.md)),
    and the user checks each template in the dashboard’s preview. Before the first email type, the
    user onboards the sending domain to Email Service, a DNS change on their side.
@@ -167,17 +167,17 @@ Write the stages into the plan in this order:
    resets and receipts last):
    1. Add the Chaski send next to the old one, behind a switch the host owns, such as a
       `CHASKI_TYPES` var listing the types Chaski sends. A listed type goes through Chaski and
-      skips the old path; an unlisted one takes the old path. Never both: with dry run off, that
-      sends twice.
-   2. Locally, trigger the flow twice: unlisted, to see what the old path sends, and listed, in
-      dry run, to see Chaski’s delivery in the dashboard (content, recipient, skipped channels).
+      skips the old path; an unlisted one takes the old path. Never both: that sends twice.
+   2. Locally, trigger the flow twice: unlisted, to see what the old path sends, and listed, to
+      see Chaski’s delivery in the dashboard (content, recipient, skipped channels) and its email
+      under `.wrangler/tmp/email/`.
       Compare the two. With its provider key set, the old path sends for real even locally: point
       it at a test address, or log what it would send.
    3. Load its template into production (the template file’s `--remote` load in
       [sending.md](sending.md), with the user’s go-ahead). Deploy with the type unlisted, so
       nothing changes, then list it in production and watch **Deliveries** and the type’s
-      health on the **Overview**. `dryRun` covers the whole config, so in production the switch
-      is what moves types one at a time.
+      health on the **Overview**. If it misbehaves, pause its channel in **Channels**: its
+      deliveries wait as held while the type is unlisted, then send or discard them.
    4. Keep the old path and the provider’s credentials until the type has run clean for as long
       as the user wants. Unlisting the type switches back.
 5. **Clean-up**, once every type has moved: delete the old send code, templates and tables, drop

@@ -20,7 +20,11 @@ class GlobalSocket extends FakeSocket {
 
 const renderDashboard = (realtime: boolean) => {
   const network = fakeFetch({
-    'GET https://app.example.com/api/channels': () => ({ dryRun: false, realtime, channels: [] }),
+    'GET https://app.example.com/api/channels': () => ({
+      environment: null,
+      realtime,
+      channels: [],
+    }),
   });
   vi.stubGlobal('fetch', network.fetch);
   vi.stubGlobal('WebSocket', GlobalSocket);
