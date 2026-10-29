@@ -371,12 +371,22 @@ describe('FCM', () => {
     );
   };
 
-  const fcmError = (status: number, errorCode: string) =>
+  const fcmError = (status: number, errorCode: string, field?: string) =>
     Response.json(
       {
         error: {
           code: status,
-          details: [{ '@type': 'type.googleapis.com/google.firebase.fcm.v1.FcmError', errorCode }],
+          details: [
+            { '@type': 'type.googleapis.com/google.firebase.fcm.v1.FcmError', errorCode },
+            ...(field
+              ? [
+                  {
+                    '@type': 'type.googleapis.com/google.rpc.BadRequest',
+                    fieldViolations: [{ field }],
+                  },
+                ]
+              : []),
+          ],
         },
       },
       { status },
@@ -461,6 +471,35 @@ describe('FCM', () => {
 
     expect(await sendPush()).toMatchObject({ status: 'failed', errorCode: 'no_device_tokens' });
     expect(await devices()).toEqual([]);
+  });
+
+  it('forgets a device FCM calls an invalid token', async () => {
+    await registerAndroid();
+    stubFcm(() => fcmError(400, 'INVALID_ARGUMENT', 'message.token'));
+
+    expect(await sendPush()).toMatchObject({ status: 'failed', errorCode: 'no_device_tokens' });
+    expect(await devices()).toEqual([]);
+  });
+
+  it('keeps the device when FCM rejects another field of the message', async () => {
+    await registerAndroid();
+    stubFcm(() => fcmError(400, 'INVALID_ARGUMENT', 'message.android.ttl'));
+
+    expect(await sendPush()).toMatchObject({ status: 'pending', errorCode: 'provider_error' });
+    expect(await devices()).toHaveLength(1);
+  });
+
+  it('keeps the device when the service account may not send', async () => {
+    await registerAndroid();
+    stubFcm(() =>
+      Response.json({ error: { code: 403, status: 'PERMISSION_DENIED' } }, { status: 403 }),
+    );
+
+    const delivery = await sendPush();
+
+    expect(delivery).toMatchObject({ status: 'pending', errorCode: 'provider_error' });
+    expect(delivery?.lastError).toContain('PERMISSION_DENIED');
+    expect(await devices()).toHaveLength(1);
   });
 
   it('retries, keeping the device, when FCM is unavailable', async () => {

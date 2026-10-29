@@ -7,8 +7,8 @@ export type FcmCredentials = {
   privateKeyPem: string;
 };
 
-/** What FCM said went wrong: its own error code, and the field a bad request names. */
-export type FcmError = { errorCode?: string; field?: string };
+/** What went wrong: FCM's own code, Google's generic status and the field a 400 names. */
+export type FcmError = { errorCode?: string; status?: string; field?: string };
 
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
@@ -134,7 +134,8 @@ export const readFcmError = async (response: Response): Promise<FcmError> => {
   const fcm = details.find((d) => d['@type']?.endsWith('google.firebase.fcm.v1.FcmError'));
   const badRequest = details.find((d) => d['@type']?.endsWith('google.rpc.BadRequest'));
   return {
-    errorCode: fcm?.errorCode ?? body.error?.status,
+    errorCode: fcm?.errorCode,
+    status: body.error?.status,
     field: badRequest?.fieldViolations?.[0]?.field,
   };
 };

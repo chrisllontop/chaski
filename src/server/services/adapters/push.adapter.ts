@@ -36,11 +36,19 @@ const APNS_PRUNE_REASONS = new Set(['BadDeviceToken', 'DeviceTokenNotForTopic', 
 // retries, 'retry' only retries.
 type FcmVerdict = 'expired' | 'renew' | 'retry';
 
+// Only FCM's own codes condemn a device: a 403 PERMISSION_DENIED or a 404
+// NOT_FOUND without one is the service account or the project, not the token.
+// Firebase reads INVALID_ARGUMENT as a dead token only when the payload is
+// valid; Chaski builds a fixed payload and checks its size before sending, so
+// the token is to blame unless the 400 names another field.
 const classifyFcmError = (status: number, error: FcmError): FcmVerdict => {
-  // TODO: map FCM's answers to a verdict. error.errorCode is FCM's code
-  // (UNREGISTERED, SENDER_ID_MISMATCH, INVALID_ARGUMENT, QUOTA_EXCEEDED,
-  // UNAVAILABLE, INTERNAL, or Google's generic UNAUTHENTICATED), and
-  // error.field names what a 400 is about ('message.token' for a bad token).
+  if (error.errorCode === 'UNREGISTERED' || error.errorCode === 'SENDER_ID_MISMATCH') {
+    return 'expired';
+  }
+  if (error.errorCode === 'INVALID_ARGUMENT' && (!error.field || error.field === 'message.token')) {
+    return 'expired';
+  }
+  if (status === 401) return 'renew';
   return 'retry';
 };
 
@@ -126,9 +134,8 @@ const sendFcm = async (
   const verdict = classifyFcmError(response.status, error);
   if (verdict === 'expired') return 'expired';
   if (verdict === 'renew') clearFcmAccessToken(creds);
-  throw new Error(
-    `FCM answered ${response.status}${error.errorCode ? ` (${error.errorCode})` : ''}`,
-  );
+  const code = error.errorCode ?? error.status;
+  throw new Error(`FCM answered ${response.status}${code ? ` (${code})` : ''}`);
 };
 
 export class PushAdapter extends BaseService {
