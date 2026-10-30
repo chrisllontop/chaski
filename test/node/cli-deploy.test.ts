@@ -62,16 +62,15 @@ describe('chaskijs deploy', () => {
     const [file] = account.secretFiles;
     expect(file?.mode).toBe(0o600);
     expect(existsSync(file?.path ?? '')).toBe(false);
-    expect(output.slice(-9)).toEqual([
+    expect(output.slice(-8)).toEqual([
       'Chaski is live at https://chaski.acme.workers.dev',
       '',
-      'Two steps are yours, in the Cloudflare dashboard:',
-      '  1. Turn on Cloudflare Access. Open the Worker chaski, go to',
-      '     Settings › Domains & Routes and select Enable Cloudflare Access on',
-      "     its workers.dev URL. Use that switch, not the Worker's own Access",
-      "     tab: that one refuses the WebSocket of the dashboard's live updates.",
-      "  2. Set up the channels on the dashboard's Channels page:",
-      '     https://chaski.acme.workers.dev',
+      'Two steps are yours:',
+      '  1. Turn on Cloudflare Access. In the Cloudflare dashboard, open the',
+      '     Worker chaski, go to Settings › Domains & Routes and select Enable',
+      '     Cloudflare Access on its workers.dev URL. Use that switch, not the',
+      "     Worker's own Access tab: it refuses the dashboard's live updates.",
+      '  2. Set up the channels on the Channels page, at the URL above.',
     ]);
   });
 
