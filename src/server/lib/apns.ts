@@ -2,18 +2,24 @@ import { signEs256Jwt } from './jwt';
 
 export type ApnsEnvironment = 'sandbox' | 'production';
 
+/** The Apple platforms one APNs key sends to, each through an app of its own. */
+export const APNS_PLATFORMS = ['ios', 'macos'] as const;
+export type ApnsPlatform = (typeof APNS_PLATFORMS)[number];
+
+/** The app a platform's pushes go to: its bundle id is the APNs topic. */
+export type ApnsApp = { bundleId: string; environment: ApnsEnvironment };
+
+// One key signs for every app of the team, so the apps hang off the key.
 export type ApnsCredentials = {
   teamId: string;
   keyId: string;
-  bundleId: string;
-  environment: ApnsEnvironment;
   privateKeyPem: string;
-};
+} & Partial<Record<ApnsPlatform, ApnsApp>>;
 
 export type ApnsPayload = {
   aps: {
     alert: { title: string; body: string };
-    sound: string;
+    sound?: string;
   };
   [key: string]: unknown;
 };
@@ -73,14 +79,14 @@ const APNS_HOSTS: Record<ApnsEnvironment, string> = {
 export const buildApnsRequest = (input: {
   authToken: string;
   deviceToken: string;
-  bundleId: string;
+  topic: string;
   environment: ApnsEnvironment;
   payload: ApnsPayload;
   collapseId?: string;
 }): { url: string; headers: Record<string, string>; body: string } => {
   const headers: Record<string, string> = {
     authorization: `bearer ${input.authToken}`,
-    'apns-topic': input.bundleId,
+    'apns-topic': input.topic,
     'apns-push-type': 'alert',
     'apns-priority': '10',
     'apns-expiration': String(Math.floor(Date.now() / 1000) + 3600),

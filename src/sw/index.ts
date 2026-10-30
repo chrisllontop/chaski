@@ -79,6 +79,7 @@ export const handlePushEvents = (
             icon: options.icon ?? '/favicon.ico',
             data: { href: payload.href ?? defaultUrl },
             ...(payload.tag ? { tag: payload.tag } : {}),
+            ...(payload.silent ? { silent: true } : {}),
           },
         );
         for (const client of await windows()) client.postMessage({ type: messageType });

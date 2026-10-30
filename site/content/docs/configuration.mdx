@@ -63,7 +63,7 @@ No options yet: `in_app: {}` turns the channel on.
 
 ### push
 
-Configure `vapid` for web push, `apns` for iOS, `fcm` for Android, or several of them.
+Configure `vapid` for web push, `apns` for iOS and macOS, `fcm` for Android, or several of them.
 
 | `vapid` | |
 | --- | --- |
@@ -75,9 +75,12 @@ Configure `vapid` for web push, `apns` for iOS, `fcm` for Android, or several of
 | --- | --- |
 | `teamId` | Your Apple team id. |
 | `keyId` | The APNs key’s id. |
-| `bundleId` | Your app’s bundle id. |
-| `environment` | `'sandbox'` or `'production'`. |
 | `privateKey` | The contents of the `.p8` file. |
+| `ios` | The iOS app: `{ bundleId, environment }`. |
+| `macos` | The macOS app: `{ bundleId, environment }`. |
+
+Each app needs its `bundleId` and `environment`, `'sandbox'` or `'production'`; configure `ios`,
+`macos` or both. A device that registers with an `environment` of its own overrides its app’s.
 
 | `fcm` | |
 | --- | --- |

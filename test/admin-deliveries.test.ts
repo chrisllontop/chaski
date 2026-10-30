@@ -288,6 +288,7 @@ describe('GET /api/channels', () => {
           paused: null,
           web: { vapidPublicKey: publicKey },
           ios: null,
+          macos: null,
           android: null,
         },
       ],

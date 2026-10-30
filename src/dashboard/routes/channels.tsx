@@ -273,7 +273,7 @@ export const ChannelsPage = () => {
             <ChannelPanel
               icon={Smartphone}
               title="Push"
-              description="Web push, APNs for iOS and FCM for Android"
+              description="Web push, APNs for iOS and macOS, FCM for Android"
               state={stateOf(push.enabled, push.paused)}
               actions={push.enabled ? control('push', push.paused) : null}
             >
@@ -289,6 +289,11 @@ export const ChannelsPage = () => {
                   </Row>
                   <Row label="iOS">
                     {push.ios ? `${push.ios.bundleId} · ${push.ios.environment}` : 'Not configured'}
+                  </Row>
+                  <Row label="macOS">
+                    {push.macos
+                      ? `${push.macos.bundleId} · ${push.macos.environment}`
+                      : 'Not configured'}
                   </Row>
                   <Row label="Android">{push.android?.projectId ?? 'Not configured'}</Row>
                 </>

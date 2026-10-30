@@ -1,6 +1,6 @@
 ---
 title: Channels
-description: Email, in-app and push, web, iOS and Android. A channel is on when the config has an entry for it.
+description: Email, in-app and push, web, iOS, macOS and Android. A channel is on when the config has an entry for it.
 ---
 
 A channel is on when `channels` in the config has an entry for it, and each type’s template turns
@@ -60,9 +60,9 @@ channels: {
     apns: {
       teamId: '<Apple team id>',
       keyId: '<APNs key id>',
-      bundleId: 'com.example.app',
-      environment: 'production',
       privateKey: env.APNS_PRIVATE_KEY,
+      ios: { bundleId: 'com.example.app', environment: 'production' },
+      macos: { bundleId: 'com.example.desktop', environment: 'production' },
     },
     fcm: {
       serviceAccount: env.FCM_SERVICE_ACCOUNT,
@@ -74,23 +74,38 @@ channels: {
 - `vapid` takes the key pair web-push tools print: the base64url public key and the private key,
   or the whole private JWK as JSON. `subject` is a `mailto:` or `https:` contact the push services
   can reach you at.
-- `apns` takes your team id, the key’s id, your app’s bundle id, `sandbox` or `production`, and the
-  contents of the `.p8` file.
+- `apns` takes your team id, the key’s id and the contents of the `.p8` file, which send to every
+  app of your team. `ios` and `macos` each name an app: its bundle id and the APNs environment of
+  its tokens, `sandbox` for development builds and `production` for the rest.
 - `fcm` takes the contents of a service account’s JSON key file, from **Project settings → Service
   accounts** in the Firebase console. The project it names must be the one your Android app
   registers its tokens with.
 
 A contact receives push on the devices registered to them. Browsers register with
-`client.push.enable()` from `chaskijs/client`; your app can register an iOS device token or an
-Android FCM token from the server:
+`client.push.enable()` from `chaskijs/client`; your app can register an iOS or macOS device token or
+an Android FCM token from the server:
 
 ```ts
 await chaski.push.register({
   recipient: { id: user.id },
-  platform: 'android', // or 'ios'
+  platform: 'android', // or 'ios', 'macos'
   deviceToken,
 });
 ```
+
+An Apple token belongs to the environment of the build that made it: a development build’s token
+only works in `sandbox`. Pass `environment: 'sandbox'` when that build registers, and the app’s
+environment in the config applies to every other device. When APNs refuses a token as
+`BadDeviceToken` or `DeviceTokenNotForTopic`, Chaski forgets the device and hands the reason to
+[`onError`](/docs/configuration#onerror): the token may be fine and the environment or the bundle
+id wrong.
+
+An Electron app on macOS gets its token from `pushNotifications.registerForAPNSNotifications()`
+in the main process, and registers it with `client.push.registerDevice({ platform: 'macos',
+deviceToken })`, as [Browser clients](/docs/browser-clients) shows.
+
+A send with `push: { silent: true }` shows its alert without a sound, on Apple devices and in
+browsers. On Android, the notification channel your app creates decides the sound.
 
 On Android the notification shows on its own when the app is in the background; the `href` and
 `tag` of the push arrive in the intent’s extras when the user taps it.

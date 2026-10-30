@@ -23,6 +23,7 @@ export type {
   ListFeedQuery,
   MarkFeedReadBody,
   MarkFeedReadInput,
+  NativeDevice,
   PreferencesUpdate,
   Recipient,
   RegisterPushSubscriptionRequest,
@@ -57,6 +58,7 @@ export {
 } from './server/auth';
 export { type Chaski, createChaski } from './server/chaski';
 export type {
+  ApnsAppConfig,
   ApnsConfig,
   ChaskiBindings,
   ChaskiConfig,

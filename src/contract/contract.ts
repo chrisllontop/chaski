@@ -45,6 +45,12 @@ export const typeNameSchema = z
   .max(128)
   .regex(/^[a-z0-9_.-]+$/i);
 
+// A silent push still shows its alert, without a sound; on Android the app's notification
+// channel decides the sound.
+export const pushOptionsSchema = z.object({
+  silent: z.boolean().optional(),
+});
+
 export const sendRequestSchema = z.object({
   type: typeNameSchema,
   recipient: recipientSchema,
@@ -52,6 +58,7 @@ export const sendRequestSchema = z.object({
   channels: z.array(channelSchema).min(1).optional(),
   transactional: z.boolean().default(false),
   email: emailOptionsSchema.optional(),
+  push: pushOptionsSchema.optional(),
   idempotencyKey: z.string().min(1).max(512).optional(),
   // Delivers the email within the call instead of through the queue, so a provider failure
   // reaches the caller; only for one transactional email (see NotificationService.send).
@@ -129,14 +136,28 @@ const anyDeviceTokenSchema = opaqueTokenSchema.regex(/^\S+$/, {
   message: 'deviceToken must be an APNs device token or an FCM registration token',
 });
 
-const iosDeviceSchema = z.object({
-  platform: z.literal('ios'),
+// A token belongs to the APNs environment of the build that made it: a development build's
+// token only works in sandbox. Without one here, the environment of the platform's app in the
+// config applies.
+const apnsDeviceFields = {
   deviceToken: apnsDeviceTokenSchema,
-});
+  environment: z.enum(['sandbox', 'production']).optional(),
+};
+
+const iosDeviceSchema = z.object({ platform: z.literal('ios'), ...apnsDeviceFields });
+const macosDeviceSchema = z.object({ platform: z.literal('macos'), ...apnsDeviceFields });
 const androidDeviceSchema = z.object({
   platform: z.literal('android'),
   deviceToken: fcmTokenSchema,
 });
+
+/** A device token from an app: APNs for iOS and macOS, FCM for Android. */
+export const nativeDeviceSchema = z.discriminatedUnion('platform', [
+  iosDeviceSchema,
+  macosDeviceSchema,
+  androidDeviceSchema,
+]);
+export type NativeDevice = z.input<typeof nativeDeviceSchema>;
 
 const registrationFields = {
   recipient: recipientSchema,
@@ -148,6 +169,7 @@ const registrationFields = {
 export const registerPushSubscriptionSchema = z.union([
   z.discriminatedUnion('platform', [
     iosDeviceSchema.extend(registrationFields),
+    macosDeviceSchema.extend(registrationFields),
     androidDeviceSchema.extend(registrationFields),
   ]),
   z.object({ ...registrationFields, subscription: webPushSubscriptionSchema }),
@@ -225,6 +247,8 @@ export type PushPayload = {
   href?: string;
   /** The notification id, so a repeated push shows once instead of twice. */
   tag?: string;
+  /** Shows the notification without a sound. */
+  silent?: boolean;
 };
 
 export type FeedItem = {
@@ -254,10 +278,7 @@ export type FeedListParams = z.input<typeof feedListParamsSchema>;
 export const markFeedReadBodySchema = markFeedReadSchema.omit({ recipientId: true });
 export type MarkFeedReadBody = z.input<typeof markFeedReadBodySchema>;
 
-export const deviceSubscriptionSchema = z.union([
-  z.discriminatedUnion('platform', [iosDeviceSchema, androidDeviceSchema]),
-  webPushSubscriptionSchema,
-]);
+export const deviceSubscriptionSchema = z.union([nativeDeviceSchema, webPushSubscriptionSchema]);
 export type DeviceSubscription = z.input<typeof deviceSubscriptionSchema>;
 
 export const deviceUnsubscriptionSchema = z

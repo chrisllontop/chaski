@@ -67,7 +67,7 @@ Agree with the user on what to turn on, then declare only what that needs:
 | Always | `CHASKI_DB` (D1), `CHASKI_QUEUE` (queue producer and consumer) | |
 | Email | `send_email` | The Workers Paid plan and a domain onboarded to [Email Service](https://developers.cloudflare.com/email-service/get-started/send-emails/) |
 | In-app feed | `ChaskiFeed` Durable Object | |
-| Web push, iOS push, Android push | none | Keys (step 6) |
+| Web push, iOS and macOS push, Android push | none | Keys (step 6) |
 | `chaski.schedule()` | `ChaskiScheduler` Workflow | |
 | Live dashboard | `ChaskiEvents` Durable Object | |
 | Email attachments | R2 bucket | |
@@ -455,19 +455,23 @@ npx web-push generate-vapid-keys --json
 for local runs, and set it in the account at deploy time (step 8). Keep the pair once browsers
 subscribe: a subscription made with another public key can never receive this server’s pushes.
 
-**iOS push** needs an APNs key (`.p8`) from the user’s Apple developer account, its key id, their
-team id and the app’s bundle id. Add `apns` next to `vapid`, with `environment: 'sandbox'` for
-development builds and `'production'` for TestFlight and App Store builds:
+**iOS and macOS push** need an APNs key (`.p8`) from the user’s Apple developer account, its key
+id, their team id, and the bundle id of each app: one key sends to every app of the team. Add
+`apns` next to `vapid`, with an entry per app and `environment: 'sandbox'` for development builds,
+`'production'` for TestFlight, App Store, Mac App Store and Developer ID builds:
 
 ```ts
 apns: {
   teamId: '<Apple team id>',
   keyId: '<APNs key id>',
-  bundleId: 'com.example.app',
-  environment: 'production',
   privateKey: env.APNS_PRIVATE_KEY, // the contents of the .p8 file
+  ios: { bundleId: 'com.example.app', environment: 'production' },
+  macos: { bundleId: 'com.example.desktop', environment: 'production' }, // a Mac or Electron app
 },
 ```
+
+A device may register with an `environment` of its own, which overrides its app’s: a development
+build that shares the config registers with `environment: 'sandbox'`.
 
 **Android push** needs a service account key from the user’s Firebase project, the one the app
 registers its tokens with: **Project settings → Service accounts → Generate new private key**

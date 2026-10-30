@@ -3,7 +3,7 @@ import { CHANNELS, type Channel } from '../contract/contract';
 import { ChaskiError } from '../contract/errors';
 import type { ChaskiEvents } from './durable/events';
 import type { ChaskiFeed } from './durable/feed';
-import type { ApnsCredentials } from './lib/apns';
+import { APNS_PLATFORMS, type ApnsApp, type ApnsCredentials, type ApnsPlatform } from './lib/apns';
 import { decodeBase64Url, encodeBase64Url } from './lib/base64';
 import type { FcmCredentials } from './lib/fcm';
 import type { DeliveryMessage, ScheduleParams, SendEmailBinding } from './types';
@@ -44,13 +44,21 @@ export type VapidConfig = {
   privateKey: string;
 };
 
+export type ApnsAppConfig = {
+  /** The app's bundle id, which APNs takes as the topic. */
+  bundleId: string;
+  /** The APNs environment of the app's tokens; a device may name its own when it registers. */
+  environment: 'sandbox' | 'production';
+};
+
+/** One key sends to every app of the team: configure `ios`, `macos` or both. */
 export type ApnsConfig = {
   teamId: string;
   keyId: string;
-  bundleId: string;
-  environment: 'sandbox' | 'production';
   /** The contents of the .p8 file (PKCS#8 PEM). */
   privateKey: string;
+  ios?: ApnsAppConfig;
+  macos?: ApnsAppConfig;
 };
 
 export type FcmConfig = {
@@ -58,7 +66,7 @@ export type FcmConfig = {
   serviceAccount: string;
 };
 
-/** Web push needs `vapid`, iOS needs `apns`, Android needs `fcm`; configure any of them. */
+/** Web push needs `vapid`, iOS and macOS need `apns`, Android needs `fcm`; configure any of them. */
 export type PushConfig = {
   vapid?: VapidConfig;
   apns?: ApnsConfig;
@@ -171,23 +179,34 @@ const resolveVapid = (vapid: VapidConfig): NonNullable<ResolvedPush['vapid']> =>
   return { subject: vapid.subject, publicKey: vapid.publicKey, privateJwk };
 };
 
-const resolveApns = (apns: ApnsConfig): ApnsCredentials => {
-  for (const field of ['teamId', 'keyId', 'bundleId'] as const) {
-    if (!apns[field]) fail(`channels.push.apns.${field} is required`);
+const resolveApnsApp = (platform: ApnsPlatform, app: ApnsAppConfig): ApnsApp => {
+  if (!app.bundleId) fail(`channels.push.apns.${platform}.bundleId is required`);
+  if (app.environment !== 'sandbox' && app.environment !== 'production') {
+    fail(`channels.push.apns.${platform}.environment must be 'sandbox' or 'production'`);
   }
-  if (apns.environment !== 'sandbox' && apns.environment !== 'production') {
-    fail("channels.push.apns.environment must be 'sandbox' or 'production'");
+  return { bundleId: app.bundleId, environment: app.environment };
+};
+
+const resolveApns = (apns: ApnsConfig): ApnsCredentials => {
+  for (const field of ['teamId', 'keyId'] as const) {
+    if (!apns[field]) fail(`channels.push.apns.${field} is required`);
   }
   if (!apns.privateKey?.includes('PRIVATE KEY')) {
     fail('channels.push.apns.privateKey must be the contents of the .p8 file');
   }
-  return {
+  if (!APNS_PLATFORMS.some((platform) => apns[platform])) {
+    fail('channels.push.apns needs ios, macos or both: the bundle id and environment of each app');
+  }
+  const credentials: ApnsCredentials = {
     teamId: apns.teamId,
     keyId: apns.keyId,
-    bundleId: apns.bundleId,
-    environment: apns.environment,
     privateKeyPem: apns.privateKey,
   };
+  for (const platform of APNS_PLATFORMS) {
+    const app = apns[platform];
+    if (app) credentials[platform] = resolveApnsApp(platform, app);
+  }
+  return credentials;
 };
 
 const SERVICE_ACCOUNT_FIELDS = ['project_id', 'client_email', 'private_key_id', 'private_key'];
@@ -248,7 +267,9 @@ export const validateConfig = (config: ChaskiConfig): ResolvedConfig => {
   }
   if (channels.push) {
     if (!channels.push.vapid && !channels.push.apns && !channels.push.fcm) {
-      fail('channels.push needs vapid (web push), apns (iOS), fcm (Android) or several of them');
+      fail(
+        'channels.push needs vapid (web push), apns (iOS, macOS), fcm (Android) or several of them',
+      );
     }
     resolved.push = {
       vapid: channels.push.vapid ? resolveVapid(channels.push.vapid) : undefined,

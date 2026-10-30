@@ -16,8 +16,8 @@ Embeddable notification infrastructure for Cloudflare Workers, dashboard include
 Chaski lives inside your Worker. You mount it on a route of your app, and it runs on your own
 Cloudflare resources. It deploys with your Worker, and your data stays in your account.
 
-- **Email, push, and in-app.** Email through Cloudflare Email Service, web push, push to iOS through
-  APNs and to Android through FCM, and an in-app feed that updates live.
+- **Email, push, and in-app.** Email through Cloudflare Email Service, web push, push to iOS and
+  macOS through APNs and to Android through FCM, and an in-app feed that updates live.
 - **Templates** for the content of every notification, written in Liquid and edited in the
   dashboard with a live preview.
 - **Preferences** that let each contact mute the notifications they don’t want.
@@ -33,8 +33,8 @@ Cloudflare resources. It deploys with your Worker, and your data stays in your a
   mount on yours.
 - For email, the Workers Paid plan and a domain onboarded to
   [Email Service](https://developers.cloudflare.com/email-service/get-started/send-emails/).
-- For web push, a VAPID key pair. For iOS, an APNs key from your Apple developer account. For
-  Android, a service account key from your Firebase project.
+- For web push, a VAPID key pair. For iOS and macOS, an APNs key from your Apple developer account.
+  For Android, a service account key from your Firebase project.
 
 Chaski runs only on the bindings you declare. This guide declares all of them, and step 3 says which
 ones you can leave out. Resource and binding names are yours to choose; only the class names are
@@ -254,16 +254,17 @@ npx web-push generate-vapid-keys
 npx wrangler secret put VAPID_PRIVATE_KEY
 ```
 
-The public key goes in `VAPID_PUBLIC_KEY` (step 3). For iOS, add `apns` next to `vapid`:
+The public key goes in `VAPID_PUBLIC_KEY` (step 3). For iOS and macOS, add `apns` next to `vapid`:
+one key sends to every app of your team, and each app names its bundle id and environment.
 
 ```ts
 push: {
   apns: {
     teamId: '<Apple team id>',
     keyId: '<APNs key id>',
-    bundleId: 'com.example.app',
-    environment: 'production', // 'sandbox' for development builds
     privateKey: env.APNS_PRIVATE_KEY, // the contents of the .p8 file
+    ios: { bundleId: 'com.example.app', environment: 'production' },
+    macos: { bundleId: 'com.example.desktop', environment: 'production' },
   },
 },
 ```
@@ -271,6 +272,9 @@ push: {
 ```sh
 npx wrangler secret put APNS_PRIVATE_KEY < AuthKey_XXXXXXXXXX.p8
 ```
+
+A development build’s tokens only work in `sandbox`. A device can name its own environment when it
+registers, so development and release builds share one config.
 
 For Android, add `fcm` with a service account key from your Firebase project (**Project settings
 → Service accounts → Generate new private key**):
@@ -427,6 +431,16 @@ import { handlePushEvents } from 'chaskijs/sw';
 declare const self: ServiceWorkerGlobalScope;
 
 handlePushEvents(self, { icon: '/icon-192.png' });
+```
+
+An Electron app on macOS gets its push through APNs instead. Its main process asks for the token,
+and the client registers it for the signed-in user:
+
+```ts
+import { pushNotifications } from 'electron';
+
+const deviceToken = await pushNotifications.registerForAPNSNotifications();
+await client.push.registerDevice({ platform: 'macos', deviceToken });
 ```
 
 With React, `chaskijs/react` wraps the client in hooks:

@@ -80,6 +80,7 @@ export class ScheduleService extends BaseService {
       contactSnapshot: JSON.stringify(snapshot),
       attachments: storedAttachments.length > 0 ? JSON.stringify(storedAttachments) : null,
       emailOverrides: overrides ? JSON.stringify(overrides) : null,
+      pushSilent: request.push?.silent ?? false,
       transactional: request.transactional,
       groupKey: request.groupKey ?? null,
       scheduledAt,
@@ -240,6 +241,7 @@ export class ScheduleService extends BaseService {
         row.emailOverrides,
         null,
       ),
+      pushSilent: row.pushSilent,
       storedAttachments: parseJson<StoredAttachment[]>(row.attachments, []),
       // Without a key of its own, the schedule id keeps a repeated fire from
       // sending twice.
