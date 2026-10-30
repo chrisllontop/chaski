@@ -100,7 +100,7 @@ export const assertTemplates = (fields: Record<string, string | null | undefined
 
 export type ChannelFields = { subject: string | null; body: string; textBody: string | null };
 
-export type RenderedFields = { subject: string; body: string; textBody?: string };
+type RenderedFields = { subject: string; body: string; textBody?: string };
 
 /** Renders a channel's three fields; an email's body as HTML. */
 export const renderFields = async (

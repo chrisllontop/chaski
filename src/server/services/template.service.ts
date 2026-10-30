@@ -320,7 +320,7 @@ export class TemplateService extends BaseService {
     return created;
   };
 
-  /** Every live template with its channel content and translations, as the template file holds them. */
+  /** Every live template with its channel content and translations, as the template file has it. */
   static exportTemplates = async (): Promise<TemplateRecord[]> => {
     const client = TemplateService.client;
     const [rows, channels, translations] = await Promise.all([
@@ -618,8 +618,6 @@ export class TemplateService extends BaseService {
     await publishAdminEvents(['templates']);
     return row;
   };
-
-  // ─── Preview and test send ────────────────────────────────────────────────
 
   /**
    * Renders a channel with sample data as a contact asking for `locale` would get it: the stored

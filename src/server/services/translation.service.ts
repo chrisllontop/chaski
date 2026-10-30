@@ -45,8 +45,6 @@ const present = (
   updatedAt: row.updatedAt.toISOString(),
 });
 
-export type Translation = ReturnType<typeof present>;
-
 // The locales that can serve a contact asking for `requested`, closest first: the exact tag, then
 // its language. Only the Worker's other languages take part; anything else gets the default.
 const candidatesFor = (requested: string | null, supported: string[]): string[] =>

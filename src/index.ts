@@ -55,6 +55,7 @@ export type {
   TemplateFile,
   TemplateImportResult,
   TemplateRecord,
+  TemplateTranslation,
 } from './contract/template-file';
 // Type only: the app binds to the class, and its code stays in the Chaski Worker.
 export type { ChaskiEntrypoint } from './server/entrypoint';

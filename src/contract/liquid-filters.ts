@@ -2,7 +2,7 @@
 // renders in. The server registers them on its Liquid engines and the dashboard's editor offers
 // them, so both read this one list. Names stay clear of Liquid's built-ins (`date` is strftime).
 
-/** The language a delivery renders in, and the contact's timezone when the send gave a valid one. */
+/** The language a delivery formats in, and the contact's timezone when the send gave one. */
 export type LocaleFormat = { locale: string; timeZone?: string };
 
 const DATE_STYLES = ['full', 'long', 'medium', 'short', 'none'] as const;

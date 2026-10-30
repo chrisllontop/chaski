@@ -174,8 +174,6 @@ admin.put('/templates/:id/channels/:channel', async (c) => {
   return c.json({ channel: row });
 });
 
-// ─── Translations ───────────────────────────────────────────────────────────
-
 const translationParams = (c: Context) => ({
   id: c.req.param('id') ?? '',
   channel: parseInput(channelSchema, c.req.param('channel')),
