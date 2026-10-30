@@ -317,13 +317,36 @@ const ProviderRow = ({
   </div>
 );
 
-// Push credentials are sealed with CHASKI_SECRET, so nothing can be saved until it is set.
-const SECRET_HINTS: Record<Exclude<ChannelsOverview['secret'], 'set'>, string> = {
-  missing:
-    'Push credentials are stored encrypted with CHASKI_SECRET, which this Worker doesn’t have yet. Make one with `openssl rand -base64 32` and set it with `wrangler secret put CHASKI_SECRET`.',
-  too_short:
-    'CHASKI_SECRET needs at least 32 characters. Make one with `openssl rand -base64 32` and set it with `wrangler secret put CHASKI_SECRET`.',
-};
+// Push credentials are sealed with CHASKI_SECRET, so nothing can be saved until it is set, and
+// what was saved opens only with the secret it was saved with.
+const SecretHint = ({
+  status,
+  saved,
+}: {
+  status: Exclude<ChannelsOverview['secret'], 'set'>;
+  saved: boolean;
+}) => (
+  <div className="px-4 py-3">
+    <Alert>
+      <KeyRound />
+      <AlertTitle>
+        {status === 'missing' ? 'Push needs CHASKI_SECRET' : 'CHASKI_SECRET is too short'}
+      </AlertTitle>
+      <AlertDescription>
+        <p>
+          {saved
+            ? 'The saved push credentials open only with the CHASKI_SECRET they were saved with. Set that one again, or set a new one from your Chaski project and save each provider again:'
+            : status === 'missing'
+              ? 'Push credentials are stored encrypted with it. Set one from your Chaski project:'
+              : 'It needs at least 32 characters. Set a new one from your Chaski project:'}
+        </p>
+        <code className="mt-1 block rounded bg-muted px-2 py-1 font-mono text-foreground text-xs">
+          openssl rand -base64 32 | wrangler secret put CHASKI_SECRET
+        </code>
+      </AlertDescription>
+    </Alert>
+  </div>
+);
 
 type Editing = 'email' | PushProvider | 'muted';
 
@@ -485,13 +508,10 @@ export const ChannelsPage = () => {
               actions={push.enabled ? control('push', push.paused) : null}
             >
               {data.secret === 'set' ? null : (
-                <div className="px-4 py-3">
-                  <Alert>
-                    <KeyRound />
-                    <AlertTitle>Push needs CHASKI_SECRET</AlertTitle>
-                    <AlertDescription>{SECRET_HINTS[data.secret]}</AlertDescription>
-                  </Alert>
-                </div>
+                <SecretHint
+                  status={data.secret}
+                  saved={Object.values(push.providers).some(Boolean)}
+                />
               )}
               {push.paused ? <PausedRow paused={push.paused} /> : null}
               <ProviderRow

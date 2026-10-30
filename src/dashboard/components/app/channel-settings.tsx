@@ -67,7 +67,7 @@ const Field = ({
   hint?: ReactNode;
   children: ReactNode;
 }) => (
-  <div className="grid gap-2">
+  <div className="grid min-w-0 gap-2">
     <Label htmlFor={id}>{label}</Label>
     {children}
     {hint ? <p className="text-pretty text-muted-foreground text-xs">{hint}</p> : null}
@@ -121,17 +121,19 @@ const SecretField = ({
   const [replacing, setReplacing] = useState(!saved);
   if (!replacing) {
     return (
-      <div className="grid gap-2">
-        <Label htmlFor={id}>{label}</Label>
-        <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-1.5">
+      <div className="grid min-w-0 gap-2">
+        <Label asChild>
+          <span>{label}</span>
+        </Label>
+        <div className="flex min-w-0 items-center justify-between gap-3 rounded-md border px-3 py-1.5">
           <span className="flex items-center gap-2 text-muted-foreground text-sm">
             <KeyRound className="size-4" /> Saved
           </span>
           <Button
-            id={id}
             type="button"
             variant="outline"
             size="sm"
+            aria-label={`Replace the ${label.toLowerCase()}`}
             onClick={() => setReplacing(true)}
           >
             Replace
@@ -141,7 +143,7 @@ const SecretField = ({
     );
   }
   return (
-    <div className="grid gap-2">
+    <div className="grid min-w-0 gap-2">
       <div className="flex min-h-6 items-center justify-between gap-2">
         <Label htmlFor={id}>{label}</Label>
         <div className="flex items-center gap-1">
@@ -213,7 +215,7 @@ const SettingsForm = ({
   children: ReactNode;
 }) => (
   <form
-    className="grid gap-4"
+    className="grid min-w-0 gap-4"
     onSubmit={(event) => {
       event.preventDefault();
       onSubmit();
@@ -430,19 +432,15 @@ const VapidForm = ({
             </TabsContent>
           </Tabs>
         ) : (
-          <div className="grid gap-2">
-            <Label htmlFor="vapid-replace">Keys</Label>
-            <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-1.5">
+          <div className="grid min-w-0 gap-2">
+            <Label asChild>
+              <span>Keys</span>
+            </Label>
+            <div className="flex min-w-0 items-center justify-between gap-3 rounded-md border px-3 py-1.5">
               <code className="min-w-0 truncate font-mono text-muted-foreground text-xs">
                 {settings?.publicKey}
               </code>
-              <Button
-                id="vapid-replace"
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setReplacing(true)}
-              >
+              <Button type="button" variant="outline" size="sm" onClick={() => setReplacing(true)}>
                 Replace keys
               </Button>
             </div>
