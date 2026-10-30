@@ -24,7 +24,7 @@ const templateInputSchema = z.object({
   channels: z.array(channelSchema).optional(),
 });
 
-// Omitted = leave unchanged, explicit null = clear the field (types.mdc).
+// Omitted = leave unchanged, explicit null = clear the field (.agents/types.md).
 const templatePatchSchema = z.object({
   description: z.string().max(512).nullable().optional(),
   topic: z.string().min(1).max(128).nullable().optional(),

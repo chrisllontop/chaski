@@ -1,7 +1,3 @@
----
-description: TypeScript null vs undefined conventions
----
-
 ## null vs undefined
 
 `strict` is on, so `T | null` and `T | undefined` are distinct, non-interchangeable

@@ -1,7 +1,3 @@
----
-description: Service layer patterns (business logic) and persistence
----
-
 ## Services
 
 Business logic lives in services under `src/server/services/`, not in route handlers. Route handlers stay thin: parse and validate input, call a service, and shape the HTTP response. The in-process API (`createChaski()`) calls the same services.

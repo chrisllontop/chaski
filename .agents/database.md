@@ -1,7 +1,3 @@
----
-description: Database design and normalization rules for new features
----
-
 ## Database normalization
 
 When a feature adds or changes tables in `src/server/db/schema/`, keep the data normalized by default. Denormalize only deliberately, and document why in a short schema comment.
