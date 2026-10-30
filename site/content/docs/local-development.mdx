@@ -9,23 +9,18 @@ account yet.
 
 ## Run Chaski
 
-In the Chaski project, apply the migrations to the local database before the first run, and again
-after every Chaski upgrade:
-
-```bash
-npx wrangler d1 migrations apply CHASKI_DB --local
-```
-
-Give it a local secret and a local environment name in `.dev.vars`, which only `wrangler dev`
-reads:
+`chaskijs init` leaves the project ready to run: it applied Chaski’s migrations to the local
+database and wrote `.dev.vars`, which only `wrangler dev` reads, with a local secret and the local
+environment name:
 
 ```bash title=".dev.vars"
-CHASKI_SECRET=any-local-value-of-32-characters-or-more
+CHASKI_SECRET=<32 random bytes, in base64>
 CHASKI_ENVIRONMENT=local
 CHASKI_PUBLIC_URL=http://localhost:8788/me/notifications
 ```
 
-Then start it:
+`CHASKI_PUBLIC_URL` is there when you gave `init` one. Point it at the local address of your app’s
+`userRoutes()` mount, so the pixel of local emails reaches your app. Then start Chaski:
 
 ```bash
 npx wrangler dev
@@ -35,6 +30,15 @@ The dashboard is at `http://localhost:8787`. Cloudflare Access doesn’t sit in 
 `wrangler dev`, so Wrangler signs in the identity under `access.dev` in `wrangler.jsonc`, as
 Access would; changes you make are recorded under it. The local dashboard keeps settings of its
 own: set up the channels there as you would deployed.
+
+The local database follows `database_id`. When `chaskijs deploy` writes the id of the database it
+created, `wrangler dev` starts on a new local database, which the deploy migrates for you, and the
+local settings start over. `chaskijs upgrade` applies a new version’s migrations locally too. In a
+project you set up by hand, apply them yourself, before the first run and after each upgrade:
+
+```bash
+npx wrangler d1 migrations apply CHASKI_DB --local
+```
 
 ## Run your app next to it
 

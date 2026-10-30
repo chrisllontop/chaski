@@ -10,16 +10,15 @@ other environment is a block under `env`.
 
 ## Add an environment
 
-Create its resources, under names of its own:
+In the Chaski project:
 
 ```bash
-npx wrangler d1 create chaski-staging
-npx wrangler queues create chaski-staging-deliveries
-npx wrangler queues create chaski-staging-deliveries-dlq
+npx chaskijs env add staging --public-url https://staging.example.com/me/notifications
 ```
 
-Then declare them in an `env` block. Wrangler doesn’t carry bindings or vars from the top of the
-file into an environment, so the block repeats each one, with that environment’s names:
+It adds an `env.staging` block to `wrangler.jsonc`. Wrangler doesn’t carry bindings or vars from
+the top of the file into an environment, so the block repeats each one, with that environment’s
+names:
 
 ```jsonc title="wrangler.jsonc"
 {
@@ -35,7 +34,7 @@ file into an environment, so the block repeats each one, with that environment�
         {
           "binding": "CHASKI_DB",
           "database_name": "chaski-staging",
-          "database_id": "<id printed by wrangler d1 create>",
+          "database_id": "local",
           "migrations_dir": "node_modules/chaskijs/migrations"
         }
       ],
@@ -70,19 +69,19 @@ file into an environment, so the block repeats each one, with that environment�
 }
 ```
 
-The Workflow needs a name of its own in every environment, since its name is unique in your
-account. Wrangler names the Worker `chaski-staging`, after the top-level `name` and the
-environment.
+Wrangler names the Worker `chaski-staging`, after the top-level `name` and the environment, and
+every resource follows: the database `chaski-staging`, the queue `chaski-staging-deliveries`. The
+Workflow needs a name of its own in every environment, since its name is unique in your account.
 
 ## Deploy it
 
-Every Wrangler command takes the environment with `--env`, the secret included:
-
 ```bash
-openssl rand -base64 32 | npx wrangler secret put CHASKI_SECRET --env staging
-npx wrangler d1 migrations apply CHASKI_DB --remote --env staging
-npx wrangler deploy --env staging
+npx chaskijs deploy --env staging
 ```
+
+It does for staging what it does for production: creates the resources staging is missing, writes
+its database’s id, applies the migrations, deploys `chaski-staging` and gives it a
+`CHASKI_SECRET` of its own. Each step runs the Wrangler command with `--env staging`.
 
 Then turn on Cloudflare Access for its URL and set up its channels in its own dashboard, as
 [Install](/docs/install#turn-on-cloudflare-access) does for production. Settings never move
@@ -110,6 +109,15 @@ Chaski.
 
 ## Keep them in step
 
-An upgrade goes to every environment the same way: update `chaskijs`, then apply the migrations
-and deploy, environment by environment, staging first. The dashboard’s header names the
-environment from `CHASKI_ENVIRONMENT`, so nobody mistakes one for the other.
+An upgrade goes to every environment the same way, staging first:
+
+```bash
+npx chaskijs upgrade
+npx chaskijs deploy --env staging
+npx chaskijs deploy
+```
+
+`upgrade` installs the latest `chaskijs` and brings `wrangler.jsonc` and the main module, in every
+environment, up to what that version needs, such as a Durable Object migration for a class it
+added. Each deploy then applies the new migrations before the new code. The dashboard’s header
+names the environment from `CHASKI_ENVIRONMENT`, so nobody mistakes one for the other.

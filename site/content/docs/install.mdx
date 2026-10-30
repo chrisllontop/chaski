@@ -1,6 +1,6 @@
 ---
 title: Install
-description: Deploy Chaski as a Worker of its own. It takes a project of three files, a database, a queue and Cloudflare Access.
+description: Create a Chaski project and deploy it as a Worker of its own, with two commands and Cloudflare Access.
 ---
 
 ## Requirements
@@ -13,47 +13,52 @@ description: Deploy Chaski as a Worker of its own. It takes a project of three f
   account key from your Firebase project. For Windows, a Microsoft Entra app registration with a
   client secret. Web push needs nothing: Chaski makes its own key pair.
 
-Chaski runs on the bindings you declare, under fixed names. Only the database and the queue are
-required; step 3 says what each of the others turns on. This guide sets up the production Chaski;
-[Environments](/docs/environments) adds staging and the rest.
+This guide sets up the production Chaski; [Environments](/docs/environments) adds staging and the
+rest.
 
 ## Create the project [step]
 
-A Chaski project is three files: `package.json`, `wrangler.jsonc` and a main module. Keep it in a
-folder of your app’s repository, such as `chaski/`, or in a repository of its own.
-
 ```npm
-npm install chaskijs hono
-npm install -D wrangler
+npx chaskijs@next init
 ```
 
+`@next` picks Chaski 0.1, in pre-release until it ships as `latest`. The command asks:
+
+- **Where the project lives**: a folder of your app’s repository, such as `chaski/`, or a new
+  repository of its own.
+- **The Worker’s name**, `chaski` unless you pick another. Its resources take their names from it:
+  the database `chaski`, the queues `chaski-deliveries` and `chaski-deliveries-dlq`, the Workflow
+  `chaski-scheduler`. A Workflow’s name is unique in your account, so give each Chaski an account
+  holds a name of its own, such as `acme-chaski`.
+- **Email**, on unless you say no, and **email attachments**, which add an R2 bucket.
+- **The URL where your app mounts `userRoutes()`**, for the pixel that tracks email opens. Leave it
+  for later if your app doesn’t mount it yet.
+
+Every answer has a flag, for scripts and agents:
+
+```bash
+npx chaskijs@next init chaski --folder --name chaski --attachments --public-url https://app.example.com/me/notifications
+```
+
+`--repo` makes it a new repository, `--no-email` leaves email out and `--skip-install` only writes
+the files. Without them, it installs the dependencies with the package manager you ran it with,
+and creates the local database, so `npx wrangler dev` runs the dashboard right away:
+[Local development](/docs/local-development).
+
+## Read what it wrote [step]
+
+A Chaski project holds `package.json`, with `chaskijs`, `hono` and `wrangler`, a main module and
+`wrangler.jsonc`, plus `.dev.vars` for `wrangler dev` and a `.gitignore` that keeps it out of Git.
 The main module re-exports the Worker, and the classes its bindings name:
 
 ```ts title="src/index.ts"
 export { ChaskiEntrypoint, ChaskiEvents, ChaskiFeed, ChaskiScheduler, default } from 'chaskijs/worker';
 ```
 
-That line is all the code a Chaski project holds. New versions come through the package: update
-`chaskijs`, apply its migrations and deploy.
+That line is all the code a Chaski project holds. New versions come through the package:
+`npx chaskijs upgrade` installs the latest and updates the project to it.
 
-## Create the resources [step]
-
-Names are yours to choose. The rest of the guide uses these.
-
-```bash
-npx wrangler d1 create chaski
-npx wrangler queues create chaski-deliveries
-npx wrangler queues create chaski-deliveries-dlq
-npx wrangler r2 bucket create chaski-attachments  # only for attachments
-```
-
-<Callout title="Only the database and the queue are required.">
-  Add the rest when you turn on the feature that uses it. The Durable Objects and the Workflow are
-  created when you deploy. A Workflow’s name is unique in your account, so prefix the names when
-  one account holds more than one Chaski.
-</Callout>
-
-## Declare the bindings [step]
+`wrangler.jsonc` declares the bindings. The top level is production:
 
 ```jsonc title="wrangler.jsonc"
 {
@@ -76,7 +81,8 @@ npx wrangler r2 bucket create chaski-attachments  # only for attachments
     {
       "binding": "CHASKI_DB",
       "database_name": "chaski",
-      "database_id": "<id printed by wrangler d1 create>",
+      // chaskijs deploy creates the database and writes its id here.
+      "database_id": "local",
       // Chaski's tables come from the package.
       "migrations_dir": "node_modules/chaskijs/migrations"
     }
@@ -109,7 +115,9 @@ npx wrangler r2 bucket create chaski-attachments  # only for attachments
 }
 ```
 
-The binding names are fixed: Chaski reads them by name. Leave out what you don’t use:
+`init` writes `vars.CHASKI_PUBLIC_URL` only when you give it one, `r2_buckets` only with
+attachments and `send_email` only with email. `access.dev` takes your `git config user.email`.
+The binding names are fixed: Chaski reads them by name. Each one turns on a part of it:
 
 | Binding | Needed for |
 | --- | --- |
@@ -123,35 +131,46 @@ The binding names are fixed: Chaski reads them by name. Leave out what you don�
 
 [Configuration](/docs/configuration) lists the vars and the secret.
 
-## Set the secret [step]
+## Deploy [step]
 
-`CHASKI_SECRET` encrypts the push keys and credentials you save in the dashboard, such as your
-APNs key, so the database alone never holds them in the clear. Push can’t be set up without it:
+In the project, signed in to Cloudflare with `npx wrangler login`:
 
 ```bash
+npx chaskijs deploy
+```
+
+It checks what the Worker is missing in your Cloudflare account, lists what it will do, and asks
+before it does any of it:
+
+1. **Creates the resources** that don’t exist yet: the database, the queues and, with
+   attachments, the bucket. It writes the database’s id into `wrangler.jsonc`.
+2. **Applies Chaski’s migrations** to the database. They go before the code, since a new version
+   may need a new table, and they only add.
+3. **Deploys** the Worker.
+4. **Sets `CHASKI_SECRET`** to a random value, when the Worker has none. It encrypts the push keys
+   and credentials you save in the dashboard, such as your APNs key, so the database alone never
+   holds them in the clear.
+
+It prints the Worker’s URL, such as `https://chaski.<your-subdomain>.workers.dev`, which serves
+the dashboard. Run it again after every change or upgrade: it creates only what’s missing, and
+always migrates before it deploys. `--yes` answers its question, for a deploy job.
+
+Each step is a Wrangler command, should you rather run them yourself:
+
+```bash
+npx wrangler d1 create chaski                      # its id goes in database_id
+npx wrangler queues create chaski-deliveries
+npx wrangler queues create chaski-deliveries-dlq
+npx wrangler r2 bucket create chaski-attachments   # only with attachments
+npx wrangler d1 migrations apply CHASKI_DB --remote
+npx wrangler deploy
 openssl rand -base64 32 | npx wrangler secret put CHASKI_SECRET
 ```
 
-Keep it as it is. With another value, Chaski can’t open the credentials saved under this one: the
-**Channels** page shows each of those as **Failing** until you save it again.
-
-## Create the tables [step]
-
-```bash
-npx wrangler d1 migrations apply CHASKI_DB --remote
-```
-
-Run it again after every Chaski upgrade, before you deploy. Chaski checks that every migration it
-ships has been applied, and refuses to run until they are, naming the missing ones.
-
-## Deploy [step]
-
-```bash
-npx wrangler deploy
-```
-
-Wrangler prints the Worker’s URL, such as `https://chaski.<your-subdomain>.workers.dev`. That URL
-serves the dashboard.
+<Callout title="Keep the secret as it is.">
+  With another `CHASKI_SECRET`, Chaski can’t open the credentials saved under this one: the
+  **Channels** page shows each of those as **Failing** until you save it again.
+</Callout>
 
 ## Turn on Cloudflare Access [step]
 
