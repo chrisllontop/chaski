@@ -2,7 +2,7 @@
 
 When a feature adds or changes tables in `src/server/db/schema/`, keep the data normalized by default. Denormalize only deliberately, and document why in a short schema comment.
 
-Chaski is single-instance: one host, one database. Tables carry no tenant or project column.
+Chaski is single-instance: one Worker, one database. Tables carry no tenant or project column.
 
 ### Defaults for new tables
 
@@ -39,5 +39,5 @@ In every case, add a comment at the column explaining the reason and the invaria
 ### Changing schema
 
 - Ship every change as a generated migration under `migrations/` (`drizzle-kit generate --name <name>`), hand-adjusted for D1 if needed: D1 supports `PRAGMA defer_foreign_keys` (checks deferred, **cascade actions still fire**), not `PRAGMA foreign_keys=OFF`. When recreating a parent table, stash and restore its children.
-- Never edit a migration that a release already shipped; hosts may have applied it. Add a new one.
+- Never edit a migration that a release already shipped; a deployed Chaski may have applied it. Add a new one.
 - When normalizing an existing JSON or duplicated column, backfill the new table **in the same migration** before dropping the column.

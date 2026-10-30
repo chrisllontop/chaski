@@ -1,8 +1,8 @@
 ## Route layout
 
-- The admin API lives in `src/server/routes/`, mounted at `/api/*` under the path where the host mounts `chaski.routes()`. One router per concern; `src/server/routes/index.ts` composes them.
-- It is **not versioned**: its only consumer is Chaski's own dashboard, which ships in the same package. Hosts integrate through the in-process API (`chaski.send()`, `chaski.feed`…), not over HTTP.
-- Public, unauthenticated routes (the open-tracking pixel, the dashboard assets) are registered before the authorize guard and stay outside `/api/*`.
+- The admin API lives in `src/server/routes/`, at `/api/*` on the Chaski Worker's own URL, behind Cloudflare Access with the dashboard. One router per concern; `src/server/routes/index.ts` composes them.
+- It is **not versioned**: its only consumer is Chaski's own dashboard, which ships in the same package. Apps integrate through `ChaskiEntrypoint` over a service binding (`env.CHASKI.send()`, `env.CHASKI.feed()`…), not over HTTP.
+- The dashboard assets are registered before the Access guard and stay outside `/api/*`. The open-tracking pixel and the user routes are not on the Worker's URL at all: `ChaskiEntrypoint.fetch()` serves them, and the app's `userRoutes()` forwards them over its service binding.
 
 ## Request validation
 
@@ -12,7 +12,7 @@
 
 ## Error responses
 
-Every JSON error is `{ error: code, message }`, where `code` is a `ChaskiErrorCode` (`validation`, `config`, `unauthorized`, `forbidden`, `not_found`, `conflict`, `internal`). Services throw `ChaskiError(code, message)`; the mount's `onError` maps the code to the status (400, 500, 401, 403, 404, 409, 500). Clients switch on `code`, never on `message`. Do not invent parallel error shapes.
+Every JSON error is `{ error: code, message }`, where `code` is a `ChaskiErrorCode` (`validation`, `config`, `unauthorized`, `forbidden`, `not_found`, `conflict`, `internal`). Services throw `ChaskiError(code, message)`; each Hono app's `onError` maps the code to the status (400, 500, 401, 403, 404, 409, 500). Clients switch on `code`, never on `message`. Do not invent parallel error shapes.
 
 ## Success responses
 
