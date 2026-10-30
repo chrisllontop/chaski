@@ -245,7 +245,7 @@ export const TemplatesPage = () => {
   return (
     <>
       <SiteHeader />
-      <div className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col gap-6 px-6 pt-6 pb-10">
+      <div className="mx-auto flex min-w-0 w-full max-w-[1400px] flex-1 flex-col gap-6 px-6 pt-6 pb-10">
         <PageHeader
           title="Templates"
           description="The content of every notification type"
@@ -292,8 +292,8 @@ export const TemplatesPage = () => {
                     <DataHead>Topic</DataHead>
                     <DataHead>Channels</DataHead>
                     <DataHead>Health · 30 days</DataHead>
-                    <DataHead numeric>Updated</DataHead>
-                    <DataHead numeric>Last used</DataHead>
+                    <DataHead>Updated</DataHead>
+                    <DataHead>Last used</DataHead>
                     <DataHead className="w-10" />
                   </DataRow>
                 </DataHeader>
@@ -316,10 +316,10 @@ export const TemplatesPage = () => {
                           })
                         }
                       >
-                        <DataCell>
+                        <DataCell className="min-w-0 max-w-md">
                           <div className="font-medium font-mono text-xs">{template.type}</div>
                           {template.description ? (
-                            <div className="text-muted-foreground text-xs">
+                            <div className="break-words text-muted-foreground text-xs">
                               {template.description}
                             </div>
                           ) : null}
@@ -333,10 +333,10 @@ export const TemplatesPage = () => {
                         <DataCell>
                           <TypeHealth health={health.get(template.type)} />
                         </DataCell>
-                        <DataCell numeric className="text-muted-foreground">
+                        <DataCell className="whitespace-nowrap text-muted-foreground tabular-nums">
                           <When at={template.contentUpdatedAt} />
                         </DataCell>
-                        <DataCell numeric className="text-muted-foreground">
+                        <DataCell className="whitespace-nowrap text-muted-foreground tabular-nums">
                           <When at={template.lastUsedAt} />
                         </DataCell>
                         <DataCell onClick={(event) => event.stopPropagation()}>
