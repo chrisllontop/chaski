@@ -76,7 +76,7 @@ weekly digest. Trace each one from its send back to its trigger, and record:
 | What | What the message tells the reader, in product terms. |
 | Trigger | The event or schedule that sends it: a route, a webhook, a user action, a queue message, a cron expression. |
 | Recipients | Who gets it, where the address or device comes from, and the user id behind it, or that there’s none. |
-| Channels | Email, web push, iOS push, macOS push, Android push, in-app, SMS, chat. |
+| Channels | Email, web push, iOS push, macOS push, Android push, Windows push, in-app, SMS, chat. |
 | Provider | The SDK or service, with the `file:line` of the send. |
 | Template | Where the content lives: a file (React Email, MJML, Handlebars, inline HTML), a provider-hosted template id, or a string in code. |
 | Data | The values the content uses. |

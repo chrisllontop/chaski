@@ -63,7 +63,8 @@ No options yet: `in_app: {}` turns the channel on.
 
 ### push
 
-Configure `vapid` for web push, `apns` for iOS and macOS, `fcm` for Android, or several of them.
+Configure `vapid` for web push, `apns` for iOS and macOS, `fcm` for Android, `wns` for Windows, or
+several of them.
 
 | `vapid` | |
 | --- | --- |
@@ -85,6 +86,12 @@ Each app needs its `bundleId` and `environment`, `'sandbox'` or `'production'`; 
 | `fcm` | |
 | --- | --- |
 | `serviceAccount` | The contents of the service account’s JSON key file, from the Firebase console. |
+
+| `wns` | |
+| --- | --- |
+| `tenantId` | The directory (tenant) id of the Microsoft Entra app registration. |
+| `clientId` | Its application (client) id. |
+| `clientSecret` | One of its client secrets. |
 
 ## onError
 

@@ -215,6 +215,16 @@ macOS gives it no token. macOS shows the alert once the user allows the app’s 
 Electron asks for the first time the app uses `Notification`. `client.push.enable()` is web push,
 which Electron doesn’t offer: don’t use it there.
 
+## A Windows app
+
+Windows apps, Electron ones included, get a WNS channel URI from the Windows App SDK’s
+`PushNotificationManager` (`CreateChannelAsync` with the Entra app’s id), through a native module
+of the app’s own: Electron has no Windows push API. The client registers the URI with
+`client.push.registerDevice({ platform: 'windows', deviceToken: channelUri })`, on every launch,
+since channels expire after 30 days. The config needs `channels.push.wns` with the same Entra app.
+A click on the toast hands the app the push’s `href` and `tag` as launch arguments
+(`AppNotificationActivatedEventArgs.Arguments`).
+
 ## A native Android app
 
 The app registers its FCM registration token (`FirebaseMessaging.getInstance().token`) for the

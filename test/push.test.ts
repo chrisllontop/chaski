@@ -125,6 +125,16 @@ const decryptAsBrowser = async (endpoint: string, body: Uint8Array) => {
   return JSON.parse(new TextDecoder().decode(plaintext.slice(0, plaintext.lastIndexOf(2))));
 };
 
+// The Microsoft Entra app a Windows app creates its channel with. Each test gets its own client
+// id, so an access token cached by one test never answers for the next.
+const wnsApp = () => ({
+  tenantId: 'host-tenant',
+  clientId: crypto.randomUUID(),
+  clientSecret: 'entra-secret',
+});
+
+const CHANNEL_URI = 'https://wns2-by3p.notify.windows.com/w/?token=BQYAAAB%2bWq9xKz1Lm4Pq';
+
 const IOS_TOKEN = 'A1B2C3D4'.repeat(8);
 const MAC_TOKEN = 'F0E1D2C3'.repeat(8);
 // FCM tokens are case-sensitive, so this one mixes cases on purpose.
@@ -698,6 +708,161 @@ describe('FCM', () => {
   });
 });
 
+describe('WNS', () => {
+  let app = wnsApp();
+  beforeEach(async () => {
+    app = wnsApp();
+    usePush({ wns: app });
+    await chaski.push.register({
+      recipient: recipient(),
+      platform: 'windows',
+      deviceToken: CHANNEL_URI,
+    });
+  });
+
+  const TOKEN_URL = 'https://login.microsoftonline.com/host-tenant/oauth2/v2.0/token';
+
+  // Microsoft Entra hands out a new access token per request; the channel answers `send`.
+  const stubWns = (send: () => Response = () => wnsAnswer(200, 'received')) => {
+    let issued = 0;
+    return stubFetch((url) => {
+      if (url !== TOKEN_URL) return send();
+      issued += 1;
+      return Response.json({
+        token_type: 'Bearer',
+        expires_in: 3599,
+        access_token: `at-${issued}`,
+      });
+    });
+  };
+
+  const wnsAnswer = (status: number, wnsStatus?: string) =>
+    new Response(null, { status, headers: wnsStatus ? { 'x-wns-status': wnsStatus } : {} });
+
+  const toastOf = (call: Call | undefined) => new TextDecoder().decode(call?.body);
+
+  it('trades the Entra app’s client credentials for an access token it reuses', async () => {
+    const calls = stubWns();
+
+    await sendPush();
+    await sendPush();
+
+    expect(calls.map((call) => call.url)).toEqual([TOKEN_URL, CHANNEL_URI, CHANNEL_URI]);
+    expect(Object.fromEntries(new URLSearchParams(toastOf(calls[0])))).toEqual({
+      grant_type: 'client_credentials',
+      client_id: app.clientId,
+      client_secret: 'entra-secret',
+      scope: 'https://wns.windows.com/.default',
+    });
+    expect(calls[1]?.headers.get('authorization')).toBe('Bearer at-1');
+    expect(calls[2]?.headers.get('authorization')).toBe('Bearer at-1');
+  });
+
+  it('sends the toast WNS expects, with the link and the tag as launch arguments', async () => {
+    const calls = stubWns();
+
+    const delivery = await sendPush();
+
+    expect(delivery).toMatchObject({ status: 'sent', providerMessageId: 'push:1/1' });
+    expect(Object.fromEntries(calls[1]?.headers ?? [])).toMatchObject({
+      'content-type': 'text/xml',
+      'x-wns-type': 'wns/toast',
+      'x-wns-ttl': '3600',
+    });
+    expect(toastOf(calls[1])).toBe(
+      `<toast launch="href=/payments/1500;tag=${delivery?.notificationId}">` +
+        '<visual><binding template="ToastGeneric">' +
+        '<text>Hello Ana</text><text>Amount: 1500</text>' +
+        '</binding></visual></toast>',
+    );
+  });
+
+  it('escapes the text and encodes the launch arguments the Windows App SDK splits', async () => {
+    await getClient().templateChannels.update({
+      where: { id: 'tc_payment_received_push' },
+      data: { body: '5 < 6 & "fine"', textBody: '/pay?a=1;b=2&c=100%' },
+    });
+    const calls = stubWns();
+
+    await sendPush({ silent: true });
+
+    const toast = toastOf(calls[1]);
+    expect(toast).toContain('<toast launch="href=/pay?a%3D1%3Bb%3D2&amp;c%3D100%25;tag=');
+    expect(toast).toContain('<text>5 &lt; 6 &amp; &quot;fine&quot;</text>');
+    expect(toast).toContain('</visual><audio silent="true"/></toast>');
+  });
+
+  it('forgets a channel WNS no longer knows or that expired', async () => {
+    for (const status of [404, 410]) {
+      await chaski.push.register({
+        recipient: recipient(),
+        platform: 'windows',
+        deviceToken: CHANNEL_URI,
+      });
+      stubWns(() => wnsAnswer(status));
+
+      expect(await sendPush()).toMatchObject({ status: 'failed', errorCode: 'no_device_tokens' });
+      expect(await devices()).toEqual([]);
+      vi.restoreAllMocks();
+    }
+  });
+
+  it('asks for a new access token after WNS rejects the cached one', async () => {
+    let rejected = false;
+    const calls = stubWns(() => {
+      if (rejected) return wnsAnswer(200, 'received');
+      rejected = true;
+      return wnsAnswer(401);
+    });
+
+    expect(await sendPush()).toMatchObject({ status: 'pending', errorCode: 'provider_error' });
+    expect(await sendPush()).toMatchObject({ status: 'sent' });
+    expect(calls.filter((call) => call.url === TOKEN_URL)).toHaveLength(2);
+    expect(calls.at(-1)?.headers.get('authorization')).toBe('Bearer at-2');
+  });
+
+  it('keeps the channel when WNS says another app owns it', async () => {
+    stubWns(
+      () =>
+        new Response(null, {
+          status: 403,
+          headers: { 'x-wns-error-description': 'Token does not match the channel' },
+        }),
+    );
+
+    const delivery = await sendPush();
+
+    expect(delivery).toMatchObject({ status: 'pending', errorCode: 'provider_error' });
+    expect(delivery?.lastError).toBe('WNS answered 403 (Token does not match the channel)');
+    expect(await devices()).toHaveLength(1);
+  });
+
+  it('retries a toast WNS accepted but dropped', async () => {
+    stubWns(() => wnsAnswer(200, 'dropped'));
+
+    const delivery = await sendPush();
+
+    expect(delivery).toMatchObject({ status: 'pending', errorCode: 'provider_error' });
+    expect(delivery?.lastError).toBe('WNS answered 200 (dropped)');
+  });
+
+  it('still reaches the other devices when Entra refuses the credentials', async () => {
+    usePush({ wns: app, vapid });
+    await chaski.push.register({
+      recipient: recipient(),
+      subscription: await browserSubscription('https://push.example/sub/1'),
+    });
+    stubFetch((url) =>
+      url === TOKEN_URL
+        ? Response.json({ error: 'invalid_client' }, { status: 401 })
+        : new Response(null, { status: 201 }),
+    );
+
+    expect(await sendPush()).toMatchObject({ status: 'sent', providerMessageId: 'push:1/2' });
+    expect(await devices()).toHaveLength(2);
+  });
+});
+
 describe('push subscriptions', () => {
   beforeEach(() => usePush({ vapid }));
 
@@ -742,8 +907,26 @@ describe('push subscriptions', () => {
     });
     await expect(chaski.push.unregister({ deviceToken: 'not a token' })).rejects.toMatchObject({
       code: 'validation',
-      message: expect.stringContaining('deviceToken must be an APNs device token or an FCM'),
+      message: expect.stringContaining(
+        'deviceToken must be an APNs device token, an FCM registration token or a WNS channel URI',
+      ),
     });
+  });
+
+  it('refuses a Windows channel URI off notify.windows.com', async () => {
+    for (const deviceToken of [
+      'https://notify.windows.com.attacker.example/?token=abc',
+      'https://attacker.example/db5.notify.windows.com',
+      'https://notify.windows.com@attacker.example/',
+      'http://db5.notify.windows.com/?token=abc',
+    ]) {
+      await expect(
+        chaski.push.register({ recipient: recipient(), platform: 'windows', deviceToken }),
+      ).rejects.toMatchObject({
+        code: 'validation',
+        message: expect.stringContaining('deviceToken must be a WNS channel URI'),
+      });
+    }
   });
 
   it('reports the VAPID public key, or null without one', async () => {
@@ -760,7 +943,7 @@ describe('push config', () => {
     return () => validateConfig({ ...config, channels: { ...config.channels, push } });
   };
 
-  it('needs VAPID, APNs, FCM or several of them', () => {
+  it('needs VAPID, APNs, FCM, WNS or several of them', () => {
     expect(withPush({})).toThrowError(/channels.push needs vapid/);
   });
 
@@ -803,6 +986,12 @@ describe('push config', () => {
     expect(withPush({ apns: { ...apns, macos: development } })).toThrowError(
       "channels.push.apns.macos.environment must be 'sandbox' or 'production'",
     );
+  });
+
+  it('names the missing WNS field', () => {
+    expect(
+      withPush({ wns: { tenantId: 'host-tenant', clientId: 'client', clientSecret: '' } }),
+    ).toThrowError('Chaski config: channels.push.wns.clientSecret is required');
   });
 
   it('reads the FCM credentials from the service account JSON', () => {

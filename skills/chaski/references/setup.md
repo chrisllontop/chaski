@@ -67,7 +67,7 @@ Agree with the user on what to turn on, then declare only what that needs:
 | Always | `CHASKI_DB` (D1), `CHASKI_QUEUE` (queue producer and consumer) | |
 | Email | `send_email` | The Workers Paid plan and a domain onboarded to [Email Service](https://developers.cloudflare.com/email-service/get-started/send-emails/) |
 | In-app feed | `ChaskiFeed` Durable Object | |
-| Web push, iOS and macOS push, Android push | none | Keys (step 6) |
+| Web push, iOS and macOS push, Android push, Windows push | none | Keys (step 6) |
 | `chaski.schedule()` | `ChaskiScheduler` Workflow | |
 | Live dashboard | `ChaskiEvents` Durable Object | |
 | Email attachments | R2 bucket | |
@@ -484,6 +484,19 @@ fcm: {
 },
 ```
 
+**Windows push** needs the Microsoft Entra app registration the Windows app creates its channel
+with, through the Windows App SDK’s `PushNotificationManager`: its directory (tenant) id, its
+application (client) id and a client secret, set as the `WNS_CLIENT_SECRET` secret. Partner Center
+credentials (a package SID) are a different model, which the Windows App SDK doesn’t use:
+
+```ts
+wns: {
+  tenantId: '<directory (tenant) id>',
+  clientId: '<application (client) id>',
+  clientSecret: env.WNS_CLIENT_SECRET,
+},
+```
+
 **Done when** the keys are in place and the secrets live only in `.dev.vars` and, later, the
 account. `.dev.vars` must be in `.gitignore`.
 
@@ -499,6 +512,7 @@ ENVIRONMENT=local
 # With web push: VAPID_PRIVATE_KEY.
 # With Android push: FCM_SERVICE_ACCOUNT='<the JSON key file>', in single quotes: double quotes
 # turn the \n escapes of its private_key into line breaks, and the JSON no longer parses.
+# With Windows push: WNS_CLIENT_SECRET.
 ```
 
 Match `CHASKI_PUBLIC_URL` to the address `wrangler dev` prints and the mount path. Under

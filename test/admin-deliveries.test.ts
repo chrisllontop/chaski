@@ -290,6 +290,7 @@ describe('GET /api/channels', () => {
           ios: null,
           macos: null,
           android: null,
+          windows: null,
         },
       ],
     });

@@ -135,6 +135,17 @@ the user allows the app’s notifications, which Electron asks for the first tim
 `Notification`. While the app runs, each push also reaches the main process as the
 `received-apns-notification` event, with the push’s `href` and `tag` in its `userInfo`.
 
+## Windows apps
+
+A Windows app, Electron or not, gets its push through WNS. The Windows App SDK’s
+`PushNotificationManager` creates the channel for the Microsoft Entra app in `channels.push.wns`;
+Electron has no API for it, so an Electron app reaches it through a native module of its own. The
+client registers the channel’s URI, on every launch, since WNS channels expire after 30 days:
+
+```ts
+await client.push.registerDevice({ platform: 'windows', deviceToken: channelUri });
+```
+
 ## React
 
 `chaskijs/react` wraps the client in hooks. Give them a client once, near the root:

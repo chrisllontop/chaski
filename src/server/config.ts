@@ -6,6 +6,7 @@ import type { ChaskiFeed } from './durable/feed';
 import { APNS_PLATFORMS, type ApnsApp, type ApnsCredentials, type ApnsPlatform } from './lib/apns';
 import { decodeBase64Url, encodeBase64Url } from './lib/base64';
 import type { FcmCredentials } from './lib/fcm';
+import type { WnsCredentials } from './lib/wns';
 import type { DeliveryMessage, ScheduleParams, SendEmailBinding } from './types';
 
 export type ChaskiBindings = {
@@ -66,17 +67,32 @@ export type FcmConfig = {
   serviceAccount: string;
 };
 
-/** Web push needs `vapid`, iOS and macOS need `apns`, Android needs `fcm`; configure any of them. */
+/** The Microsoft Entra app a Windows App SDK app creates its push channel with. */
+export type WnsConfig = {
+  /** The directory (tenant) id of the app registration. */
+  tenantId: string;
+  /** The application (client) id of the app registration. */
+  clientId: string;
+  /** A client secret of the app registration. */
+  clientSecret: string;
+};
+
+/**
+ * Web push needs `vapid`, iOS and macOS need `apns`, Android needs `fcm`, Windows needs `wns`;
+ * configure any of them.
+ */
 export type PushConfig = {
   vapid?: VapidConfig;
   apns?: ApnsConfig;
   fcm?: FcmConfig;
+  wns?: WnsConfig;
 };
 
 export type ResolvedPush = {
   vapid?: { subject: string; publicKey: string; privateJwk: string };
   apns?: ApnsCredentials;
   fcm?: FcmCredentials;
+  wns?: WnsCredentials;
 };
 
 export type ErrorSource =
@@ -238,6 +254,15 @@ const resolveFcm = (fcm: FcmConfig): FcmCredentials => {
   };
 };
 
+const resolveWns = (wns: WnsConfig): WnsCredentials => {
+  for (const field of ['tenantId', 'clientId', 'clientSecret'] as const) {
+    if (typeof wns[field] !== 'string' || !wns[field]) {
+      fail(`channels.push.wns.${field} is required`);
+    }
+  }
+  return { tenantId: wns.tenantId, clientId: wns.clientId, clientSecret: wns.clientSecret };
+};
+
 export const validateConfig = (config: ChaskiConfig): ResolvedConfig => {
   let publicUrl: URL | null = null;
   try {
@@ -266,15 +291,18 @@ export const validateConfig = (config: ChaskiConfig): ResolvedConfig => {
     resolved.in_app = {};
   }
   if (channels.push) {
-    if (!channels.push.vapid && !channels.push.apns && !channels.push.fcm) {
+    const { vapid, apns, fcm, wns } = channels.push;
+    if (!vapid && !apns && !fcm && !wns) {
       fail(
-        'channels.push needs vapid (web push), apns (iOS, macOS), fcm (Android) or several of them',
+        'channels.push needs vapid (web push), apns (iOS, macOS), fcm (Android), wns (Windows) ' +
+          'or several of them',
       );
     }
     resolved.push = {
-      vapid: channels.push.vapid ? resolveVapid(channels.push.vapid) : undefined,
-      apns: channels.push.apns ? resolveApns(channels.push.apns) : undefined,
-      fcm: channels.push.fcm ? resolveFcm(channels.push.fcm) : undefined,
+      vapid: vapid ? resolveVapid(vapid) : undefined,
+      apns: apns ? resolveApns(apns) : undefined,
+      fcm: fcm ? resolveFcm(fcm) : undefined,
+      wns: wns ? resolveWns(wns) : undefined,
     };
   }
 

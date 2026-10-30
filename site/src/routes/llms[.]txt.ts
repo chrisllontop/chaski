@@ -13,7 +13,7 @@ const entry = (title: string, url: string, notes?: string) =>
 const llms = [
   '# Chaski',
   '',
-  '> Notification infrastructure for Cloudflare Workers, dashboard included. A Worker mounts Chaski on a route, and Chaski sends email, web push, iOS, macOS and Android push and in-app notifications from that Worker, on its own Cloudflare account, with templates, preferences, scheduling, retries and a dashboard. Open source under the MIT license, published on npm as `chaskijs`.',
+  '> Notification infrastructure for Cloudflare Workers, dashboard included. A Worker mounts Chaski on a route, and Chaski sends email, web push, iOS, macOS, Android and Windows push and in-app notifications from that Worker, on its own Cloudflare account, with templates, preferences, scheduling, retries and a dashboard. Open source under the MIT license, published on npm as `chaskijs`.',
   '',
   `To set Chaski up in a project, follow the agent skill at ${skillUrl}.`,
   ...NAV.flatMap((group) => [
