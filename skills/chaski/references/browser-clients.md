@@ -96,7 +96,10 @@ until a panel opens.
 
 Without React, `chaskiClient.feed` has `list()`, `unreadCount()`, `markRead()` and
 `subscribe(listener)`, which opens the socket for the first listener and returns the function that
-stops listening. When the socket keeps failing, the client falls back to checking once a minute.
+stops listening. A new item reaches the listener whole (`{ type: 'feed_item.created', item }`),
+with its `notificationId` and the send’s `data`; the listener hears `undefined` when the socket
+comes back after a drop, or when polling notices something, and should list the feed again then.
+When the socket keeps failing, the client falls back to checking once a minute.
 
 **With a query cache**, keep Chaski’s data there instead of in the hooks:
 
@@ -213,7 +216,27 @@ user with `client.push.registerDevice({ platform: 'macos', deviceToken })`; a de
 entitlement (`com.apple.developer.aps-environment`) and a provisioning profile that grants it, or
 macOS gives it no token. macOS shows the alert once the user allows the app’s notifications, which
 Electron asks for the first time the app uses `Notification`. `client.push.enable()` is web push,
-which Electron doesn’t offer: don’t use it there.
+which Electron doesn’t offer: don’t use it there. A click on a push banner while the app runs
+reaches no Electron event; the push only reaches the app through the click that launches it
+(`launchInfo` of `ready`).
+
+## Electron’s main process
+
+When the renderer has no network, the client runs in the main process on Node’s `fetch` and
+`WebSocket`, with the host’s full URL as `baseUrl`. Node sends no cookies, so the app adds its
+credentials to every request and to the socket, plus an `Origin` that `allowedOrigins` lists:
+
+```ts
+const headers = { authorization: `Bearer ${token}`, origin: 'app://app' };
+const chaskiClient = createChaskiClient({
+  baseUrl: 'https://app.example.com/me/notifications',
+  fetch: (input, init = {}) => fetch(input, { ...init, headers: { ...init.headers, ...headers } }),
+  feed: { socketFactory: (url) => new WebSocket(url, { headers }) },
+});
+```
+
+`identify` reads that header. A renderer with network authenticates with a `SameSite=None; Secure`
+cookie instead: the browser’s WebSocket can’t carry a header.
 
 ## A Windows app
 

@@ -115,6 +115,8 @@ export type DispatchInput = {
   transactional: boolean;
   emailOverrides: { fromName?: string; replyTo?: string } | null;
   pushSilent: boolean;
+  pushCollapseId: string | null;
+  data: Record<string, string> | null;
   storedAttachments: StoredAttachment[];
   idempotencyKey: string | null;
   inline?: boolean;
@@ -147,6 +149,8 @@ export class NotificationService extends BaseService {
       transactional: request.transactional,
       emailOverrides: overrides,
       pushSilent: request.push?.silent ?? false,
+      pushCollapseId: request.push?.collapseId ?? null,
+      data: request.data ?? null,
       storedAttachments,
       idempotencyKey: request.idempotencyKey ?? null,
       inline: request.inline,
@@ -205,6 +209,8 @@ export class NotificationService extends BaseService {
             input.storedAttachments.length > 0 ? JSON.stringify(input.storedAttachments) : null,
           emailOverrides: input.emailOverrides ? JSON.stringify(input.emailOverrides) : null,
           pushSilent: input.pushSilent,
+          pushCollapseId: input.pushCollapseId,
+          data: input.data ? JSON.stringify(input.data) : null,
           transactional: input.transactional,
           idempotencyKey: input.idempotencyKey,
           createdAt: now,

@@ -117,6 +117,7 @@ const sendApns = async (
         alert: { title: payload.title, body: payload.body },
         ...(payload.silent ? {} : { sound: 'default' }),
       },
+      ...payload.data,
       ...(payload.href ? { href: payload.href } : {}),
       ...(payload.tag ? { tag: payload.tag } : {}),
     },
@@ -151,6 +152,7 @@ const sendFcm = async (
     notification: { title: payload.title, body: payload.body },
     // FCM only carries strings in data.
     data: {
+      ...payload.data,
       ...(payload.href ? { href: payload.href } : {}),
       ...(payload.tag ? { tag: payload.tag } : {}),
     },
@@ -239,12 +241,14 @@ export class PushAdapter extends BaseService {
       });
     }
 
+    const sendData = parseJson<Record<string, string> | null>(notification.data, null);
     const message: PushPayload = {
       title,
       body,
       href: href || undefined,
-      tag: notification.id,
+      tag: notification.pushCollapseId ?? notification.id,
       ...(notification.pushSilent ? { silent: true } : {}),
+      ...(sendData ? { data: sendData } : {}),
     };
     const webPayload = new TextEncoder().encode(JSON.stringify(message));
     if (webPayload.length > MAX_PAYLOAD_BYTES) {
@@ -261,6 +265,7 @@ export class PushAdapter extends BaseService {
           title,
           body,
           arguments: {
+            ...message.data,
             ...(message.href ? { href: message.href } : {}),
             ...(message.tag ? { tag: message.tag } : {}),
           },

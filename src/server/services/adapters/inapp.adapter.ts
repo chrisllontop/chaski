@@ -6,6 +6,7 @@ import { renderTemplate } from '../../lib/render';
 import { reportError } from '../../lib/report-error';
 import { BaseService } from '../base.service';
 import type { ContactSnapshot } from '../contact.service';
+import { toFeedItem } from '../feed.service';
 import { TemplateService } from '../template.service';
 import type { AdapterContext, AdapterResult } from './types';
 
@@ -53,8 +54,11 @@ export class InAppAdapter extends BaseService {
     try {
       await feedStub(notification.recipientId).publish({
         type: 'feed_item.created',
-        feedItemId: item.id,
-        createdAt: item.createdAt.toISOString(),
+        item: toFeedItem({
+          ...item,
+          type: notification.type,
+          notificationData: notification.data,
+        }),
       });
     } catch (error) {
       reportError(error, { source: 'feed', deliveryId: ctx.delivery.id, channel: 'in_app' });

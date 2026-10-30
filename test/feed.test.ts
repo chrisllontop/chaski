@@ -60,6 +60,46 @@ describe('in-app channel', () => {
     expect(delivery).toMatchObject({ status: 'sent', providerMessageId: page.items[0]?.id });
   });
 
+  it('hands the item its notification id and the send’s data, in the list and the event', async () => {
+    await seedTemplate('payment_received', 'in_app');
+    const ana = await openFeedSocket('user_1');
+
+    const result = await NotificationService.send({
+      type: 'payment_received',
+      recipient: recipient(),
+      payload: { amount: 1500 },
+      channels: ['in_app'],
+      data: { eventId: 'evt_42', kind: 'payment' },
+    });
+    await processDeliveries(result.notificationId);
+
+    const [item] = (await chaski.feed.list({ recipientId: 'user_1' })).items;
+    expect(item).toMatchObject({
+      notificationId: result.notificationId,
+      data: { eventId: 'evt_42', kind: 'payment' },
+    });
+    await vi.waitFor(() => expect(ana.received).toEqual([{ type: 'feed_item.created', item }]));
+    ana.socket.close();
+  });
+
+  it('refuses data a push couldn’t carry as is', async () => {
+    await seedTemplate('payment_received', 'in_app');
+    const send = (data: Record<string, string>) =>
+      NotificationService.send({
+        type: 'payment_received',
+        recipient: recipient(),
+        channels: ['in_app'],
+        data,
+      });
+
+    await expect(send({ href: '/elsewhere' })).rejects.toMatchObject({ code: 'validation' });
+    await expect(send({ google_sent: '1' })).rejects.toMatchObject({ code: 'validation' });
+    await expect(send({ 'event-id': '1' })).rejects.toMatchObject({ code: 'validation' });
+    await expect(send({ count: 3 as unknown as string })).rejects.toMatchObject({
+      code: 'validation',
+    });
+  });
+
   it('signals open feed sockets of that recipient only', async () => {
     await seedTemplate('payment_received', 'in_app');
     const ana = await openFeedSocket('user_1');
@@ -68,11 +108,7 @@ describe('in-app channel', () => {
     await sendInApp();
 
     const [item] = (await chaski.feed.list({ recipientId: 'user_1' })).items;
-    await vi.waitFor(() =>
-      expect(ana.received).toEqual([
-        { type: 'feed_item.created', feedItemId: item?.id, createdAt: item?.createdAt },
-      ]),
-    );
+    await vi.waitFor(() => expect(ana.received).toEqual([{ type: 'feed_item.created', item }]));
     expect(other.received).toEqual([]);
     ana.socket.close();
     other.socket.close();

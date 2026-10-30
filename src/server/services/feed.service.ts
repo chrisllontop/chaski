@@ -24,6 +24,25 @@ const decodeCursor = (cursor: string): { createdAt: Date; id: string } => {
   return { createdAt: new Date(epochMilliseconds), id: cursor.slice(at + 1) };
 };
 
+type FeedItemRow = Pick<
+  typeof feedItems.$inferSelect,
+  'id' | 'notificationId' | 'title' | 'body' | 'data' | 'readAt' | 'createdAt'
+> & { type: string; notificationData: string | null };
+
+// The feed item keeps its rendered link in its own data; the send's data stays on the
+// notification, where it is one fact.
+export const toFeedItem = (row: FeedItemRow): FeedItem => ({
+  id: row.id,
+  notificationId: row.notificationId,
+  type: row.type,
+  title: row.title,
+  body: row.body,
+  href: parseJson<{ href?: string }>(row.data, {}).href,
+  data: parseJson<Record<string, string> | null>(row.notificationData, null),
+  readAt: row.readAt?.toISOString() ?? null,
+  createdAt: row.createdAt.toISOString(),
+});
+
 export class FeedService extends BaseService {
   protected static override name = 'feed';
 
@@ -46,12 +65,14 @@ export class FeedService extends BaseService {
     const rows = await FeedService.db
       .select({
         id: feedItems.id,
+        notificationId: feedItems.notificationId,
         title: feedItems.title,
         body: feedItems.body,
         data: feedItems.data,
         readAt: feedItems.readAt,
         createdAt: feedItems.createdAt,
         type: notifications.type,
+        notificationData: notifications.data,
       })
       .from(feedItems)
       .innerJoin(notifications, eq(notifications.id, feedItems.notificationId))
@@ -61,15 +82,7 @@ export class FeedService extends BaseService {
       .all();
 
     const page = rows.slice(0, limit);
-    const items: FeedItem[] = page.map((row) => ({
-      id: row.id,
-      type: row.type,
-      title: row.title,
-      body: row.body,
-      href: parseJson<{ href?: string }>(row.data, {}).href,
-      readAt: row.readAt?.toISOString() ?? null,
-      createdAt: row.createdAt.toISOString(),
-    }));
+    const items = page.map(toFeedItem);
     const last = page.at(-1);
     const nextCursor = rows.length > limit && last ? encodeCursor(last.createdAt, last.id) : null;
     return { items, nextCursor };

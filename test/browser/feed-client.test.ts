@@ -9,6 +9,17 @@ import { fakeFetch, socketFactory } from './fakes';
 const BASE = '/me/notifications';
 const PAGE = { items: [], nextCursor: null };
 
+const ITEM = {
+  id: 'f1',
+  notificationId: 'n_1',
+  type: 'payment_received',
+  title: 'Paid',
+  body: '1500',
+  data: { eventId: 'evt_1' },
+  readAt: null,
+  createdAt: '2026-10-30T12:00:00.000Z',
+};
+
 const setup = (routes = {}, feed = {}) => {
   const network = fakeFetch({
     'GET /me/notifications/feed': () => PAGE,
@@ -91,18 +102,58 @@ describe('feed socket', () => {
     client.feed.subscribe((event) => events.push(event));
     sockets[0]?.open();
 
-    sockets[0]?.receive(
-      JSON.stringify({ type: 'feed_item.created', feedItemId: 'f1', createdAt: 'now' }),
-    );
+    sockets[0]?.receive(JSON.stringify({ type: 'feed_item.created', item: ITEM }));
     sockets[0]?.receive(JSON.stringify({ type: 'feed_item.read', ids: ['f1'] }));
-    sockets[0]?.receive(JSON.stringify({ type: 'feed_item.deleted', feedItemId: 'f1' }));
+    sockets[0]?.receive(JSON.stringify({ type: 'feed_item.deleted', id: 'f1' }));
     sockets[0]?.receive('pong');
     sockets[0]?.receive('not json');
 
     expect(events).toEqual([
-      { type: 'feed_item.created', feedItemId: 'f1', createdAt: 'now' },
+      { type: 'feed_item.created', item: ITEM },
       { type: 'feed_item.read', ids: ['f1'] },
     ]);
+  });
+
+  it('tells listeners to check again when the socket comes back, not when it first opens', async () => {
+    const { client, sockets } = setup({}, { reconnect: { minDelayMs: 1_000 } });
+    const listener = vi.fn();
+    client.feed.subscribe(listener);
+    sockets[0]?.open();
+    expect(listener).not.toHaveBeenCalled();
+
+    sockets[0]?.drop();
+    await vi.advanceTimersByTimeAsync(1_000);
+    sockets[1]?.open();
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(listener).toHaveBeenCalledWith(undefined);
+  });
+
+  it('tells listeners to check again when the first connection only opens on a retry', async () => {
+    const { client, sockets } = setup({}, { reconnect: { minDelayMs: 1_000 } });
+    const listener = vi.fn();
+    client.feed.subscribe(listener);
+    sockets[0]?.drop();
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    sockets[1]?.open();
+
+    expect(listener).toHaveBeenCalledWith(undefined);
+  });
+
+  it('hands the factory a ws URL outside a browser when baseUrl is absolute', () => {
+    vi.stubGlobal('location', undefined);
+    const sockets = socketFactory();
+    const client = createChaskiClient({
+      baseUrl: 'https://api.example.com/me/notifications',
+      fetch: fakeFetch({}).fetch,
+      feed: { socketFactory: sockets.factory },
+    });
+
+    client.feed.subscribe(() => {});
+
+    expect(sockets.sockets[0]?.url).toBe('wss://api.example.com/me/notifications/feed/socket');
+    vi.unstubAllGlobals();
   });
 
   it('reconnects with backoff after the socket drops', async () => {

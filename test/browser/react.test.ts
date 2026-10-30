@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { createElement, type ReactNode } from 'react';
 import { describe, expect, it } from 'vitest';
-import { createChaskiClient, type FeedItem } from '../../src/client';
+import { createChaskiClient, type FeedItem, type FeedOptions } from '../../src/client';
 import {
   ChaskiProvider,
   useFeed,
@@ -13,15 +13,17 @@ import { fakeFetch, socketFactory } from './fakes';
 
 const item = (id: string, readAt: string | null = null): FeedItem => ({
   id,
+  notificationId: `n_${id}`,
   type: 'payment_received',
   title: 'Paid',
   body: id,
+  data: null,
   readAt,
   createdAt: '2026-10-23T12:00:00.000Z',
 });
 
 // A server holding one recipient's feed, two items per page.
-const server = (initial: FeedItem[]) => {
+const server = (initial: FeedItem[], feedOptions: FeedOptions = {}) => {
   let items = [...initial];
   let preferences = { channels: {}, mutedTypes: [] as string[] };
   const network = fakeFetch({
@@ -45,12 +47,13 @@ const server = (initial: FeedItem[]) => {
   const client = createChaskiClient({
     baseUrl: '/me/notifications',
     fetch: network.fetch,
-    feed: { socketFactory: sockets.factory },
+    feed: { socketFactory: sockets.factory, ...feedOptions },
   });
   const wrapper = ({ children }: { children: ReactNode }) =>
     createElement(ChaskiProvider, { client }, children);
   return {
     wrapper,
+    network,
     sockets: sockets.sockets,
     add: (next: FeedItem) => {
       items = [next, ...items];
@@ -62,19 +65,33 @@ const server = (initial: FeedItem[]) => {
 };
 
 describe('useFeed', () => {
-  it('loads the feed and adds new items when the socket signals', async () => {
+  it('loads the feed and adds the item a socket event carries, without a request', async () => {
     const feed = server([item('f2'), item('f1')]);
     const { result } = renderHook(() => useFeed(), { wrapper: feed.wrapper });
     await waitFor(() => expect(result.current.status).toBe('ready'));
     expect(result.current.items.map((i) => i.id)).toEqual(['f2', 'f1']);
+    const requests = feed.network.calls.length;
 
-    feed.add(item('f3'));
     act(() => {
       feed.sockets[0]?.open();
-      feed.sockets[0]?.receive(
-        JSON.stringify({ type: 'feed_item.created', feedItemId: 'f3', createdAt: 'now' }),
-      );
+      feed.sockets[0]?.receive(JSON.stringify({ type: 'feed_item.created', item: item('f3') }));
+      feed.sockets[0]?.receive(JSON.stringify({ type: 'feed_item.created', item: item('f3') }));
     });
+
+    expect(result.current.items.map((i) => i.id)).toEqual(['f3', 'f2', 'f1']);
+    expect(feed.network.calls).toHaveLength(requests);
+  });
+
+  it('reads the head again when the socket comes back after a drop', async () => {
+    const feed = server([item('f2'), item('f1')], { reconnect: { minDelayMs: 0, maxDelayMs: 0 } });
+    const { result } = renderHook(() => useFeed(), { wrapper: feed.wrapper });
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    act(() => feed.sockets[0]?.open());
+
+    feed.add(item('f3'));
+    act(() => feed.sockets[0]?.drop());
+    await waitFor(() => expect(feed.sockets).toHaveLength(2));
+    act(() => feed.sockets[1]?.open());
 
     await waitFor(() => expect(result.current.items.map((i) => i.id)).toEqual(['f3', 'f2', 'f1']));
   });

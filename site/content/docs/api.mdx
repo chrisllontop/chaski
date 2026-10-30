@@ -62,8 +62,12 @@ type SendRequest = {
   channels?: Array<'email' | 'in_app' | 'push'>;
   transactional?: boolean;
   email?: { fromName?: string; replyTo?: string; attachments?: AttachmentInput[] };
-  // Shows the push without a sound, on Apple devices, on Windows and in browsers.
-  push?: { silent?: boolean };
+  // silent shows the push without a sound, on Apple devices, on Windows and in browsers;
+  // collapseId replaces a push already shown with the same id and becomes its tag.
+  push?: { silent?: boolean; collapseId?: string };
+  // For your clients, as is: the feed item and every push carry it. Strings only, since FCM
+  // data and WNS launch arguments hold nothing else; up to 20 keys.
+  data?: Record<string, string>;
   idempotencyKey?: string;
   // Delivers the one transactional email before send() returns; see Sending.
   inline?: boolean;
@@ -100,10 +104,15 @@ type AttachmentInput = {
 ```ts
 type FeedItem = {
   id: string;
+  // The notification it came from; its pushes carry the same id as their tag, unless the send
+  // named a collapseId.
+  notificationId: string;
   type: string;
   title: string;
   body: string;
   href?: string;
+  // The send's data, or null.
+  data: Record<string, string> | null;
   readAt: string | null;
   createdAt: string;
 };
@@ -124,7 +133,7 @@ returns. `chaskijs/client` calls them for you.
 | `GET /feed` | The feed; `cursor`, `limit` and `unreadOnly` as query parameters. |
 | `GET /feed/unread-count` | `{ unread }` |
 | `POST /feed/read` | Marks items read: `{ ids?, before? }`, or `{}` for the whole feed. |
-| `GET /feed/socket` | A WebSocket that announces new items, and reads made in other tabs and devices. |
+| `GET /feed/socket` | A WebSocket that announces new items, whole, and reads made in other tabs and devices. |
 | `GET /preferences` | The user’s preferences. |
 | `PATCH /preferences` | Updates them. |
 | `GET /preferences/topics` | Template types grouped by topic. |
