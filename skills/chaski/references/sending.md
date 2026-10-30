@@ -1,9 +1,10 @@
 # Send with Chaski
 
-What the host’s code calls once Chaski is set up. The full guides: https://chaski.sh/docs/sending,
-https://chaski.sh/docs/scheduling, https://chaski.sh/docs/templates and
-https://chaski.sh/docs/preferences. Every request and result type is in
-`node_modules/chaskijs/dist/contract/contract.d.ts`.
+What the app’s code calls through its `CHASKI` binding once Chaski is set up
+([setup.md](setup.md)). The examples write `env.CHASKI`; in a Hono handler it’s `c.env.CHASKI`.
+The full guides: https://chaski.sh/docs/sending, https://chaski.sh/docs/scheduling,
+https://chaski.sh/docs/templates and https://chaski.sh/docs/preferences. Every request and result
+type is in `node_modules/chaskijs/dist/contract/contract.d.ts`.
 
 ## Types and templates
 
@@ -19,16 +20,17 @@ A template holds, per channel, three fields under the same three names:
 | `in_app` | Title | Message | Link the item opens (optional) |
 | `push` | Title | Message | Link the notification opens (optional) |
 
-A channel goes out only when the template has it `enabled`. A template can also carry a
-`description`, a `topic` that groups it on the user’s preferences screen, and `sampleData`, a
-string of JSON the dashboard previews it with.
+A channel goes out only when the template has it `enabled` and the channel is on (its settings
+saved on the dashboard’s **Channels** page). A template can also carry a `description`, a `topic`
+that groups it on the user’s preferences screen, and `sampleData`, a string of JSON the dashboard
+previews it with.
 
 ### The template file
 
-Templates live in Chaski’s database and reach it from a **template file** in the project:
-`chaski-templates.json` at its root, one entry per type. Write the templates there, load the file,
-and have the user check each one under **Templates** in the dashboard, whose preview renders it
-with its `sampleData`.
+Templates live in Chaski’s database and reach it from a **template file**:
+`chaski-templates.json` at the root of the Chaski project, one entry per type. Write the
+templates there, load the file, and have the user check each one under **Templates** in the
+dashboard, whose preview renders it with its `sampleData`.
 
 ```json title="chaski-templates.json"
 {
@@ -60,25 +62,26 @@ with its `sampleData`.
 }
 ```
 
-Load it into the local database, after Chaski’s migrations:
+Load it into the local database from the Chaski project, after Chaski’s migrations:
 
 ```sh
 npx chaskijs templates sql chaski-templates.json > .wrangler/chaski-templates.sql
 npx wrangler d1 execute CHASKI_DB --local --file .wrangler/chaski-templates.sql
 ```
 
-- **Loaded** when both commands exit 0 and **Templates** lists every type in the file.
-  `chaskijs templates sql` stops at a file it can’t load (Liquid that doesn’t parse, a type listed
-  twice) and names the type, channel and field; fix the file and run both again.
+- **Loaded** when both commands exit 0 and **Templates** lists every type in the file (a dashboard
+  already open shows them once reloaded). `chaskijs templates sql` stops at a file it can’t load
+  (Liquid that doesn’t parse, a type listed twice) and names the type, channel and field; fix the
+  file and run both again.
 - **Loading again** changes nothing for the types that match. A type that differs takes the
   file’s fields, overwriting what the user edited in the dashboard. Once the user edits there,
-  bring the file up to date from `chaski.templates.export()`, or load a file with only the new
-  types.
+  bring the file up to date from `env.CHASKI.templates().export()`, or load a file with only the
+  new types.
 - **Production** runs the same two commands with `--remote` in place of `--local`, after
-  `wrangler d1 migrations apply CHASKI_DB --remote`. They write to the user’s database: ask first.
-- **From the host’s code**, `chaski.templates.import(file)` applies the same file (a seed route,
-  the host’s tests), and `{ preview: true }` reports what it would change without writing. Over
-  RPC: `env.CHASKI.templates().import(file)`.
+  `wrangler d1 migrations apply CHASKI_DB --remote`, and another environment adds `--env <name>`.
+  They write to the user’s database: ask first.
+- **From the app’s code**, `env.CHASKI.templates().import(file)` applies the same file (a seed
+  route, a deploy job), and `{ preview: true }` reports what it would change without writing.
 
 ### Liquid
 
@@ -90,7 +93,7 @@ Templates are [Liquid](https://liquidjs.com). They see the send’s `payload` at
   goes through `raw`: `{{ summary_html | raw }}`. The subject, the text body, in-app and push
   are plain text and stay as written, HTML entities included: `&middot;` reaches the inbox as
   typed. Write the characters themselves: `chaskijs templates sql` prints a warning for each
-  entity left, and `templates.import()` lists them under `warnings`.
+  entity left, and `templates().import()` lists them under `warnings`.
 - Loops and conditions: `{% for item in items %}…{% endfor %}`, `{% if overdue %}…{% endif %}`.
   Only `nil` and `false` are false: test a list with `{% if items.size > 0 %}` and a string with
   `{% if name != blank %}`.
@@ -100,9 +103,7 @@ Templates are [Liquid](https://liquidjs.com). They see the send’s `payload` at
 ## Send
 
 ```ts
-import { chaski } from './chaski';
-
-const result = await chaski.send({
+const result = await env.CHASKI.send({
   type: 'payment_received',
   recipient: { id: user.id, email: user.email, name: user.name },
   payload: { amount: '$15.00' },
@@ -115,24 +116,24 @@ const result = await chaski.send({
 | `type` | Picks the template. |
 | `recipient` | `id` is required: the same id `identify` returns in the user routes, so the feed and preferences line up. `email` is needed for the email channel. |
 | `payload` | The values the template renders with. |
-| `channels` | Narrows the send to some of the template’s channels, such as `['email']`. A channel the config doesn’t turn on fails the send. |
+| `channels` | Narrows the send to some of the template’s channels, such as `['email']`. A channel that isn’t on fails the send. |
 | `transactional` | `true` sends whatever the contact’s preferences say: receipts, password resets, security alerts. |
-| `email` | `fromName`, `replyTo`, and up to 10 `attachments` (`filename`, `contentType`, and base64 `content` or a `url`); attachments need the R2 binding. Chaski deletes them once the email goes out or its schedule is cancelled; a failed or dead delivery keeps them for a replay, so suggest an R2 lifecycle rule on `att/` that outlasts the farthest schedule with attachments. |
+| `email` | `fromName`, `replyTo`, and up to 10 `attachments` (`filename`, `contentType`, and base64 `content` or a `url`); attachments need `CHASKI_ATTACHMENTS`. Chaski deletes them once the email goes out or its schedule is cancelled; a failed or dead delivery keeps them for a replay, so suggest an R2 lifecycle rule on `att/` that outlasts the farthest schedule with attachments. |
 | `push` | `silent: true` shows the push’s alert without a sound on Apple devices, on Windows and in browsers; on Android the app’s notification channel decides the sound. `collapseId` (up to 64 printable ASCII characters) replaces a push already shown with the same id, and becomes the push’s `tag`. |
-| `data` | Up to 20 string values for the host’s clients, such as its own event id: the feed item (`data`) and every push carry them as they came. Keys are letters, digits and `_`; `aps`, `href`, `tag`, `from`, `message_type`, `collapse_key` and keys starting with `google` or `gcm` are refused. |
+| `data` | Up to 20 string values for the app’s clients, such as its own event id: the feed item (`data`) and every push carry them as they came. Keys are letters, digits and `_`; `aps`, `href`, `tag`, `from`, `message_type`, `collapse_key` and keys starting with `google` or `gcm` are refused. |
 | `idempotencyKey` | The same key returns the first send’s result (`replayed: true`) instead of sending again. |
 | `inline` | `true` delivers the email before `send()` returns, for someone waiting on it; needs `transactional: true` and `channels: ['email']`. |
 
 Derive the idempotency key from the event the notification is about, such as the payment or the
 order, so a retried request or a redelivered queue message sends once.
 
-`send()` records the notification and puts one delivery per channel on the queue; it doesn’t wait
-for providers, except with `inline` (below). It returns
+`send()` records the notification and puts one delivery per channel on Chaski’s queue; it doesn’t
+wait for providers, except with `inline` (below). It returns
 `{ notificationId, replayed, outcome, deliveries }`:
 
 - `outcome: 'delivered'`: at least one channel took it.
 - `outcome: 'suppressed'`: the contact’s preferences skipped every channel.
-- `outcome: 'undeliverable'`: the config or the contact’s data skipped every channel.
+- `outcome: 'undeliverable'`: the channel settings or the contact’s data skipped every channel.
 
 A skipped delivery carries a `reason`: `channel_not_configured`, `muted_by_preferences`,
 `missing_email`, `no_device_tokens` or `no_template`.
@@ -146,13 +147,13 @@ provider doesn’t take it, or `channel_paused` when someone paused email in the
 route answers the person with an error instead of a silent success. Handle both the same way. The
 delivery is recorded and shows in the dashboard as usual; a failed one isn’t retried in the
 background, and a paused one waits there as held. With an `idempotencyKey`, a second request tries
-a failed or held email again and returns one that went out as it was. Everything else (receipts, digests, reminders) stays on the
-queue, which retries with backoff.
+a failed or held email again and returns one that went out as it was. Everything else (receipts,
+digests, reminders) stays on the queue, which retries with backoff.
 
 ## Schedule
 
 ```ts
-await chaski.schedule({
+await env.CHASKI.schedule({
   type: 'invoice_due',
   recipient: { id: user.id, email: user.email },
   payload: { invoice: 'INV-1042' },
@@ -161,9 +162,9 @@ await chaski.schedule({
   groupKey: `trial:${trial.id}`, // optional, to cancel several at once
 });
 
-await chaski.schedules.cancel({ idempotencyKey: 'invoice_due:INV-1042' });
-await chaski.schedules.cancel({ groupKey: `trial:${trial.id}` });
-const pending = await chaski.schedules.list({ recipientId: user.id });
+await env.CHASKI.schedules().cancel({ idempotencyKey: 'invoice_due:INV-1042' });
+await env.CHASKI.schedules().cancel({ groupKey: `trial:${trial.id}` });
+const pending = await env.CHASKI.schedules().list({ recipientId: user.id });
 ```
 
 - `scheduledAt` is ISO 8601 with an explicit offset (`Z` or `±hh:mm`); a time in the past is
@@ -175,57 +176,58 @@ const pending = await chaski.schedules.list({ recipientId: user.id });
   each time.
 - Preferences and the template are read when the send fires, not when it’s scheduled.
 - A schedule is one send at one time. Something that repeats, such as a weekly digest, stays a
-  Cron Trigger in the host whose handler calls `chaski.send()`.
-- It needs the `ChaskiScheduler` Workflow bound as `scheduler`.
+  Cron Trigger in the app whose handler calls `env.CHASKI.send()`.
+- It needs `CHASKI_SCHEDULER` bound in the Chaski Worker.
 
 ## Preferences
 
 A contact’s preferences are channels they turned off and types they muted:
 
 ```ts
-await chaski.preferences.set(user.id, {
-  channels: { email: false },        // merges key by key
+await env.CHASKI.preferences().set(user.id, {
+  channels: { email: false },                     // merges key by key
   mutedTypes: ['marketing.*', 'push:reminder.*'], // overwrites the whole list
 });
-const { channels, mutedTypes } = await chaski.preferences.get(user.id);
-const topics = await chaski.preferences.topics(); // types grouped by their template's topic
+const { channels, mutedTypes } = await env.CHASKI.preferences().get(user.id);
+const topics = await env.CHASKI.preferences().topics(); // types grouped by their template's topic
 ```
 
 - A `mutedTypes` entry ending in `*` mutes every type starting with it; a `channel:` prefix limits
   it to that channel.
 - `mutedTypes` overwrites the stored list on every `set`: send the full list.
-- `defaultMutedTypes` in the config mutes types for every contact until they save preferences of
-  their own, for opt-in types such as a digest. `get()` for a contact who never saved returns
-  those defaults, with every channel on.
+- **Default muted types**, on the dashboard’s **Channels** page, mutes types for every contact
+  until they save preferences of their own, for opt-in types such as a digest. `get()` for a
+  contact who never saved returns those defaults, with every channel on.
 - Every send checks preferences channel by channel, except `transactional: true` sends.
 
 ## Feed and devices on the server
 
 ```ts
-await chaski.feed.list({ recipientId: user.id, limit: 20 });    // { items, nextCursor }
-await chaski.feed.unreadCount(user.id);                         // { unread }
-await chaski.feed.markRead({ recipientId: user.id, ids: [id] }); // or before, or neither for all
+await env.CHASKI.feed().list({ recipientId: user.id, limit: 20 });    // { items, nextCursor }
+await env.CHASKI.feed().unreadCount(user.id);                         // { unread }
+await env.CHASKI.feed().markRead({ recipientId: user.id, ids: [id] }); // or before, or neither for all
 
-await chaski.push.register({ recipient: { id: user.id }, platform: 'ios', deviceToken });
-await chaski.push.register({ recipient: { id: user.id }, platform: 'macos', deviceToken });
-await chaski.push.register({ recipient: { id: user.id }, platform: 'windows', deviceToken: channelUri });
-await chaski.push.register({ recipient: { id: user.id }, platform: 'android', deviceToken }); // FCM
-await chaski.push.register({ recipient: { id: user.id }, subscription }); // a web push subscription
-await chaski.push.unregister({ deviceToken });
+await env.CHASKI.push().register({ recipient: { id: user.id }, platform: 'ios', deviceToken });
+await env.CHASKI.push().register({ recipient: { id: user.id }, platform: 'macos', deviceToken });
+await env.CHASKI.push().register({ recipient: { id: user.id }, platform: 'windows', deviceToken: channelUri });
+await env.CHASKI.push().register({ recipient: { id: user.id }, platform: 'android', deviceToken }); // FCM
+await env.CHASKI.push().register({ recipient: { id: user.id }, subscription }); // a web push subscription
+await env.CHASKI.push().unregister({ deviceToken });
 ```
 
 Registering an endpoint or a device token Chaski already knows hands it to this contact, so a
 repeat is safe.
 
-The frontend reaches the same data as the signed-in user through `chaski.userRoutes()`; see
+The frontend reaches the same data as the signed-in user through the app’s `userRoutes()`; see
 [browser-clients.md](browser-clients.md).
 
 ## Errors
 
 Chaski throws `ChaskiError` with a `code`: `validation` (fix the request or the template),
 `config` (fix the setup), `delivery_failed` (an inline email didn’t go out), `channel_paused` (an
-inline email is held: email is paused in the dashboard), `not_found`,
-`conflict`, `unauthorized`, `forbidden`, `internal`. Check
-it with `isChaskiError(error)`, never `instanceof`, since the class doesn’t survive a service
-binding or a queue. `isRetryableChaskiError(error)` is `true` only for `internal` and for errors
-that aren’t Chaski’s.
+inline email is held: email is paused in the dashboard), `not_found`, `conflict`, `unauthorized`,
+`forbidden`, `internal`. Check it with `isChaskiError(error)` from `chaskijs`, never `instanceof`,
+since the class doesn’t survive the service binding. `isRetryableChaskiError(error)` is `true` only
+for `internal` and for errors that aren’t Chaski’s, for a job of the app that decides whether to
+retry. Between two local `wrangler dev` sessions the code doesn’t cross the binding:
+[troubleshooting.md](troubleshooting.md), “Local development”.

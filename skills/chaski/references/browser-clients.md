@@ -1,8 +1,9 @@
 # Add Chaski to the frontend
 
 The frontend reaches the signed-in user’s feed, push devices and preferences through the routes
-the host mounted with `chaski.userRoutes()` ([setup.md](setup.md), step 5). Three entries of the
-package run in the browser, and none imports server code:
+the app mounts with `userRoutes()` ([setup.md](setup.md), step 5), which forward each request to
+Chaski for the user `identify` names. Three entries of the package run in the browser, and none
+imports server code:
 
 | Entry | Gives |
 | --- | --- |
@@ -16,8 +17,8 @@ The guide for people: https://chaski.sh/docs/browser-clients.
 
 Write down:
 
-- **Where it’s served**, compared with the user routes: the same origin (this Worker’s `assets`,
-  or a route of the same domain), or another origin.
+- **Where it’s served**, compared with the user routes: the same origin (the app Worker’s
+  `assets`, or a route of the same domain), or another origin.
 - **The framework and bundler**: React or not, Vite, Next.js, Astro, a plain bundle.
 - **A query cache** already in use: TanStack Query, SWR.
 - **An existing service worker**: a PWA plugin (`vite-plugin-pwa`, Workbox), a hand-written
@@ -29,7 +30,8 @@ Write down:
 
 ## 2. Create the client
 
-Create it once and share it:
+Add `chaskijs` to the frontend’s own `package.json` when it has one apart from the app’s, then
+create the client once and share it:
 
 ```ts
 // src/lib/chaski.ts
@@ -49,22 +51,27 @@ export const chaskiClient = createChaskiClient({ baseUrl: '/me/notifications' })
    });
    ```
 
-2. The frontend’s origin in `allowedOrigins` on the user routes. Chaski refuses writes and socket
-   upgrades from origins it doesn’t know, with a 403 `cross-origin request refused`.
-3. CORS on the host, which Chaski doesn’t add. Register Hono’s `cors()` for the user routes’ path
-   before mounting them:
+2. The frontend’s origin in `allowedOrigins` on the user routes. They refuse writes and socket
+   upgrades from origins they don’t know, with a 403 `cross-origin request refused`.
+3. CORS in the app, which `userRoutes()` doesn’t add. Register Hono’s `cors()` for the mount’s
+   path before mounting it: it answers the browser’s preflight on its own, and a preflight carries
+   no session cookie for `identify` to read. The feed’s WebSocket escapes CORS, so
+   `allowedOrigins` alone admits it.
 
    ```ts
    import { cors } from 'hono/cors';
 
-   app.use(
-     '/me/notifications/*',
-     cors({ origin: ['https://frontend.example.com'], credentials: true }),
+   const frontend = ['https://www.example.com'];
+
+   app.use('/me/notifications/*', cors({ origin: frontend, credentials: true }));
+   app.route(
+     '/me/notifications',
+     userRoutes({ chaski: (c) => c.env.CHASKI, identify, allowedOrigins: frontend }),
    );
    ```
 
-   The session cookie must also reach the host on a cross-site request (`SameSite=None; Secure`),
-   which is the host’s own auth setting.
+   The session cookie must also reach the app on a cross-site request (`SameSite=None; Secure`),
+   which is the app’s own auth setting.
 
 **Done when** `await chaskiClient.feed.unreadCount()` in the signed-in frontend returns
 `{ unread: <number> }`. A `ChaskiRequestError` with `status: 401` means the session didn’t reach
@@ -91,8 +98,8 @@ const Bell = () => {
 
 The hooks open a WebSocket while mounted and add new items as they arrive; marking an item read
 updates the unread count on the same page at once, and in the user’s other tabs and devices
-through the socket. `useFeed({ enabled: false })` holds the first load
-until a panel opens.
+through the socket. `useFeed({ enabled: false })` holds the first load until a panel opens. In-app
+content is plain text: render it as text.
 
 Without React, `chaskiClient.feed` has `list()`, `unreadCount()`, `markRead()` and
 `subscribe(listener)`, which opens the socket for the first listener and returns the function that
@@ -111,13 +118,13 @@ const unread = useQuery(queries.unreadCount());
 chaskiClient.feed.subscribe(() => queryClient.invalidateQueries({ queryKey: CHASKI_QUERY_KEY }));
 ```
 
-**Done when** a send of an `in_app` type to the signed-in user’s id shows up in the open page
-without a reload.
+**Done when** an `env.CHASKI.send()` of a type with `in_app` content to the signed-in user’s id
+shows up in the open page without a reload.
 
 ## 4. Web push
 
-Web push needs `channels.push.vapid` in the config ([setup.md](setup.md), step 6) and a service
-worker that hands pushes to Chaski.
+Web push needs the web push channel set up on the dashboard’s **Channels** page (a subject and a
+key pair) and a service worker that hands pushes to Chaski.
 
 **No service worker yet:** write one and bundle it to a file served at `/sw.js`, the path the
 client registers by default:
@@ -163,21 +170,20 @@ const PushToggle = () => {
 ```
 
 Without React: `chaskiClient.push.isSupported()`, `state()`, `enable()` and `disable()`.
-`enable()` throws when permission is denied, the server has no VAPID key or the user routes refuse
-the browser (`allowPush`). `state()` reads a subscription made with another VAPID key, such as the
-one the project’s earlier push provider left, as not subscribed, and `enable()` replaces it. On iPhone and iPad,
-web push reaches only a site the user added to the home screen.
+`enable()` throws when permission is denied, web push has no key pair on **Channels** or the user
+routes refuse the browser (`allowPush`). `state()` reads a subscription made with another VAPID
+key, such as the one the project’s earlier push provider left, as not subscribed, and `enable()`
+replaces it. On iPhone and iPad, web push reaches only a site the user added to the home screen.
 
 A click on a push takes an open window to the push’s link and focuses it, or opens the link in a
 new window; open windows also get a message to refresh their feed. A window the service worker
 doesn’t control yet (the page that just turned push on, until it reloads) can’t be navigated, so
-the link opens in a new one. `handlePushEvents` shows every push the worker
-receives, reading `title`, `body` and `href` from its JSON. A push of another shape still shows,
-but its click opens `/`, so while an old path sends pushes of its own the worker has to handle
-both.
+the link opens in a new one. `handlePushEvents` shows every push the worker receives, reading
+`title`, `body` and `href` from its JSON. A push of another shape still shows, but its click opens
+`/`, so while an old path sends pushes of its own the worker has to handle both.
 
-**Done when** `state.subscribed` is `true` after enabling, and a send of a `push` type to the
-signed-in user shows a `push` delivery that isn’t skipped with `no_device_tokens`.
+**Done when** `state.subscribed` is `true` after enabling, and a send of a type with `push`
+content to the signed-in user shows a `push` delivery that isn’t skipped with `no_device_tokens`.
 
 ## 5. Preferences
 
@@ -202,28 +208,28 @@ delivery skipped as `muted_by_preferences`.
 
 The app registers its APNs device token for the signed-in user with
 `POST <user routes>/push/subscriptions` and the body `{ "platform": "ios", "deviceToken": "<hex>" }`,
-using the app’s own session, or the host calls
-`chaski.push.register({ recipient: { id }, platform: 'ios', deviceToken })` from an endpoint of its
-own. The config needs `channels.push.apns`.
+using the app’s own session or token, which `identify` reads, or the app’s Worker calls
+`env.CHASKI.push().register({ recipient: { id }, platform: 'ios', deviceToken })` from an endpoint
+of its own. APNs needs its settings on **Channels**, with the iOS app’s bundle id.
 
 ## An Electron app on macOS
 
 Electron’s main process gets the APNs device token from
 `pushNotifications.registerForAPNSNotifications()`, and the client registers it for the signed-in
 user with `client.push.registerDevice({ platform: 'macos', deviceToken })`; a development build adds
-`environment: 'sandbox'`. On sign-out, `client.push.unregisterDevice(deviceToken)`. The config needs
-`channels.push.apns.macos` with the Mac app’s bundle id, and the app must be signed with the push
-entitlement (`com.apple.developer.aps-environment`) and a provisioning profile that grants it, or
-macOS gives it no token. macOS shows the alert once the user allows the app’s notifications, which
-Electron asks for the first time the app uses `Notification`. `client.push.enable()` is web push,
-which Electron doesn’t offer: don’t use it there. A click on a push banner while the app runs
-reaches no Electron event; the push only reaches the app through the click that launches it
-(`launchInfo` of `ready`).
+`environment: 'sandbox'`. On sign-out, `client.push.unregisterDevice(deviceToken)`. The APNs settings
+on **Channels** need the macOS app with the Mac app’s bundle id, and the app must be signed with the
+push entitlement (`com.apple.developer.aps-environment`) and a provisioning profile that grants it,
+or macOS gives it no token. macOS shows the alert once the user allows the app’s notifications,
+which Electron asks for the first time the app uses `Notification`. `client.push.enable()` is web
+push, which Electron doesn’t offer: register the APNs token instead. A click on a push banner while
+the app runs reaches no Electron event; the push only reaches the app through the click that
+launches it (`launchInfo` of `ready`).
 
 ## Electron’s main process
 
 When the renderer has no network, the client runs in the main process on Node’s `fetch` and
-`WebSocket`, with the host’s full URL as `baseUrl`. Node sends no cookies, so the app adds its
+`WebSocket`, with the app’s full URL as `baseUrl`. Node sends no cookies, so the app adds its
 credentials to every request and to the socket, plus an `Origin` that `allowedOrigins` lists:
 
 ```ts
@@ -250,8 +256,8 @@ Windows apps, Electron ones included, get a WNS channel URI from the Windows App
 `PushNotificationManager` (`CreateChannelAsync` with the Entra app’s id), through a native module
 of the app’s own: Electron has no Windows push API. The client registers the URI with
 `client.push.registerDevice({ platform: 'windows', deviceToken: channelUri })`, on every launch,
-since channels expire after 30 days. The config needs `channels.push.wns` with the same Entra app.
-A click on the toast hands the app the push’s `href` and `tag` as launch arguments
+since channels expire after 30 days. The WNS settings on **Channels** name the same Entra app. A
+click on the toast hands the app the push’s `href` and `tag` as launch arguments
 (`AppNotificationActivatedEventArgs.Arguments`).
 
 ## A native Android app
@@ -259,14 +265,15 @@ A click on the toast hands the app the push’s `href` and `tag` as launch argum
 The app registers its FCM registration token (`FirebaseMessaging.getInstance().token`) for the
 signed-in user with `POST <user routes>/push/subscriptions` and the body
 `{ "platform": "android", "deviceToken": "<token>" }`, and again from `onNewToken` when FCM
-rotates it, or the host calls
-`chaski.push.register({ recipient: { id }, platform: 'android', deviceToken })` from an endpoint of
-its own. The config needs `channels.push.fcm`. Android shows the notification on its own while the
-app is in the background; the push’s `href` and `tag` arrive in the intent’s extras.
+rotates it, or the app’s Worker calls
+`env.CHASKI.push().register({ recipient: { id }, platform: 'android', deviceToken })` from an
+endpoint of its own. The FCM settings on **Channels** hold a service account of the Firebase
+project the app registers its tokens with. Android shows the notification on its own while the app
+is in the background; the push’s `href` and `tag` arrive in the intent’s extras.
 
 ## Content-Security-Policy on the frontend
 
 Same origin, `connect-src 'self'` covers the requests and, in current browsers, the socket. From
-another origin, add the host’s `https://` origin and its `wss://` origin to `connect-src`. The
+another origin, add the app’s `https://` origin and its `wss://` origin to `connect-src`. The
 service worker’s script must pass `worker-src`, which falls back to `child-src`, then
 `script-src`, then `default-src`.
