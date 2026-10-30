@@ -39,7 +39,7 @@ const outcomeOf = (deliveries: DeliveryResult[]): SendOutcome => {
 };
 
 // Ingest-only guard; dispatch keeps the channel_not_configured skip so
-// scheduled sends survive the host dropping a channel before they fire.
+// scheduled sends survive a channel being dropped before they fire.
 export const assertChannelsConfigured = (
   enabledChannels: Channel[],
   channels?: Channel[],
@@ -233,7 +233,6 @@ export class NotificationService extends BaseService {
     const pendingMessages: DeliveryMessage[] = deliveryRows
       .filter((row) => row.status === 'pending')
       .map((row) => ({
-        kind: 'chaski.delivery',
         deliveryId: row.id,
         notificationId,
         channel: row.channel,
@@ -294,7 +293,6 @@ export class NotificationService extends BaseService {
     });
     if (!notification) return existing;
     const delivered = await DeliveryService.deliverInline({
-      kind: 'chaski.delivery',
       deliveryId: email.id,
       notificationId: notification.id,
       channel: 'email',

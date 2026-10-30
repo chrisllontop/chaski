@@ -1,5 +1,5 @@
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from 'cloudflare:workers';
-import { reportError } from '../lib/report-error';
+import { logger } from '../lib/log';
 import { ScheduleService } from '../services/schedule.service';
 import type { ScheduleParams } from '../types';
 
@@ -17,6 +17,8 @@ const SEND_STEP = {
 // on a transient failure. A sleeping instance costs nothing; 50 attempts at
 // this pace cover about 12 hours.
 const RETRY_BACKOFF = '15 minutes';
+
+const log = logger('scheduler');
 
 /** One instance per scheduled notification: it sleeps until scheduledAt, then sends. */
 export class ChaskiScheduler extends WorkflowEntrypoint<unknown, ScheduleParams> {
@@ -37,7 +39,7 @@ export class ChaskiScheduler extends WorkflowEntrypoint<unknown, ScheduleParams>
         await step.do(`send ${attempt}`, SEND_STEP, () => ScheduleService.fire(scheduledId));
         return;
       } catch (error) {
-        reportError(error, { source: 'workflow', scheduledId });
+        log.error('scheduled send failed', error, { scheduledId, attempt });
         // fire() is idempotent (status guard plus a derived idempotency key),
         // so trying again after a partial failure never sends twice.
         await step.sleep(`backoff ${attempt}`, RETRY_BACKOFF);

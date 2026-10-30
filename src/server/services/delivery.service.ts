@@ -173,7 +173,7 @@ export class DeliveryService extends BaseService {
     if (error instanceof DeliveryError) {
       return { permanent: error.permanent, code: error.errorCode, message: error.message };
     }
-    // A template Liquid rejects, or a config the host has to fix, fails the same way next time.
+    // A template Liquid rejects, or a config someone has to fix, fails the same way next time.
     if (isChaskiError(error)) {
       return {
         permanent: !isRetryableChaskiError(error),

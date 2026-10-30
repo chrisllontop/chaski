@@ -165,7 +165,7 @@ export class PushSubscriptionService extends BaseService {
     });
   };
 
-  /** The platforms the host configured push credentials for. */
+  /** The platforms the config holds push credentials for. */
   static configuredPlatforms = (): DevicePlatform[] => {
     const push = PushSubscriptionService.config.channels.push;
     const platforms: DevicePlatform[] = [];

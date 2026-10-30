@@ -50,7 +50,6 @@ const toMessage = (row: {
   type: string;
   recipientId: string;
 }): DeliveryMessage => ({
-  kind: 'chaski.delivery',
   deliveryId: row.id,
   notificationId: row.notificationId,
   channel: row.channel as Channel,

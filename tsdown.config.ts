@@ -5,6 +5,7 @@ export default defineConfig({
   // into its bundle.
   entry: {
     index: 'src/index.ts',
+    worker: 'src/worker/index.ts',
     client: 'src/client/index.ts',
     sw: 'src/sw/index.ts',
     react: 'src/react/index.ts',

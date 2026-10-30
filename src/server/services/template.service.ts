@@ -274,7 +274,7 @@ export class TemplateService extends BaseService {
     }));
   };
 
-  /** Every live template, as the file `chaski.templates.import()` takes. */
+  /** Every live template, as the file `templates().import()` takes. */
   static exportFile = async (): Promise<TemplateFile> => ({
     format: TEMPLATE_FILE_FORMAT,
     version: TEMPLATE_FILE_VERSION,

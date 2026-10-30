@@ -3,7 +3,6 @@ import { DeliveryError } from '../../lib/errors';
 import { newId } from '../../lib/ids';
 import { parseJson } from '../../lib/json';
 import { renderTemplate } from '../../lib/render';
-import { reportError } from '../../lib/report-error';
 import { BaseService } from '../base.service';
 import type { ContactSnapshot } from '../contact.service';
 import { toFeedItem } from '../feed.service';
@@ -61,7 +60,6 @@ export class InAppAdapter extends BaseService {
         }),
       });
     } catch (error) {
-      reportError(error, { source: 'feed', deliveryId: ctx.delivery.id, channel: 'in_app' });
       InAppAdapter.log.error('feed signal failed', error, { feedItemId: item.id });
     }
 

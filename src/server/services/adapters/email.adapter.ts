@@ -50,9 +50,11 @@ export class EmailAdapter extends BaseService {
       content.textBody ? renderTemplate(content.textBody, data) : Promise.resolve(undefined),
     ]);
 
-    // The consumer has no request to derive an origin from, so the pixel URL
-    // comes from the publicUrl the host declares.
-    const html = injectOpenPixel(renderedHtml, openPixelUrl(config.publicUrl, ctx.delivery.id));
+    // The pixel loads through the app's userRoutes(), since Access closes Chaski's own URL to
+    // mail clients; without CHASKI_PUBLIC_URL there is nowhere for it to load from.
+    const html = config.publicUrl
+      ? injectOpenPixel(renderedHtml, openPixelUrl(config.publicUrl, ctx.delivery.id))
+      : renderedHtml;
 
     const from = senderAddress(emailConfig.from, overrides.fromName ?? emailConfig.fromName);
     const replyTo = overrides.replyTo ?? emailConfig.replyTo;

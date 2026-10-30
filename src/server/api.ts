@@ -16,7 +16,7 @@ const run =
     return fn(...args);
   };
 
-/** The in-process API, shared by createChaski() and the ChaskiEntrypoint RPC surface. */
+/** The API ChaskiEntrypoint serves over RPC; each call checks the config and the migrations first. */
 export const api: ChaskiApi = {
   ready: async () => {
     const config = await ready({ fresh: true });

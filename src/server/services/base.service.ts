@@ -3,7 +3,7 @@ import { type Client, type Database, getClient, getDb } from '../db';
 import { getLogger, type Logger } from '../lib/log';
 
 // Follows the BaseService pattern in .agents/services.md:
-// static methods only, the host config via `Service.config` and its bindings via
+// static methods only, the config via `Service.config` and its bindings via
 // `Service.bindings`, persistence via `Service.client`.
 // `db` (raw Drizzle) is the escape hatch for D1 `batch()` atomicity and
 // conditional UPDATEs that must read `meta.changes` — better-drizzle does not

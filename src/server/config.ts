@@ -9,25 +9,51 @@ import type { FcmCredentials } from './lib/fcm';
 import type { WnsCredentials } from './lib/wns';
 import type { DeliveryMessage, ScheduleParams, SendEmailBinding } from './types';
 
+/** The Chaski Worker's bindings and vars, under the names its wrangler.jsonc declares. */
+export type ChaskiEnv = {
+  CHASKI_DB: D1Database;
+  CHASKI_QUEUE: Queue<DeliveryMessage>;
+  CHASKI_FEED?: DurableObjectNamespace<ChaskiFeed>;
+  CHASKI_EVENTS?: DurableObjectNamespace<ChaskiEvents>;
+  CHASKI_SCHEDULER?: Workflow<ScheduleParams>;
+  CHASKI_EMAIL?: SendEmailBinding;
+  CHASKI_ATTACHMENTS?: R2Bucket;
+  /** Where this Worker runs, as the dashboard shows it, such as `production` or `staging`. */
+  CHASKI_ENVIRONMENT?: string;
+  /** Where the app mounts userRoutes(); emails track opens through it, and without it they don't. */
+  CHASKI_PUBLIC_URL?: string;
+};
+
 export type ChaskiBindings = {
-  /** The D1 database Chaski keeps its data in. */
   db: D1Database;
-  /** The delivery queue; the host's consumer passes its batches to chaski.queue(). */
   queue: Queue<DeliveryMessage>;
-  /** The host's `send_email` binding; required when the email channel is configured. */
+  /** Required when the email channel is configured. */
   email?: SendEmailBinding;
-  /** The ChaskiEvents Durable Object namespace; without it the dashboard gets no realtime updates. */
+  /** Without it the dashboard gets no realtime updates. */
   events?: DurableObjectNamespace<ChaskiEvents>;
-  /** The ChaskiScheduler Workflow; required by chaski.schedule(). */
+  /** Required by schedule(). */
   scheduler?: Workflow<ScheduleParams>;
-  /** The ChaskiFeed Durable Object namespace; required when the in_app channel is configured. */
+  /** Required when the in_app channel is configured. */
   feed?: DurableObjectNamespace<ChaskiFeed>;
-  /** An R2 bucket; required by sends that carry email attachments. */
+  /** Required by sends that carry email attachments. */
   attachments?: R2Bucket;
 };
 
+const BINDING_NAMES = {
+  db: 'CHASKI_DB',
+  queue: 'CHASKI_QUEUE',
+  email: 'CHASKI_EMAIL',
+  events: 'CHASKI_EVENTS',
+  scheduler: 'CHASKI_SCHEDULER',
+  feed: 'CHASKI_FEED',
+  attachments: 'CHASKI_ATTACHMENTS',
+} as const satisfies Record<keyof ChaskiBindings, keyof ChaskiEnv>;
+
+/** How a missing binding is named in an error: the name it has in wrangler.jsonc. */
+export const bindingName = (key: keyof ChaskiBindings): string => BINDING_NAMES[key];
+
 export type EmailConfig = {
-  /** The sender address; it must be allowed by the host's send_email binding. */
+  /** The sender address; it must be allowed by the CHASKI_EMAIL send_email binding. */
   from: string;
   fromName?: string;
   replyTo?: string;
@@ -95,26 +121,9 @@ export type ResolvedPush = {
   wns?: WnsCredentials;
 };
 
-export type ErrorSource =
-  | 'http'
-  | 'queue'
-  | 'workflow'
-  | 'tracking'
-  | 'feed'
-  | 'events'
-  | 'attachments';
-
-export type ErrorContext = {
-  source: ErrorSource;
-  deliveryId?: string;
-  notificationId?: string;
-  scheduledId?: string;
-  channel?: string;
-};
-
 export type ChaskiConfig = {
-  /** Absolute URL where the host mounts Chaski, e.g. `https://app.example.com/chaski`. */
-  publicUrl: string;
+  /** Absolute URL where the app mounts userRoutes(), e.g. `https://app.example.com/notifications`. */
+  publicUrl?: string;
   bindings: ChaskiBindings;
   /** A channel is active when it has a config entry. */
   channels?: {
@@ -124,22 +133,12 @@ export type ChaskiConfig = {
   };
   /** Type mutes every recipient has until they save preferences of their own. */
   defaultMutedTypes?: string[];
-  /**
-   * Where this Worker runs, as the dashboard shows it, such as `production` or `staging`. `local`
-   * is for `wrangler dev`: it opens the dashboard without `authorize` and needs a `publicUrl` on
-   * localhost. Any other value, or none, is a deployed environment.
-   */
+  /** Where this Worker runs, as the dashboard shows it, such as `production` or `staging`. */
   environment?: string;
-  /** Must match `max_retries` on the host's queue consumer; defaults to 5. */
-  maxRetries?: number;
-  /** Must match `migrations_table` on the host's D1 binding; defaults to `d1_migrations`. */
-  migrationsTable?: string;
-  /** Receives every unexpected error Chaski handles on its own. */
-  onError?: (error: unknown, context: ErrorContext) => void;
 };
 
 export type ResolvedConfig = {
-  publicUrl: string;
+  publicUrl: string | null;
   bindings: ChaskiBindings;
   channels: {
     email?: EmailConfig;
@@ -149,26 +148,14 @@ export type ResolvedConfig = {
   enabledChannels: Channel[];
   defaultMutedTypes: string[];
   environment: string | null;
-  maxRetries: number;
-  migrationsTable: string;
-  onError?: (error: unknown, context: ErrorContext) => void;
 };
-
-/** The one environment that changes what Chaski does: see `ChaskiConfig.environment`. */
-export const LOCAL_ENVIRONMENT = 'local';
-
-const isLoopback = ({ hostname }: URL): boolean =>
-  hostname === 'localhost' ||
-  hostname.endsWith('.localhost') ||
-  hostname === '[::1]' ||
-  /^127(\.\d{1,3}){3}$/.test(hostname);
 
 const fail = (message: string): never => {
   throw new ChaskiError('config', `Chaski config: ${message}`);
 };
 
-// Subscriptions are bound to the public key they were made with, so hosts bring
-// their own pair, in the raw base64url form web-push tools print.
+// Subscriptions are bound to the public key they were made with, so each Chaski brings
+// its own pair, in the raw base64url form web-push tools print.
 const resolveVapid = (vapid: VapidConfig): NonNullable<ResolvedPush['vapid']> => {
   if (!/^(mailto:|https:)/.test(vapid.subject ?? '')) {
     fail('channels.push.vapid.subject must be a mailto: or https: URL');
@@ -265,29 +252,35 @@ const resolveWns = (wns: WnsConfig): WnsCredentials => {
 
 export const validateConfig = (config: ChaskiConfig): ResolvedConfig => {
   let publicUrl: URL | null = null;
-  try {
-    publicUrl = new URL(config.publicUrl);
-  } catch {
-    // Reported below with the rest of the publicUrl rule.
-  }
-  if (!publicUrl || !/^https?:$/.test(publicUrl.protocol)) {
-    fail('publicUrl must be the absolute http(s) URL where Chaski is mounted');
+  if (config.publicUrl) {
+    try {
+      publicUrl = new URL(config.publicUrl);
+    } catch {
+      // Reported below with the rest of the publicUrl rule.
+    }
+    if (!publicUrl || !/^https?:$/.test(publicUrl.protocol)) {
+      fail('CHASKI_PUBLIC_URL must be the absolute http(s) URL where the app mounts userRoutes()');
+    }
   }
 
-  const bindings = config.bindings ?? fail('bindings is required');
+  const bindings = config.bindings;
   for (const name of ['db', 'queue'] as const) {
-    if (!bindings[name]) fail(`bindings.${name} is missing`);
+    if (!bindings[name]) fail(`the ${bindingName(name)} binding is missing`);
   }
 
   const channels = config.channels ?? {};
   const resolved: ResolvedConfig['channels'] = {};
   if (channels.email) {
-    if (!bindings.email) fail('channels.email is configured but bindings.email is missing');
+    if (!bindings.email) {
+      fail(`channels.email is configured but the ${bindingName('email')} binding is missing`);
+    }
     if (!channels.email.from?.includes('@')) fail('channels.email.from must be an email address');
     resolved.email = channels.email;
   }
   if (channels.in_app) {
-    if (!bindings.feed) fail('channels.in_app is configured but bindings.feed is missing');
+    if (!bindings.feed) {
+      fail(`channels.in_app is configured but the ${bindingName('feed')} binding is missing`);
+    }
     resolved.in_app = {};
   }
   if (channels.push) {
@@ -306,56 +299,37 @@ export const validateConfig = (config: ChaskiConfig): ResolvedConfig => {
     };
   }
 
-  const maxRetries = config.maxRetries ?? 5;
-  if (!Number.isInteger(maxRetries) || maxRetries < 0) {
-    fail('maxRetries must be a non-negative integer');
-  }
-
-  if (config.environment !== undefined && typeof config.environment !== 'string') {
-    fail('environment must be a string');
-  }
-  const environment = config.environment?.trim() || null;
-  // A deploy that picks up 'local' by mistake would open its dashboard to anyone who finds it. Its
-  // publicUrl still names the real host, so the two together are refused instead.
-  if (environment === LOCAL_ENVIRONMENT && !isLoopback(publicUrl as URL)) {
-    fail(
-      `environment '${LOCAL_ENVIRONMENT}' opens the dashboard without authorize, so publicUrl ` +
-        `must point at localhost, not ${(publicUrl as URL).host}`,
-    );
-  }
-
-  const migrationsTable = config.migrationsTable ?? 'd1_migrations';
-  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(migrationsTable)) {
-    fail('migrationsTable must be a plain table name');
-  }
-
   return {
-    publicUrl: (publicUrl as URL).href.replace(/\/+$/, ''),
+    publicUrl: publicUrl ? publicUrl.href.replace(/\/+$/, '') : null,
     bindings,
     channels: resolved,
     enabledChannels: CHANNELS.filter((channel) => resolved[channel]),
     defaultMutedTypes: config.defaultMutedTypes ?? [],
-    environment,
-    maxRetries,
-    migrationsTable,
-    onError: config.onError,
+    environment: config.environment?.trim() || null,
   };
 };
 
-let configure: ((env: never) => ChaskiConfig) | undefined;
+export const configFromEnv = (env: ChaskiEnv): ChaskiConfig => ({
+  publicUrl: env.CHASKI_PUBLIC_URL,
+  environment: env.CHASKI_ENVIRONMENT,
+  bindings: {
+    db: env.CHASKI_DB,
+    queue: env.CHASKI_QUEUE,
+    email: env.CHASKI_EMAIL,
+    events: env.CHASKI_EVENTS,
+    scheduler: env.CHASKI_SCHEDULER,
+    feed: env.CHASKI_FEED,
+    attachments: env.CHASKI_ATTACHMENTS,
+  },
+});
 
-export const setConfigure = <E>(fn: (env: E) => ChaskiConfig): void => {
-  configure = fn as (env: never) => ChaskiConfig;
+let configure: (env: ChaskiEnv) => ChaskiConfig = configFromEnv;
+
+/** The test fixture turns channels on and swaps bindings through this. */
+export const setConfigure = (fn: (env: ChaskiEnv) => ChaskiConfig): void => {
+  configure = fn;
 };
 
-// Evaluated on every call: the host owns the config and its env, and nothing
-// here may outlive a vitest binding swap or a secret rotation.
-export const resolveConfig = (): ResolvedConfig => {
-  if (!configure) {
-    throw new ChaskiError(
-      'config',
-      "Chaski is not configured: call createChaski() in your Worker's main module",
-    );
-  }
-  return validateConfig(configure(env as never));
-};
+// Evaluated on every call, so nothing here outlives a vitest binding swap or a secret rotation.
+export const resolveConfig = (): ResolvedConfig =>
+  validateConfig(configure(env as unknown as ChaskiEnv));

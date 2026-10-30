@@ -35,7 +35,7 @@ const EXPIRY_MARGIN_MS = 5 * 60 * 1000;
 const tokenCache = new Map<string, { token: string; expiresAt: number }>();
 
 // A service account can hold several keys; a token minted with one must not
-// outlive the host's switch to another.
+// outlive a switch to another.
 const cacheKey = (creds: Pick<FcmCredentials, 'clientEmail' | 'privateKeyId'>) =>
   `${creds.clientEmail}:${creds.privateKeyId}`;
 
