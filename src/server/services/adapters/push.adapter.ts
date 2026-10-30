@@ -49,6 +49,9 @@ type PushOutcome = 'delivered' | 'expired' | { refused: string };
 // What Apple's 400 reasons for a token that will never work again say about the cause. A token
 // of another environment or another app reads the same as a broken one, so each names the
 // setting to check before the device registers again.
+// As the Channels page names them.
+const APNS_APP_NAMES = { ios: 'iOS app', macos: 'macOS app' } as const;
+
 const APNS_REFUSALS: Record<string, (device: ApnsPushDevice, app: ApnsApp) => string> = {
   BadDeviceToken: (device, app) =>
     `APNs refused the ${device.platform} device ${device.id} in ` +
@@ -56,8 +59,8 @@ const APNS_REFUSALS: Record<string, (device: ApnsPushDevice, app: ApnsApp) => st
     "only works in sandbox, so register it with environment: 'sandbox'",
   DeviceTokenNotForTopic: (device, app) =>
     `APNs refused the ${device.platform} device ${device.id} for ${app.bundleId} ` +
-    `(DeviceTokenNotForTopic): the token belongs to another app; check ` +
-    `channels.push.apns.${device.platform}.bundleId and the platform the app registers with`,
+    `(DeviceTokenNotForTopic): the token belongs to another app; check the bundle ID of the ` +
+    `${APNS_APP_NAMES[device.platform]} in the APNs settings, and the platform the app registers with`,
 };
 
 // What a failed FCM send means for the device and for the access token:

@@ -530,7 +530,8 @@ describe('APNs for macOS', () => {
     expect(warn).toHaveBeenCalledWith('[chaski:push]', 'device refused', {
       deliveryId: expect.any(String),
       refusal: expect.stringContaining(
-        'for com.host.desktop (DeviceTokenNotForTopic): the token belongs to another app',
+        'for com.host.desktop (DeviceTokenNotForTopic): the token belongs to another app; check ' +
+          'the bundle ID of the macOS app in the APNs settings',
       ),
     });
     expect(await devices()).toEqual([expect.objectContaining({ platform: 'ios' })]);

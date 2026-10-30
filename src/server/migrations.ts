@@ -38,7 +38,7 @@ export const ensureMigrations = async (db: D1Database, { fresh = false } = {}): 
     throw new ChaskiError(
       'config',
       `Chaski: the database is missing migrations ${missing.join(', ')}. Apply them with ` +
-        '`wrangler d1 migrations apply CHASKI_DB --remote`.',
+        '`wrangler d1 migrations apply CHASKI_DB --remote`, or `--local` under `wrangler dev`.',
     );
   }
   verified.add(db);
