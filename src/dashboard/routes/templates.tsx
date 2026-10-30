@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useNavigate } from '@tanstack/react-router';
+import { useNavigate } from '@tanstack/react-router';
 import { cn } from 'cn';
 import { FileText, MoreHorizontal, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { ConfirmDialog } from '~/components/app/confirm-dialog';
+import { TemplateDetailsDialog } from '~/components/app/template-details-dialog';
 import {
   DataBody,
   DataCell,
@@ -204,6 +205,7 @@ export const TemplatesPage = () => {
   const client = useQueryClient();
   const navigate = useNavigate();
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<TemplateSummary | null>(null);
   const [deleting, setDeleting] = useState<TemplateSummary | null>(null);
   const [purging, setPurging] = useState<DeletedTemplate | null>(null);
 
@@ -355,13 +357,8 @@ export const TemplatesPage = () => {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem asChild>
-                                <Link
-                                  to="/templates/$templateId"
-                                  params={{ templateId: template.id }}
-                                >
-                                  Edit template
-                                </Link>
+                              <DropdownMenuItem onClick={() => setEditing(template)}>
+                                Edit template
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 variant="destructive"
@@ -433,6 +430,16 @@ export const TemplatesPage = () => {
       </div>
 
       <NewTemplateDialog open={creating} onOpenChange={setCreating} />
+      {editing ? (
+        <TemplateDetailsDialog
+          templateId={editing.id}
+          type={editing.type}
+          description={editing.description}
+          topic={editing.topic}
+          open={editing !== null}
+          onOpenChange={(open) => !open && setEditing(null)}
+        />
+      ) : null}
 
       <ConfirmDialog
         open={deleting !== null}
