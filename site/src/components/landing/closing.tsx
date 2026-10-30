@@ -12,11 +12,11 @@ export const Closing = () => (
       id="closing-title"
       className="text-[44px] leading-[48px] font-semibold tracking-[-0.045em] text-balance sm:text-[72px] sm:leading-[76px]"
     >
-      Mount it this afternoon.
+      Deploy it this afternoon.
     </h2>
     <p className="lede max-w-[520px]">
       Free and open source under the MIT license. Install it and follow the guide, or hand it to
-      your agent. Either way, your first notification goes out from your own Worker.
+      your agent. Either way, your first notification goes out from a Worker of your own.
     </p>
     <div className="flex flex-wrap items-center justify-center gap-3 pt-5">
       <DocsButton />

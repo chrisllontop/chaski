@@ -5,9 +5,9 @@ import { CheckIcon, CopyIcon, TerminalIcon, TickIcon } from '../icons';
 
 const STEPS = [
   { text: 'Read the Chaski skill and its setup guide', meta: 'chaski.sh/skill' },
-  { text: 'Read the Worker and its session middleware', meta: 'src/index.ts' },
-  { text: 'Declared a database and a queue', meta: 'wrangler.jsonc' },
-  { text: 'Mounted the dashboard, for admins only', meta: '/admin/notifications' },
+  { text: 'Read the app’s Worker and its sign-in', meta: 'src/index.ts' },
+  { text: 'Created the Chaski Worker next to it', meta: 'chaski/' },
+  { text: 'Bound the app and mounted the user routes', meta: '/me/notifications' },
   { text: 'Created the tables locally', meta: '--local' },
   { text: 'Sent a welcome email locally', meta: 'delivered', metaClass: 'text-success' },
 ];
@@ -165,7 +165,7 @@ export const Agent = () => (
       <h2 id="agent-title" className="h2">
         Or let your agent
         <br />
-        mount it.
+        set it up.
       </h2>
       <p className="lede">
         One prompt, any coding agent. It follows the same guide you would, and asks before it

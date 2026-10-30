@@ -18,7 +18,7 @@ export const ProductShot = () => (
         src={dashboard}
         width={2400}
         height={1367}
-        alt="Chaski’s dashboard, mounted in a host app: notifications, sent, success rate and open rate for the last 30 days, deliveries per day, latency and health by type."
+        alt="Chaski’s dashboard: notifications, sent, success rate and open rate for the last 30 days, deliveries per day, latency and health by type."
         className="block h-auto w-full"
         decoding="async"
         fetchPriority="high"

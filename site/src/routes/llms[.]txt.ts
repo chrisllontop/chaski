@@ -13,7 +13,7 @@ const entry = (title: string, url: string, notes?: string) =>
 const llms = [
   '# Chaski',
   '',
-  '> Notification infrastructure for Cloudflare Workers, dashboard included. A Worker mounts Chaski on a route, and Chaski sends email, web push, iOS, macOS, Android and Windows push and in-app notifications from that Worker, on its own Cloudflare account, with templates, preferences, scheduling, retries and a dashboard. Open source under the MIT license, published on npm as `chaskijs`.',
+  '> Notification infrastructure for Cloudflare Workers, dashboard included. Chaski runs as a Worker of its own on your Cloudflare account, one per environment, and your app calls it over a service binding. It sends email, web push, iOS, macOS, Android and Windows push and in-app notifications, with templates, preferences, scheduling, retries and a dashboard. Open source under the MIT license, published on npm as `chaskijs`.',
   '',
   `To set Chaski up in a project, follow the agent skill at ${skillUrl}.`,
   ...NAV.flatMap((group) => [
@@ -30,7 +30,7 @@ const llms = [
   entry(
     'SKILL.md',
     skillUrl,
-    'Sets Chaski up in a Worker and its frontend, audits the notifications a codebase sends and plans moving them onto Chaski, and fixes a setup that fails.',
+    'Sets up a Chaski Worker next to an app and connects the app and its frontend, audits the notifications a codebase sends and plans moving them onto Chaski, and fixes a setup that fails.',
   ),
   '',
 ].join('\n');

@@ -107,11 +107,12 @@ export const Hero = () => (
         id="hero-title"
         className="hero-in text-[44px] leading-[46px] font-semibold tracking-[-0.045em] text-balance [animation-delay:80ms] sm:text-6xl sm:leading-[62px] lg:text-[74px] lg:leading-[76px]"
       >
-        Notifications that run inside your Worker.
+        Notifications that run in a Worker of your own.
       </h1>
       <p className="hero-in max-w-[600px] text-[17px] leading-7 text-pretty text-muted-foreground [animation-delay:160ms] sm:text-[19px] sm:leading-[30px]">
         Email, web push and in-app notifications with templates, scheduling, retries and a
-        dashboard. Mount Chaski on a route, and it runs on your own Cloudflare account.
+        dashboard. Deploy Chaski next to your app, on your own Cloudflare account, and send with one
+        call.
       </p>
       <div className="hero-in flex flex-wrap items-center gap-3 pt-2 [animation-delay:240ms]">
         <DocsButton />

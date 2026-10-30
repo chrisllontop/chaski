@@ -118,8 +118,8 @@ export const Browser = () => (
         The bell comes with it.
       </h2>
       <p className="lede">
-        Your frontend talks to the routes you mounted, as the signed-in user. The feed updates over
-        a WebSocket the moment a send lands.
+        Your frontend talks to the routes your app mounts, as the signed-in user. The feed updates
+        over a WebSocket the moment a send lands.
       </p>
       <dl className="mt-4 flex flex-col border-t border-border">
         {PACKAGES.map((entry) => (

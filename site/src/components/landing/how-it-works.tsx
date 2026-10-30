@@ -4,9 +4,9 @@ import { highlight } from './code';
 import { billingSample, indexSample, wranglerSample } from './samples';
 
 const FILES = [
-  { id: 'wrangler', name: 'wrangler.jsonc', code: wranglerSample },
-  { id: 'index', name: 'src/index.ts', code: indexSample },
-  { id: 'billing', name: 'src/billing.ts', code: billingSample },
+  { id: 'wrangler', name: 'chaski/wrangler.jsonc', code: wranglerSample },
+  { id: 'index', name: 'chaski/src/index.ts', code: indexSample },
+  { id: 'billing', name: 'app/src/billing.ts', code: billingSample },
 ];
 
 const STEPS = [
@@ -15,12 +15,12 @@ const STEPS = [
     text: 'A database and a queue to start. Add the rest as you need it.',
   },
   {
-    title: 'Mount the routes',
-    text: 'The dashboard behind the sign-in you choose, and the routes your frontend calls for the signed-in user.',
+    title: 'Deploy it',
+    text: 'One line re-exports the Worker. Its dashboard opens for your team only, and the channels are set up there.',
   },
   {
-    title: 'Send',
-    text: 'One call fans out to email, push and the in-app feed through your queue, with retries.',
+    title: 'Send from your app',
+    text: 'Bind your app to it, and one call fans out to email, push and the in-app feed, with retries.',
   },
 ];
 
@@ -69,11 +69,11 @@ export const HowItWorks = () => {
       <div className="flex flex-col gap-5">
         <p className="kicker">How it works</p>
         <h2 id="how-title" className="h2">
-          Mount it on a route. It ships with your Worker.
+          Deploy it next to your app.
         </h2>
         <p className="lede">
-          Chaski is a library you mount, not another service. Your Worker hands it the bindings and
-          sends from anywhere in your code.
+          Chaski is a Worker of its own, on your account. A project of three files deploys it, and
+          your app sends to it from anywhere in its code.
         </p>
         <ol className="flex flex-col pt-5">
           {STEPS.map((step, index) => {

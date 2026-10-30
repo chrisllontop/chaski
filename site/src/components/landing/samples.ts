@@ -1,17 +1,16 @@
-export const sendSample = `await chaski.send({
+export const sendSample = `await env.CHASKI.send({
   type: 'payment_received',
   recipient: { id: user.id, email: user.email },
   payload: { amount: '$15.00' },
 });`;
 
 export const wranglerSample = `{
-  "vars": {
-    "CHASKI_PUBLIC_URL": "https://app.example.com/admin/notifications"
-  },
+  "name": "chaski",
+  "main": "src/index.ts",
   "d1_databases": [
     {
       "binding": "CHASKI_DB",
-      "database_name": "my-app-chaski",
+      "database_name": "chaski",
       "database_id": "<printed by wrangler d1 create>",
       // Chaski's tables come from the package.
       "migrations_dir": "node_modules/chaskijs/migrations"
@@ -19,49 +18,34 @@ export const wranglerSample = `{
   ],
   "queues": {
     "producers": [
-      { "binding": "CHASKI_QUEUE", "queue": "my-app-deliveries" }
+      { "binding": "CHASKI_QUEUE", "queue": "chaski-deliveries" }
     ],
     "consumers": [
       {
-        "queue": "my-app-deliveries",
+        "queue": "chaski-deliveries",
         "max_retries": 5,
-        "dead_letter_queue": "my-app-deliveries-dlq"
+        "dead_letter_queue": "chaski-deliveries-dlq"
       }
     ]
   },
   "send_email": [{ "name": "CHASKI_EMAIL" }]
 }`;
 
-export const indexSample = `import { cloudflareAccess, createChaski } from 'chaskijs';
+export const indexSample = `// The whole Chaski Worker: the dashboard, the queue
+// consumer and the API your app calls.
+export {
+  ChaskiEntrypoint,
+  ChaskiEvents,
+  ChaskiFeed,
+  ChaskiScheduler,
+  default,
+} from 'chaskijs/worker';`;
 
-export const chaski = createChaski((env: Env) => ({
-  publicUrl: env.CHASKI_PUBLIC_URL,
-  bindings: {
-    db: env.CHASKI_DB,
-    queue: env.CHASKI_QUEUE,
-    email: env.CHASKI_EMAIL,
-  },
-  channels: { email: { from: 'notifications@example.com' } },
-}));
-
-// The dashboard, for your team.
-app.route('/admin/notifications', chaski.routes({
-  dashboard: { authorize: cloudflareAccess({ teamDomain, audience }) },
-}));
-// The feed and preferences, for your signed-in users.
-app.route('/me/notifications', chaski.userRoutes({ identify }));
-
-export default {
-  fetch: app.fetch,
-  queue: async (batch, env, ctx) => {
-    await chaski.queue(batch, env, ctx);
-  },
-};`;
-
-export const billingSample = `import { chaski } from './index';
-
-export const sendReceipt = async (user: User, payment: Payment) => {
-  await chaski.send({
+export const billingSample = `// Bound to Chaski in wrangler.jsonc:
+// { "binding": "CHASKI", "service": "chaski",
+//   "entrypoint": "ChaskiEntrypoint" }
+export const sendReceipt = async (env: Env, user: User, payment: Payment) => {
+  await env.CHASKI.send({
     type: 'payment_received',
     recipient: { id: user.id, email: user.email, name: user.name },
     payload: { amount: payment.amount },
