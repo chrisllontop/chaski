@@ -249,16 +249,14 @@ export const deploy = async (context: Context, flags: DeployFlags) => {
   context.print(url ? `Chaski is live at ${url}` : `Chaski is deployed as ${env.worker}.`);
   context.print();
   context.print('Two steps are yours, in the Cloudflare dashboard:');
-  context.print(
-    `  1. Turn on Cloudflare Access: open the ${env.worker} Worker, go to Settings › Domains & Routes`,
-  );
-  context.print(
-    '     and select Enable Cloudflare Access on its workers.dev URL. Use that switch rather than',
-  );
-  context.print(
-    "     the Worker's own Access tab, which refuses the WebSocket the dashboard's live updates use.",
-  );
-  context.print(
-    `  2. Open ${url ?? 'the dashboard'} and set up the channels on its Channels page.`,
-  );
+  context.print(`  1. Turn on Cloudflare Access. Open the Worker ${env.worker}, go to`);
+  context.print('     Settings › Domains & Routes and select Enable Cloudflare Access on');
+  context.print("     its workers.dev URL. Use that switch, not the Worker's own Access");
+  context.print("     tab: that one refuses the WebSocket of the dashboard's live updates.");
+  if (url) {
+    context.print("  2. Set up the channels on the dashboard's Channels page:");
+    context.print(`     ${url}`);
+  } else {
+    context.print("  2. Set up the channels on the dashboard's Channels page.");
+  }
 };

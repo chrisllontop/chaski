@@ -94,7 +94,7 @@ export const init = async (context: Context, flags: InitFlags) => {
     flags.email,
     () =>
       context.prompts.confirm(
-        'Send email? It needs the Workers Paid plan and a domain on Email Service.',
+        'Send email? It needs Workers Paid and a domain on Email Service.',
         true,
       ),
     true,
@@ -115,9 +115,7 @@ export const init = async (context: Context, flags: InitFlags) => {
       context,
       flags.publicUrl,
       () =>
-        context.prompts.text(
-          'The URL where your app mounts userRoutes(), for the email open pixel (optional)',
-        ),
+        context.prompts.text("Your app's userRoutes() URL, for the email open pixel (optional)"),
       '',
       (value) => {
         if (value) assertPublicUrl(value);
@@ -144,7 +142,8 @@ export const init = async (context: Context, flags: InitFlags) => {
   }
   const shown = relative(context.cwd, target) || '.';
   context.print();
-  context.print(`Created ${shown}/ with ${Object.keys(files).join(', ')}`);
+  context.print(`Created ${shown}/ with:`);
+  for (const path of Object.keys(files)) context.print(`  ${path}`);
 
   if (repo) {
     const git = await context.run('git', ['init', '--quiet'], { cwd: target, capture: true });
@@ -174,8 +173,8 @@ export const init = async (context: Context, flags: InitFlags) => {
   }
 
   const commands = [
-    [`${exec} wrangler dev`, 'Runs it here, the dashboard at http://localhost:8787'],
-    [`${exec} chaskijs deploy`, 'Creates its resources in your Cloudflare account and deploys it'],
+    [`${exec} wrangler dev`, 'Runs it, the dashboard at http://localhost:8787'],
+    [`${exec} chaskijs deploy`, 'Creates its resources and deploys it'],
   ];
   const width = Math.max(...commands.map(([command = '']) => command.length));
   context.print();

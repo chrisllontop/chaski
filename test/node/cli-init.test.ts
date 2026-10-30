@@ -30,9 +30,9 @@ describe('chaskijs init', () => {
       'Where should the Chaski project live?',
       'Directory',
       'Worker name',
-      'Send email? It needs the Workers Paid plan and a domain on Email Service.',
+      'Send email? It needs Workers Paid and a domain on Email Service.',
       'Email attachments? They need an R2 bucket.',
-      'The URL where your app mounts userRoutes(), for the email open pixel (optional)',
+      "Your app's userRoutes() URL, for the email open pixel (optional)",
     ]);
     const root = join(cwd, 'chaski');
     expect(JSON.parse(read(root, 'package.json'))).toEqual({
@@ -106,8 +106,8 @@ describe('chaskijs init', () => {
     expect(output.slice(-4)).toEqual([
       'Next:',
       '  cd chaski',
-      '  npx wrangler dev      Runs it here, the dashboard at http://localhost:8787',
-      '  npx chaskijs deploy   Creates its resources in your Cloudflare account and deploys it',
+      '  npx wrangler dev      Runs it, the dashboard at http://localhost:8787',
+      '  npx chaskijs deploy   Creates its resources and deploys it',
     ]);
   });
 
@@ -168,8 +168,8 @@ describe('chaskijs init', () => {
       '  cd notifications',
       '  pnpm install',
       '  pnpm wrangler d1 migrations apply CHASKI_DB --local',
-      '  pnpm wrangler dev      Runs it here, the dashboard at http://localhost:8787',
-      '  pnpm chaskijs deploy   Creates its resources in your Cloudflare account and deploys it',
+      '  pnpm wrangler dev      Runs it, the dashboard at http://localhost:8787',
+      '  pnpm chaskijs deploy   Creates its resources and deploys it',
     ]);
   });
 
