@@ -195,7 +195,7 @@ export class TemplateService extends BaseService {
     };
     return renderFields(content, data, {
       html: options.html,
-      format: localeFormat(content.locale, snapshot.timezone),
+      format: localeFormat(content.locale, notification.requestedLocale, snapshot.timezone),
     });
   };
 
@@ -663,7 +663,7 @@ export class TemplateService extends BaseService {
     const rendered = await renderFields(
       resolved,
       { ...sample, ...(resolved.locale ? { locale: resolved.locale } : {}) },
-      { html: channel === 'email', format: localeFormat(resolved.locale, timeZone) },
+      { html: channel === 'email', format: localeFormat(resolved.locale, requested, timeZone) },
     );
     return {
       subject: rendered.subject,

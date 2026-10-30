@@ -1,6 +1,7 @@
 import { filters, Liquid, LiquidError } from 'liquidjs';
 import { ChaskiError } from '../../contract/errors';
 import { LOCALE_FILTERS, type LocaleFormat } from '../../contract/liquid-filters';
+import { languageOf } from '../../contract/locales';
 
 // Lenient variable resolution mirrors SendGrid: a missing payload key renders
 // empty instead of failing the whole delivery.
@@ -22,11 +23,21 @@ const FORMAT = Symbol('chaski.format');
 /** With no languages saved there's no language to render in, and the filters format in English. */
 const DEFAULT_FORMAT: LocaleFormat = { locale: 'en' };
 
-/** How a delivery formats: in the language it renders in, in the contact's timezone. */
+/**
+ * How a delivery formats, in the contact's timezone: as the locale asked for when the content is
+ * in its language (es-PE writes money as Peru does, over content in es), else as the content's.
+ */
 export const localeFormat = (
-  locale: string | null,
+  rendered: string | null,
+  requested: string | null,
   timeZone: string | null | undefined,
-): LocaleFormat => ({ locale: locale ?? DEFAULT_FORMAT.locale, ...(timeZone ? { timeZone } : {}) });
+): LocaleFormat => {
+  const regional = rendered && requested && languageOf(requested) === languageOf(rendered);
+  return {
+    locale: (regional ? requested : rendered) ?? DEFAULT_FORMAT.locale,
+    ...(timeZone ? { timeZone } : {}),
+  };
+};
 
 // What liquidjs binds `this` to in a filter, as far as these filters read it.
 type FilterThis = { context: { globals: object } };

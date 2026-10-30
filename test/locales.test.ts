@@ -155,23 +155,30 @@ describe('the language a send goes out in', () => {
     expect(sent.map((email) => email.subject)).toEqual(['We received 1500', 'Recibimos 1500']);
   });
 
-  it('formats in the language rendered and the contact’s timezone, and exposes it as locale', async () => {
+  it('formats in the contact’s region when the content is in its language, else in the content’s', async () => {
     const { template } = await TemplateService.getByType('payment_received');
-    await TemplateService.upsertChannel(template.id, 'email', {
-      subject: "{{ amount | currency: 'USD' }} · {{ paidAt | format_date }} · {{ locale }}",
-    });
-    await TranslationService.save(template.id, 'email', 'es', {
-      subject: "{{ amount | currency: 'USD' }} · {{ paidAt | format_date }} · {{ locale }}",
-    });
+    const subject = "{{ amount | currency: 'USD' }} · {{ paidAt | format_date }} · {{ locale }}";
+    await TemplateService.upsertChannel(template.id, 'email', { subject });
+    await TranslationService.save(template.id, 'email', 'es', { subject });
     const payload = { amount: 1500, paidAt: '2026-10-30T03:30:00Z', locale: 'payload' };
 
     await send({ payload, recipient: { ...recipient(), timezone: 'America/Lima' } });
     await send({ payload, recipient: recipient('user_2'), locale: 'es-PE' });
+    await send({ payload, recipient: recipient('user_3'), locale: 'en-GB' });
+    await send({ payload, recipient: recipient('user_4'), locale: 'fr' });
 
-    expect(sent.map((email) => email.subject.replace(/ /g, ' '))).toEqual([
-      '$1,500.00 · October 29, 2026 · en',
-      '1500,00 US$ · 30 de octubre de 2026 · es',
+    // What each locale writes, from the runtime's own Intl, so the test reads which one was picked.
+    const as = (locale: string, timeZone = 'UTC') =>
+      `${new Intl.NumberFormat(locale, { style: 'currency', currency: 'USD' }).format(1500)} · ` +
+      `${new Intl.DateTimeFormat(locale, { dateStyle: 'long', timeZone }).format(new Date(payload.paidAt))}`;
+    expect(sent.map((email) => email.subject)).toEqual([
+      `${as('en', 'America/Lima')} · en`,
+      `${as('es-PE')} · es`,
+      `${as('en-GB')} · en`,
+      `${as('en')} · en`,
     ]);
+    expect(sent[1]?.subject).toContain('30 de octubre de 2026');
+    expect(sent[0]?.subject).toContain('October 29, 2026');
   });
 
   it('fails a delivery for good when a filter’s argument is wrong', async () => {
