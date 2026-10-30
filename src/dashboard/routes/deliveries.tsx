@@ -533,7 +533,7 @@ export const DeliveriesPage = () => {
               <DataHead>Channel</DataHead>
               <DataHead>Status</DataHead>
               <DataHead numeric>Attempts</DataHead>
-              <DataHead numeric>Updated</DataHead>
+              <DataHead className="text-start">Updated</DataHead>
               <DataHead className="w-10" />
             </DataRow>
           </DataHeader>
@@ -577,7 +577,7 @@ export const DeliveriesPage = () => {
                     </div>
                   </DataCell>
                   <DataCell numeric>{delivery.attempts}</DataCell>
-                  <DataCell numeric className="text-muted-foreground">
+                  <DataCell className="text-start text-muted-foreground">
                     <time dateTime={delivery.updatedAt} title={formatDateTime(delivery.updatedAt)}>
                       {formatRelative(delivery.updatedAt)}
                     </time>

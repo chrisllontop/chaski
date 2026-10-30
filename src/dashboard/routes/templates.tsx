@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useNavigate } from '@tanstack/react-router';
+import { useNavigate } from '@tanstack/react-router';
 import { cn } from 'cn';
 import { FileText, MoreHorizontal, Plus } from 'lucide-react';
 import { useState } from 'react';
@@ -17,6 +17,7 @@ import {
 import { CHANNEL_ICONS, HealthBadge } from '~/components/app/delivery-bits';
 import { ErrorAlert, PageHeader } from '~/components/app/page';
 import { SiteHeader } from '~/components/app/site-header';
+import { TemplateDetailsDialog } from '~/components/app/template-details-dialog';
 import { Button } from '~/components/ui/button';
 import {
   Dialog,
@@ -204,6 +205,7 @@ export const TemplatesPage = () => {
   const client = useQueryClient();
   const navigate = useNavigate();
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<TemplateSummary | null>(null);
   const [deleting, setDeleting] = useState<TemplateSummary | null>(null);
   const [purging, setPurging] = useState<DeletedTemplate | null>(null);
 
@@ -245,7 +247,7 @@ export const TemplatesPage = () => {
   return (
     <>
       <SiteHeader />
-      <div className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col gap-6 px-6 pt-6 pb-10">
+      <div className="mx-auto flex min-w-0 w-full max-w-[1400px] flex-1 flex-col gap-6 px-6 pt-6 pb-10">
         <PageHeader
           title="Templates"
           description="The content of every notification type"
@@ -292,8 +294,8 @@ export const TemplatesPage = () => {
                     <DataHead>Topic</DataHead>
                     <DataHead>Channels</DataHead>
                     <DataHead>Health · 30 days</DataHead>
-                    <DataHead numeric>Updated</DataHead>
-                    <DataHead numeric>Last used</DataHead>
+                    <DataHead>Updated</DataHead>
+                    <DataHead>Last used</DataHead>
                     <DataHead className="w-10" />
                   </DataRow>
                 </DataHeader>
@@ -316,10 +318,13 @@ export const TemplatesPage = () => {
                           })
                         }
                       >
-                        <DataCell>
+                        <DataCell className="min-w-0 max-w-md whitespace-normal">
                           <div className="font-medium font-mono text-xs">{template.type}</div>
                           {template.description ? (
-                            <div className="text-muted-foreground text-xs">
+                            <div
+                              className="line-clamp-2 break-words text-muted-foreground text-xs"
+                              title={template.description}
+                            >
                               {template.description}
                             </div>
                           ) : null}
@@ -333,10 +338,10 @@ export const TemplatesPage = () => {
                         <DataCell>
                           <TypeHealth health={health.get(template.type)} />
                         </DataCell>
-                        <DataCell numeric className="text-muted-foreground">
+                        <DataCell className="whitespace-nowrap text-muted-foreground tabular-nums">
                           <When at={template.contentUpdatedAt} />
                         </DataCell>
-                        <DataCell numeric className="text-muted-foreground">
+                        <DataCell className="whitespace-nowrap text-muted-foreground tabular-nums">
                           <When at={template.lastUsedAt} />
                         </DataCell>
                         <DataCell onClick={(event) => event.stopPropagation()}>
@@ -352,13 +357,8 @@ export const TemplatesPage = () => {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem asChild>
-                                <Link
-                                  to="/templates/$templateId"
-                                  params={{ templateId: template.id }}
-                                >
-                                  Edit template
-                                </Link>
+                              <DropdownMenuItem onClick={() => setEditing(template)}>
+                                Edit template
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 variant="destructive"
@@ -430,6 +430,16 @@ export const TemplatesPage = () => {
       </div>
 
       <NewTemplateDialog open={creating} onOpenChange={setCreating} />
+      {editing ? (
+        <TemplateDetailsDialog
+          templateId={editing.id}
+          type={editing.type}
+          description={editing.description}
+          topic={editing.topic}
+          open={editing !== null}
+          onOpenChange={(open) => !open && setEditing(null)}
+        />
+      ) : null}
 
       <ConfirmDialog
         open={deleting !== null}
