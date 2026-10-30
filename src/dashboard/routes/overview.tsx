@@ -39,6 +39,7 @@ import { Skeleton } from '~/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs';
 import { api } from '~/lib/api';
 import {
+  CHANNEL_LABELS,
   formatChange,
   formatDuration,
   formatNumber,
@@ -46,6 +47,7 @@ import {
   formatUtcDay,
   formatUtcRange,
 } from '~/lib/format';
+import { languageName, languagesOf, useLocales } from '~/lib/locales';
 import type {
   DayOutcome,
   Health,
@@ -580,25 +582,27 @@ const CountList = ({
   rows,
   empty,
   barClass,
+  footer,
 }: {
   title: string;
   description: string;
   rows: Array<{ key: string; count: number }>;
   empty: string;
   barClass: string;
+  footer?: ReactNode;
 }) => {
   const max = Math.max(1, ...rows.map((row) => row.count));
   return (
-    <Panel>
+    <Panel className="flex flex-col">
       <PanelHeader title={title} description={description} />
       {rows.length === 0 ? (
-        <p className="p-4 text-muted-foreground text-sm">{empty}</p>
+        <p className="flex-1 p-4 text-muted-foreground text-sm">{empty}</p>
       ) : (
-        <ul className="space-y-3 p-4">
+        <ul className="flex-1 space-y-3 p-4">
           {rows.map((row) => (
             <li key={row.key} className="space-y-1.5">
               <div className="flex items-center justify-between gap-3 text-[13px]">
-                <code className="truncate font-mono text-xs">{row.key}</code>
+                <code className="min-w-0 break-words font-mono text-xs">{row.key}</code>
                 <span className="font-medium tabular-nums">{formatNumber(row.count)}</span>
               </div>
               <div className="h-1 overflow-hidden rounded-full bg-muted">
@@ -611,9 +615,18 @@ const CountList = ({
           ))}
         </ul>
       )}
+      {footer ? <div className="border-t p-2">{footer}</div> : null}
     </Panel>
   );
 };
+
+const ViewLink = ({ to, children }: { to: '/schedules' | '/templates'; children: ReactNode }) => (
+  <Button variant="ghost" size="sm" className="w-full justify-between" asChild>
+    <Link to={to}>
+      {children} <ArrowRight />
+    </Link>
+  </Button>
+);
 
 const ScheduledPanel = ({ pending }: { pending: number }) => (
   <Panel className="flex flex-col">
@@ -625,11 +638,7 @@ const ScheduledPanel = ({ pending }: { pending: number }) => (
       <span className="text-muted-foreground text-sm">pending</span>
     </div>
     <div className="border-t p-2">
-      <Button variant="ghost" size="sm" className="w-full justify-between" asChild>
-        <Link to="/schedules">
-          View schedules <ArrowRight />
-        </Link>
-      </Button>
+      <ViewLink to="/schedules">View schedules</ViewLink>
     </div>
   </Panel>
 );
@@ -643,6 +652,7 @@ export const OverviewPage = () => {
   const types = usePeriodQuery<{ types: TypeOutcome[] }>('types', period);
   const latency = usePeriodQuery<Latency>('latency', period);
   const error = overview.error ?? timeseries.error ?? types.error ?? latency.error;
+  const languages = languagesOf(useLocales().data);
 
   return (
     <>
@@ -675,7 +685,12 @@ export const OverviewPage = () => {
               <HealthPanel types={types.data.types} />
             </div>
             <TypeTable types={types.data.types} />
-            <div className="grid @3xl/main:grid-cols-3 gap-4">
+            <div
+              className={cn(
+                'grid gap-4',
+                languages ? '@3xl/main:grid-cols-2 @5xl/main:grid-cols-4' : '@3xl/main:grid-cols-3',
+              )}
+            >
               <CountList
                 title="Top error codes"
                 description="Failed and dead deliveries"
@@ -694,6 +709,19 @@ export const OverviewPage = () => {
                 barClass="bg-muted-foreground/50"
               />
               <ScheduledPanel pending={overview.data.scheduledPending} />
+              {languages ? (
+                <CountList
+                  title="Language fallbacks"
+                  description="Sent in the default language"
+                  rows={overview.data.languageFallbacks.rows.slice(0, 5).map((r) => ({
+                    key: `${r.type} · ${CHANNEL_LABELS[r.channel].toLowerCase()} · ${r.requestedLocale}`,
+                    count: r.count,
+                  }))}
+                  empty={`Nothing fell back to ${languageName(languages.default)} in this period.`}
+                  barClass="bg-warning/70"
+                  footer={<ViewLink to="/templates">View templates</ViewLink>}
+                />
+              ) : null}
             </div>
           </>
         ) : error ? null : (
