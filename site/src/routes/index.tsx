@@ -10,6 +10,7 @@ import { HowItWorks } from '~/components/landing/how-it-works';
 import { ProductShot } from '~/components/landing/product-shot';
 import { SiteFooter } from '~/components/landing/site-footer';
 import { SiteHeader } from '~/components/landing/site-header';
+import { Usage } from '~/components/landing/usage';
 import { useEntrances } from '~/lib/motion';
 import { seo } from '~/lib/seo';
 
@@ -29,6 +30,7 @@ const Landing = () => {
         <Hero />
         <ProductShot />
         <HowItWorks />
+        <Usage />
         <Agent />
         <Features />
         <Browser />
@@ -43,7 +45,7 @@ const Landing = () => {
 export const Route = createFileRoute('/')({
   head: () =>
     seo({
-      title: 'Chaski · Notifications that run inside your Worker',
+      title: 'Chaski · Notifications that run in a Worker of your own',
       description:
         'Open-source notification infrastructure for Cloudflare Workers. Email, web push and in-app notifications with templates, scheduling, retries and a dashboard, on your own Cloudflare account.',
       path: '/',

@@ -9,20 +9,20 @@ out is a separate request from the user. Every Chaski call below is in [sending.
 Put every flow in one of two groups.
 
 **Moves** when it sends email, web push, iOS, macOS, Android or Windows push or in-app notifications
-from code that runs in the Worker that hosts Chaski, or in another Worker of the same account,
-which calls Chaski through `ChaskiEntrypoint` ([setup.md](setup.md) ends with it).
+from code that runs in a Cloudflare Worker of the account Chaski will run in, which calls it
+through its `CHASKI` binding ([setup.md](setup.md), step 5).
 
 **Stays** on its current provider, with the reason written next to it:
 
 - **SMS, WhatsApp, voice, Slack, Discord and other chat apps.** Chaski has no channel for them.
 - **Expo push tokens, and FCM tokens of iOS apps.** Chaski’s push covers web push, APNs, WNS,
   and FCM for Android only.
-- **Code that doesn’t run in a Cloudflare Worker**, with no Worker of the account to call. Chaski
-  has no HTTP API for outside callers.
+- **Code that doesn’t run in a Cloudflare Worker**, with no Worker of the account to call.
+  Chaski has no HTTP API for outside callers.
 - **Broadcasts to a list or an audience, and sequences built in a provider’s dashboard.** Chaski
   sends one notification to one contact per call; it has no audiences, campaigns or sequence
-  builder. A sequence can become `chaski.schedule()` calls in the host, which is new code the user
-  decides on.
+  builder. A sequence can become `env.CHASKI.schedule()` calls in the app, which is new code the
+  user decides on.
 - **Inbound email.**
 
 Some flows move but lean on something their provider does that Chaski doesn’t:
@@ -30,12 +30,12 @@ Some flows move but lean on something their provider does that Chaski doesn’t:
 - click tracking;
 - bounce and complaint handling, with a suppression list;
 - `List-Unsubscribe` headers and a hosted unsubscribe page;
-- a sender address of their own: Chaski sends every email from the one `from` in its config, and a
-  send can change only `fromName` and `replyTo`.
+- a sender address of their own: Chaski sends every email from the one sender address saved on
+  its **Channels** page, and a send can change only `fromName` and `replyTo`.
 
-Chaski records opens, through a pixel. Name what each flow loses, and let the user decide whether
-it moves, or how the host covers it (an unsubscribe link to a host route that calls
-`chaski.preferences.set()`, say).
+Chaski records opens, through a pixel the app’s `userRoutes()` mount serves. Name what each flow
+loses, and let the user decide whether it moves, or how the app covers it (an unsubscribe link to
+an app route that calls `env.CHASKI.preferences().set()`, say).
 
 **Done when** every flow from the inventory is in one group, and every flow that stays has its
 reason.
@@ -50,16 +50,16 @@ Write these down per flow:
   channels (an email and a push) become one type with two channels and one send.
 - **Template.** One per type, with an entry per channel the flow uses. Note where its content
   comes from, and convert it (below).
-- **The call.** `chaski.send()` for an immediate send. `chaski.schedule()` for a delayed one-off,
-  with a `groupKey` when a later event cancels several (`trial:<id>`). Once a schedule has gone
-  out, scheduling its key again changes nothing (`op: 'completed'`), so a flow that arms again
-  after firing needs a key per arming. A recurring send stays a Cron Trigger in the host whose
-  handler calls `chaski.send()` per contact.
+- **The call.** `env.CHASKI.send()` for an immediate send. `env.CHASKI.schedule()` for a delayed
+  one-off, with a `groupKey` when a later event cancels several (`trial:<id>`). Once a schedule
+  has gone out, scheduling its key again changes nothing (`op: 'completed'`), so a flow that arms
+  again after firing needs a key per arming. A recurring send stays a Cron Trigger in the app
+  whose handler calls `env.CHASKI.send()` per contact.
 - **Recipient.** `recipient.id` is required, and is the same user id `identify` returns in the
   user routes, so the feed, devices and preferences line up; `email` and `name` come from the
   user record. A flow that sends to an address with no user behind it (a password reset typed in,
   a list) looks the user up; when there’s none, the user decides whether it sends at all.
-- **Payload.** The template’s values, formatted in the host (money, dates), since Liquid prints
+- **Payload.** The template’s values, formatted in the app (money, dates), since Liquid prints
   them as given. Chaski stores the payload with the notification and shows it in the dashboard’s
   delivery detail, so a secret in it, such as a password reset token or a sign-in link, is
   readable there. Point that out, and let the user decide.
@@ -67,8 +67,8 @@ Write these down per flow:
 - **Idempotency key.** From the event, never the time: `payment_received:<payment id>`, a digest’s
   `weekly_digest:<user id>:<week>`, a reminder’s `trial_ending:<trial id>`. A “sent” column the
   flow keeps today becomes this key.
-- **Bindings** the flow needs beyond `db` and `queue`: `email`, `feed`, `scheduler`,
-  `attachments` for email attachments.
+- **Bindings** the flow needs in the Chaski Worker beyond `CHASKI_DB` and `CHASKI_QUEUE`:
+  `CHASKI_EMAIL`, `CHASKI_FEED`, `CHASKI_SCHEDULER`, `CHASKI_ATTACHMENTS` for email attachments.
 
 ### Converting templates to Liquid
 
@@ -83,7 +83,7 @@ value that holds HTML on purpose goes through `raw` instead.
   `{{ name }}`, and `{{{html}}}` becomes `{{ html | raw }}`.
   `{{#each items}}{{this.title}}{{/each}}` becomes
   `{% for item in items %}{{ item.title }}{% endfor %}`. Helpers become Liquid filters, or
-  values the host formats before sending.
+  values the app formats before sending.
 - **Conditions.** In Liquid only `nil` and `false` are false: `0`, `''` and an empty list are
   true. So `{{#if items.length}}` becomes `{% if items.size > 0 %}`, `{{#if name}}` becomes
   `{% if name != blank %}`, and a number is compared outright (`{% if count > 0 %}`).
@@ -115,41 +115,43 @@ Write every converted template into the template file ([sending.md](sending.md))
 ### State to bring over
 
 - **Preferences.** A global email opt-out becomes `channels: { email: false }`; a category opt-out
-  becomes a `mutedTypes` entry; a type people opt into becomes `defaultMutedTypes` in the config.
-  A contact who never saved gets those defaults, but a saved list takes their place: a backfilled
-  `mutedTypes` names every default-muted type the user hasn’t opted into, or it opts them in. A
-  one-off backfill calls `chaski.preferences.set(userId, …)` for each user whose choices differ
-  from the defaults.
-- **Web push subscriptions** the host stored, made with its own VAPID pair: configure Chaski with
-  that same pair, and register each one with
-  `chaski.push.register({ recipient: { id }, subscription: { endpoint, keys: { p256dh, auth } } })`.
+  becomes a `mutedTypes` entry; a type people opt into becomes a **Default muted types** entry on
+  the dashboard’s **Channels** page. A contact who never saved gets those defaults, but a saved
+  list takes their place: a backfilled `mutedTypes` names every default-muted type the user hasn’t
+  opted into, or it opts them in. A one-off backfill calls
+  `env.CHASKI.preferences().set(userId, …)` for each user whose choices differ from the defaults.
+- **Web push subscriptions** the app stored, made with its own VAPID pair: paste that same pair
+  into the web push settings on **Channels**, and register each subscription with
+  `env.CHASKI.push().register({ recipient: { id }, subscription: { endpoint, keys: { p256dh, auth } } })`.
   Browsers keep their subscription, and `client.push.enable()` reuses it. Subscriptions made with
   another pair, or FCM web tokens, can’t come over: `client.push.state()` reports those browsers
   as not subscribed, so Chaski’s toggle offers push again, and where permission is already
-  `granted`, `enable()` replaces the subscription without asking. Chaski’s pushes carry `{ title, body, href, tag }`; while the old
-  path still sends pushes of another shape, the service worker has to show both.
-- **APNs device tokens**: `chaski.push.register({ recipient: { id }, platform: 'ios', deviceToken })`,
-  or `platform: 'macos'` for a Mac app, with the same bundle id and environment in
-  `channels.push.apns.ios` or `.macos`. Tokens of development builds add `environment: 'sandbox'`.
+  `granted`, `enable()` replaces the subscription without asking. Chaski’s pushes carry
+  `{ title, body, href, tag }`; while the old path still sends pushes of another shape, the service
+  worker has to show both.
+- **APNs device tokens**:
+  `env.CHASKI.push().register({ recipient: { id }, platform: 'ios', deviceToken })`, or
+  `platform: 'macos'` for a Mac app, with the same bundle id and environment in the APNs settings’
+  iOS or macOS app. Tokens of development builds add `environment: 'sandbox'`.
 - **Windows channel URIs** from the Windows App SDK:
-  `chaski.push.register({ recipient: { id }, platform: 'windows', deviceToken: channelUri })`, with
-  the same Entra app in `channels.push.wns`. Channels made through Partner Center credentials (a
+  `env.CHASKI.push().register({ recipient: { id }, platform: 'windows', deviceToken: channelUri })`,
+  with the same Entra app in the WNS settings. Channels made through Partner Center credentials (a
   package SID) stay on their current sender.
 - **Android FCM tokens**:
-  `chaski.push.register({ recipient: { id }, platform: 'android', deviceToken })`, with a service
-  account of the same Firebase project in `channels.push.fcm`.
+  `env.CHASKI.push().register({ recipient: { id }, platform: 'android', deviceToken })`, with a
+  service account of the same Firebase project in the FCM settings.
 - **In-app history.** Chaski’s feed starts empty and has no import; earlier items stay in the
-  host’s table. Agree with the user whether the UI shows both for a while or lets the old ones go.
+  app’s table. Agree with the user whether the UI shows both for a while or lets the old ones go.
 - **Notification services** (Knock, Novu, Courier, OneSignal, MagicBell): each workflow becomes a
-  type, its channel steps the template’s channels, its delay steps `chaski.schedule()`, its digest
-  or batch steps a host Cron Trigger, its inbox the in-app feed, and its subscriber preferences a
-  backfill from an export.
+  type, its channel steps the template’s channels, its delay steps `env.CHASKI.schedule()`, its
+  digest or batch steps an app Cron Trigger, its inbox the in-app feed, and its subscriber
+  preferences a backfill from an export.
 
-Backfills are scripts or temporary routes that the user runs. Make them safe to run twice:
-registering a known endpoint or device token again hands it to that contact, and
-`preferences.set()` with the full list gives the same result every time. From the backfill on,
-every host route that changes preferences or registers a device writes to Chaski too, so nothing
-changed in between is lost. The host’s own preference columns keep being written as well, for as
+Backfills are scripts or temporary routes of the app that the user runs. Make them safe to run
+twice: registering a known endpoint or device token again hands it to that contact, and
+`preferences().set()` with the full list gives the same result every time. From the backfill on,
+every app route that changes preferences or registers a device writes to Chaski too, so nothing
+changed in between is lost. The app’s own preference columns keep being written as well, for as
 long as an old path reads them. A recurring send that picks its recipients by such a column (an
 opt-in flag) reads it until the column goes; afterwards it sends to everyone it could reach and
 lets preferences skip the rest, each skipped send recorded as `suppressed`.
@@ -171,20 +173,20 @@ Write the stages into the plan in this order:
    them, devices before any push type, with the double writes above from the same deploy.
 3. **The frontend** ([browser-clients.md](browser-clients.md)), before the in-app and web push
    types: the feed and the push toggle. The preferences screen switches to Chaski’s preferences
-   once no old path reads the host’s columns; until then it writes both.
+   once no old path reads the app’s columns; until then it writes both.
 4. **One type at a time**, from the least risky (internal, low volume) to the most (password
    resets and receipts last):
-   1. Add the Chaski send next to the old one, behind a switch the host owns, such as a
+   1. Add the Chaski send next to the old one, behind a switch the app owns, such as a
       `CHASKI_TYPES` var listing the types Chaski sends. A listed type goes through Chaski and
-      skips the old path; an unlisted one takes the old path. Never both: that sends twice.
+      skips the old path; an unlisted one takes the old path, so each send goes out exactly once.
    2. Locally, trigger the flow twice: unlisted, to see what the old path sends, and listed, to
       see Chaski’s delivery in the dashboard (content, recipient, skipped channels) and its email
-      under `.wrangler/tmp/email/`.
-      Compare the two. With its provider key set, the old path sends for real even locally: point
-      it at a test address, or log what it would send.
+      under the Chaski project’s `.wrangler/tmp/email/`. Compare the two. With its provider key
+      set, the old path sends for real even locally: point it at a test address, or log what it
+      would send.
    3. Load its template into production (the template file’s `--remote` load in
-      [sending.md](sending.md), with the user’s go-ahead). Deploy with the type unlisted, so
-      nothing changes, then list it in production and watch **Deliveries** and the type’s
+      [sending.md](sending.md), with the user’s go-ahead). Deploy the app with the type unlisted,
+      so nothing changes, then list it in production and watch **Deliveries** and the type’s
       health on the **Overview**. If it misbehaves, pause its channel in **Channels**: its
       deliveries wait as held while the type is unlisted, then send or discard them.
    4. Keep the old path and the provider’s credentials until the type has run clean for as long

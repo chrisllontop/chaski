@@ -5,10 +5,10 @@ description: Send a notification later, at a time with its offset. A Workflow ho
 
 ## Schedule a send
 
-`chaski.schedule()` takes everything `chaski.send()` does, plus the time to send at:
+`schedule()` takes everything `send()` does, plus the time to send at:
 
 ```ts
-const { scheduledId, op } = await chaski.schedule({
+const { scheduledId, op } = await env.CHASKI.schedule({
   type: 'invoice_due',
   recipient: { id: user.id, email: user.email },
   payload: { invoice: 'INV-1042' },
@@ -22,13 +22,13 @@ const { scheduledId, op } = await chaski.schedule({
 name a different instant in every timezone, so Chaski rejects it rather than guess. A time in the
 past is rejected too, with five minutes of grace for clock skew.
 
-When the time comes, the send runs as if you had called `chaski.send()` then: the contact’s
+When the time comes, the send runs as if you had called `send()` then: the contact’s
 preferences and the template are read at that moment, with the recipient and payload you
 scheduled.
 
 <Callout title="Scheduling needs the ChaskiScheduler Workflow.">
-  Bind it as `scheduler` and export `ChaskiScheduler` from your main module, as
-  [Install](/docs/install) shows.
+  Bind it as `CHASKI_SCHEDULER` in the Chaski Worker, as [Install](/docs/install) shows;
+  without it, `schedule()` throws a `config` error that names the binding.
 </Callout>
 
 ## Move a schedule
@@ -49,10 +49,10 @@ Derive the key from what the notification is about, never from the time, so a ne
 Cancel by the schedule’s id, its `idempotencyKey`, or a `groupKey` you gave several schedules:
 
 ```ts
-await chaski.schedules.cancel({ idempotencyKey: 'invoice-due:INV-1042' });
+await env.CHASKI.schedules().cancel({ idempotencyKey: 'invoice-due:INV-1042' });
 
 // Every pending reminder for one trial, scheduled with groupKey: `trial:${trial.id}`.
-await chaski.schedules.cancel({ groupKey: `trial:${trial.id}` });
+await env.CHASKI.schedules().cancel({ groupKey: `trial:${trial.id}` });
 ```
 
 The result says how many pending schedules it cancelled.
@@ -60,7 +60,7 @@ The result says how many pending schedules it cancelled.
 ## List what’s pending
 
 ```ts
-const pending = await chaski.schedules.list({ recipientId: user.id });
+const pending = await env.CHASKI.schedules().list({ recipientId: user.id });
 ```
 
 `list()` returns pending schedules, soonest first, for one recipient or for everyone. The

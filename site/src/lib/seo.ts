@@ -25,7 +25,10 @@ export const seo = ({
       { property: 'og:image', content: OG_IMAGE },
       { property: 'og:image:width', content: '1200' },
       { property: 'og:image:height', content: '630' },
-      { property: 'og:image:alt', content: 'Chaski: notifications that run inside your Worker.' },
+      {
+        property: 'og:image:alt',
+        content: 'Chaski: notifications that run in a Worker of your own.',
+      },
       { name: 'twitter:card', content: 'summary_large_image' },
     ],
     links: [{ rel: 'canonical', href: url }],

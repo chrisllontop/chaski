@@ -3,8 +3,8 @@ title: Browser clients
 description: chaskijs/client, chaskijs/sw and chaskijs/react give your frontend the signed-in user’s feed, push and preferences.
 ---
 
-Your frontend talks to the routes you mounted with `chaski.userRoutes()`, as the signed-in user.
-Three entries of the package cover the browser:
+Your frontend talks to the routes your app mounts with `userRoutes()`, as the signed-in user, and
+your app forwards each request to Chaski. Three entries of the package cover the browser:
 
 | Entry | What it gives you |
 | --- | --- |
@@ -22,15 +22,18 @@ only, never from what the browser sends, so a page can only ever see its own use
 ```ts title="src/index.ts"
 app.route(
   '/me/notifications',
-  chaski.userRoutes({
+  userRoutes({
+    chaski: (c) => c.env.CHASKI,
     // The signed-in user's id; null answers 401, and a Response is returned as is.
     identify: (c) => currentUserId(c),
   }),
 );
 ```
 
+[Connect your app](/docs/connect) sets up the `CHASKI` binding.
+
 If your frontend is served from another origin, it needs two things from these routes. List the
-origin in `allowedOrigins`, so Chaski accepts its writes and live connections; it refuses them from
+origin in `allowedOrigins`, so the routes accept its writes and live connections; it refuses them from
 origins it doesn’t know. Then answer CORS for it with `hono/cors`, so the browser lets the page read
 the responses and send JSON writes:
 
@@ -42,7 +45,11 @@ const frontend = ['https://www.example.com'];
 app.use('/me/notifications/*', cors({ origin: frontend, credentials: true }));
 app.route(
   '/me/notifications',
-  chaski.userRoutes({ identify: (c) => currentUserId(c), allowedOrigins: frontend }),
+  userRoutes({
+    chaski: (c) => c.env.CHASKI,
+    identify: (c) => currentUserId(c),
+    allowedOrigins: frontend,
+  }),
 );
 ```
 
@@ -85,7 +92,7 @@ const client = createChaskiClient({
 });
 ```
 
-A request Chaski refuses throws a `ChaskiRequestError`, with the HTTP `status` and an
+A request the routes refuse throws a `ChaskiRequestError`, with the HTTP `status` and an
 [error code](/docs/errors).
 
 ## Web push
@@ -94,8 +101,8 @@ A request Chaski refuses throws a `ChaskiRequestError`, with the HTTP `status` a
 signed-in user; `disable()` undoes it, and `state()` tells you where it stands. A subscription
 made with another VAPID key, such as one an earlier push provider left, reads as not subscribed,
 since it can’t receive your pushes: `enable()` replaces it, without a prompt when permission is
-already granted. When your server refuses the browser (see `allowPush` in
-[Configuration](/docs/configuration)), `enable()` throws and drops the subscription it made.
+already granted. When your app refuses the browser (see `allowPush` in
+[Configuration](/docs/configuration#userroutes)), `enable()` throws and drops the subscription it made.
 
 ```ts
 if (client.push.isSupported()) {
@@ -134,7 +141,7 @@ await client.push.registerDevice({ platform: 'macos', deviceToken });
 
 macOS only hands a token to an app signed with the push entitlement
 (`com.apple.developer.aps-environment`) and a provisioning profile that grants it, and
-`channels.push.apns.macos` names the app’s bundle id. A development build’s token only works in
+the macOS app in the APNs settings names its bundle id. A development build’s token only works in
 APNs’s sandbox, so that build registers with `environment: 'sandbox'`. macOS shows the alert once
 the user allows the app’s notifications, which Electron asks for the first time the app uses
 `Notification`. While the app runs, each push also reaches the main process as the
@@ -146,7 +153,7 @@ in the `ready` event’s `launchInfo`. Don’t count on a push’s link opening 
 ## Windows apps
 
 A Windows app, Electron or not, gets its push through WNS. The Windows App SDK’s
-`PushNotificationManager` creates the channel for the Microsoft Entra app in `channels.push.wns`;
+`PushNotificationManager` creates the channel for the Microsoft Entra app in the WNS settings;
 Electron has no API for it, so an Electron app reaches it through a native module of its own. The
 client registers the channel’s URI, on every launch, since WNS channels expire after 30 days:
 
@@ -178,7 +185,7 @@ reconnects, with the signal above.
 ## Electron’s main process
 
 The client runs in Electron’s main process, on Node’s `fetch` and `WebSocket`, for an app whose
-renderer has no network. A `baseUrl` with the host’s full URL gives the socket a `ws:` or `wss:`
+renderer has no network. A `baseUrl` with your app’s full URL gives the socket a `ws:` or `wss:`
 URL. Node sends no cookies, so the app adds its credentials to every request and to the socket,
 and an `Origin` of its own scheme when `allowedOrigins` lists it:
 

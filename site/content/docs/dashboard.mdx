@@ -1,55 +1,29 @@
 ---
 title: Dashboard and sign-in
-description: The dashboard ships inside the package and mounts on a route of your app, behind the sign-in you choose.
+description: The Chaski Worker serves its dashboard at its own URL, behind Cloudflare Access.
 ---
 
-## Mount the dashboard
+## Where it lives
 
-`chaski.routes()` mounts the dashboard, its API and the email open-tracking pixel on any path of
-your app. The dashboard ships built inside the package, so there is nothing to upload or host:
+The dashboard and its API are the Chaski Worker’s own URL, such as
+`https://chaski.<your-subdomain>.workers.dev`. It ships built inside the package, so there is
+nothing to upload or host: deploying the Worker deploys it.
 
-```ts title="src/index.ts"
-app.route(
-  '/admin/notifications',
-  chaski.routes({
-    dashboard: { authorize: cloudflareAccess({ teamDomain, audience }) },
-  }),
-);
-```
+## Who signs in
 
-Set `publicUrl` in the config to the absolute URL of that mount, such as
-`https://app.example.com/admin/notifications`.
+Cloudflare Access decides who gets in. Access signs people in before their request reaches the
+Worker, and hands Chaski who they are; Chaski opens the dashboard only to a request that carries
+that identity, and answers **Chaski needs Cloudflare Access** to any other. There’s no password or
+sign-in of Chaski’s own to configure. [Install](/docs/install#turn-on-cloudflare-access) turns
+Access on.
 
-## Choose who signs in
+Everyone Access lets in can do everything: edit templates, replay deliveries, change channel
+settings and pause channels. Choose who that is in the Access application’s policy, such as your
+team’s email domain or a group of your identity provider. Each change is recorded under the email
+Access signed in.
 
-`authorize` runs before every page and API call of the dashboard. It returns who is signed in, as
-`{ id, name? }`, `null` to answer 403, or a `Response` such as a redirect to your login page:
-
-```ts
-type Authorize = (c: Context) => Actor | null | Response | Promise<Actor | null | Response>;
-type Actor = { id: string; name?: string };
-```
-
-Admin actions, such as a replay or a template change, are recorded under the `id` it returns.
-Chaski ships two:
-
-- `cloudflareAccess({ teamDomain, audience })` checks the token of a
-  [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/applications/) application
-  that protects the mount path: its signature against your team’s keys, the application’s AUD tag,
-  the issuer and the expiry. The signed-in email becomes the actor.
-- `basicAuth({ username, password })` asks the browser for one username and password, compared in
-  constant time; read them from secrets.
-
-Your own sign-in works the same way: return the user it finds, or `null`. Under `wrangler dev`,
-`environment: 'local'` in the config opens the dashboard without `authorize`; see
-[Local development](/docs/local-development#open-the-local-dashboard).
-
-```ts
-authorize: async (c) => {
-  const user = await currentStaffUser(c);
-  return user ? { id: user.email, name: user.name } : null;
-},
-```
+Under `wrangler dev`, Wrangler signs in the identity under `access.dev` in `wrangler.jsonc`, as
+Access would; see [Local development](/docs/local-development#run-chaski).
 
 ## What it shows
 
@@ -60,7 +34,7 @@ authorize: async (c) => {
 - **Schedules**: pending scheduled sends, which you can cancel. One still pending a minute after
   its time shows as overdue.
 - **Templates**: the editor, with a live preview and a test send for email.
-- **Channels**: what Chaski picked up from your config, and a pause for each channel.
+- **Channels**: each channel’s settings, and a pause for each channel that runs.
 
 ## Pause a channel
 
@@ -76,23 +50,12 @@ a channel and type. A delivery sends only once its channel runs again, and a dis
 skipped and never goes out. An [inline send](/docs/sending#inline) on a paused channel throws
 `channel_paused`, and its email waits as held like the rest.
 
-Pausing stops password resets along with everything else, so it takes a permission of its own.
-Give `routes()` a `canPauseChannels` check; without it nobody can pause, or send or discard what a
-pause holds, except in the `local` environment, where pausing only holds this machine’s email:
-
-```ts
-const dashboard = chaski.routes({
-  dashboard: {
-    authorize: cloudflareAccess({ teamDomain, audience }),
-    canPauseChannels: (c, actor) => OPS_TEAM.includes(actor.id),
-  },
-});
-```
-
-`chaski.ready()` lists the paused channels under `paused`, for a health check that should notice.
+Pausing holds deliveries; removing a channel’s settings turns the channel off, and its sends skip
+it without holding anything. `ready()` lists the paused channels under `paused`, for a health
+check that should notice.
 
 ## Live updates
 
-With the `ChaskiEvents` Durable Object bound as `events`, open dashboards refresh as deliveries
-change, and the header says **Live**. Without it, the dashboard still works, and refreshes when you
-come back to its tab or reload it.
+With the `ChaskiEvents` Durable Object bound as `CHASKI_EVENTS`, open dashboards refresh as
+deliveries change, and the header says **Live**. Without it, the dashboard still works, and
+refreshes when you come back to its tab or reload it.

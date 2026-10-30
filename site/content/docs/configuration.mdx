@@ -1,122 +1,97 @@
 ---
 title: Configuration
-description: Every option createChaski() accepts, and the options of the routes it mounts.
+description: The bindings, vars and secret of the Chaski Worker, the settings its dashboard keeps, and the options of userRoutes().
 ---
 
-## createChaski()
+A Chaski Worker takes its resources and the facts of its environment from `wrangler.jsonc`, and
+its channel settings from its own dashboard. It checks them on every call, and a mistake throws a
+`config` error that names what to fix, such as
+`Chaski config: the CHASKI_QUEUE binding is missing`.
 
-Call it once, in your Worker’s main module. It takes a function of the Worker’s `env` that returns
-the config, and Chaski runs that function on every call: secrets and vars always come from the env
-of the moment.
+## Bindings
 
-```ts
-import { createChaski } from 'chaskijs';
+The names are fixed: Chaski reads each binding by its name.
 
-export const chaski = createChaski((env: Env) => ({
-  publicUrl: env.CHASKI_PUBLIC_URL,
-  bindings: { db: env.CHASKI_DB, queue: env.CHASKI_QUEUE },
-}));
-```
-
-Chaski checks the config on every call, and a mistake throws a `config` error that starts with
-`Chaski config:` and names the option, such as
-`Chaski config: channels.email is configured but bindings.email is missing`.
-
-## ChaskiConfig
-
-| Option | Type | |
+| Binding | Type | |
 | --- | --- | --- |
-| `publicUrl` | `string` | Required. The absolute http(s) URL where you mount `chaski.routes()`. |
-| `bindings` | `ChaskiBindings` | Required. The resources Chaski runs on; see below. |
-| `channels` | `object` | The channels to turn on. A channel is on when it has an entry. |
-| `defaultMutedTypes` | `string[]` | Types every contact has muted until they save preferences of their own. |
-| `environment` | `string` | Where the Worker runs, such as `production`, shown in the dashboard and returned by `ready()`. `local` opens the dashboard without `authorize` and needs a `publicUrl` on localhost; see [Local development](/docs/local-development#open-the-local-dashboard). Unrelated to `channels.push.apns.environment`, which picks the APNs server. |
-| `maxRetries` | `number` | Must match `max_retries` on your queue consumer. Defaults to `5`. |
-| `migrationsTable` | `string` | Must match `migrations_table` on your D1 binding. Defaults to `d1_migrations`. |
-| `onError` | `(error, context) => void` | Receives every unexpected error Chaski handles on its own. |
+| `CHASKI_DB` | D1 database | Required. Where Chaski keeps its data, with `migrations_dir` pointing at `node_modules/chaskijs/migrations`. |
+| `CHASKI_QUEUE` | Queue producer and consumer | Required. Every delivery goes through it. Set the consumer’s `max_retries` to `5`. |
+| `CHASKI_EMAIL` | `send_email` | Required by the email channel. |
+| `CHASKI_FEED` | `ChaskiFeed` Durable Object | Required by the in-app channel. |
+| `CHASKI_SCHEDULER` | `ChaskiScheduler` Workflow | Required by `schedule()`. |
+| `CHASKI_EVENTS` | `ChaskiEvents` Durable Object | Live updates in the dashboard. |
+| `CHASKI_ATTACHMENTS` | R2 bucket | Required by sends that carry email attachments. |
 
-## bindings
+## Vars and the secret
 
-| Key | Binding | |
+| Name | | |
 | --- | --- | --- |
-| `db` | D1 database | Required. Where Chaski keeps its data. |
-| `queue` | Queue producer | Required. Every delivery goes through it. |
-| `email` | `send_email` | Required by `channels.email`. |
-| `feed` | `ChaskiFeed` Durable Object | Required by `channels.in_app`. |
-| `scheduler` | `ChaskiScheduler` Workflow | Required by `chaski.schedule()`. |
-| `events` | `ChaskiEvents` Durable Object | Live updates in the dashboard. |
-| `attachments` | R2 bucket | Required by sends that carry email attachments. |
+| `CHASKI_ENVIRONMENT` | Var | Where the Worker runs, such as `production`, shown in the dashboard’s header and returned by `ready()`. Unrelated to an APNs app’s environment, which picks the APNs server. |
+| `CHASKI_PUBLIC_URL` | Var | The absolute http(s) URL where your app mounts `userRoutes()`. Emails load their open-tracking pixel from it; without it, they carry none. |
+| `CHASKI_SECRET` | Secret | Encrypts the channel credentials saved in the dashboard. Set it with `wrangler secret put CHASKI_SECRET`, at least 32 characters. |
 
-## channels
+`access.dev` in `wrangler.jsonc` is the identity `wrangler dev` signs in to the local dashboard; see
+[Local development](/docs/local-development#run-chaski).
 
-### email
+## Channel settings
 
-| Option | |
+The **Channels** page of the dashboard keeps each channel’s settings in Chaski’s database. A
+channel is on once its settings are saved, and off again when you remove them. The fields that
+hold credentials are encrypted with `CHASKI_SECRET`, and the dashboard never shows them again: it
+says they’re saved, and lets you replace them.
+
+### Email
+
+| Field | |
 | --- | --- |
-| `from` | Required. The sender address; the `send_email` binding must allow it. |
-| `fromName` | The sender’s display name. |
-| `replyTo` | The address replies go to. |
+| Sender address | Required. An address on a domain onboarded to Email Service, which `CHASKI_EMAIL` allows. |
+| Sender name | The sender’s display name. |
+| Reply-to address | The address replies go to. |
 
-### in_app
+### In-app
 
-No options yet: `in_app: {}` turns the channel on.
+No fields: turning it on is the setting. It needs `CHASKI_FEED`.
 
-### push
+### Push
 
-Configure `vapid` for web push, `apns` for iOS and macOS, `fcm` for Android, `wns` for Windows, or
-several of them.
+Set up any of the four. Push is on once one of them is.
 
-| `vapid` | |
+| Web push | |
 | --- | --- |
-| `subject` | A `mailto:` or `https:` contact the push services can reach you at. |
-| `publicKey` | The base64url uncompressed P-256 public key (65 bytes), as web-push tools print it. |
-| `privateKey` | The base64url P-256 private key (32 bytes), or the whole private JWK as JSON. |
+| Subject | A `mailto:` or `https:` contact the push services can reach you at. |
+| Key pair | Generated by Chaski, or one you already use: the base64url uncompressed P-256 public key (65 bytes) and its private key, as web-push tools print them. |
 
-| `apns` | |
+| APNs | |
 | --- | --- |
-| `teamId` | Your Apple team id. |
-| `keyId` | The APNs key’s id. |
-| `privateKey` | The contents of the `.p8` file. |
-| `ios` | The iOS app: `{ bundleId, environment }`. |
-| `macos` | The macOS app: `{ bundleId, environment }`. |
+| Team id | Your Apple team id. |
+| Key id | The APNs key’s id. |
+| Key | The contents of the `.p8` file. |
+| iOS app, macOS app | Each app’s bundle id and environment, `sandbox` or `production`. Set up one or both. |
 
-Each app needs its `bundleId` and `environment`, `'sandbox'` or `'production'`; configure `ios`,
-`macos` or both. A device that registers with an `environment` of its own overrides its app’s.
+A device that registers with an `environment` of its own overrides its app’s.
 
-| `fcm` | |
+| FCM | |
 | --- | --- |
-| `serviceAccount` | The contents of the service account’s JSON key file, from the Firebase console. |
+| Service account | The contents of the service account’s JSON key file, from the Firebase console. |
 
-| `wns` | |
+| WNS | |
 | --- | --- |
-| `tenantId` | The directory (tenant) id of the Microsoft Entra app registration. |
-| `clientId` | Its application (client) id. |
-| `clientSecret` | One of its client secrets. |
+| Tenant id | The directory (tenant) id of the Microsoft Entra app registration. |
+| Client id | Its application (client) id. |
+| Client secret | One of its client secrets. |
 
-## onError
+### Default muted types
 
-`onError` receives the errors Chaski handles itself, such as a failed delivery in the queue or a
-request that answered 500, with where it happened:
-
-```ts
-onError: (error, context) => {
-  // context.source: 'http' | 'queue' | 'workflow' | 'tracking' | 'feed' | 'events'
-  // and, when they apply: deliveryId, notificationId, scheduledId, channel
-  console.error('chaski', context, error);
-},
-```
-
-## routes()
-
-| Option | |
-| --- | --- |
-| `dashboard.authorize` | Required. Decides who gets into the dashboard; see [Dashboard and sign-in](/docs/dashboard). |
-| `dashboard.canPauseChannels` | `(c, actor) => boolean`. Who may pause a channel and send or discard what it holds; without it, nobody can, except in the `local` environment. See [Pause a channel](/docs/dashboard#pause-a-channel). |
+Types every contact has muted until they save preferences of their own, such as a weekly digest
+people opt into; see [Preferences](/docs/preferences#mute-types-for-everyone).
 
 ## userRoutes()
 
+The options of the routes your app mounts for its frontend:
+
 | Option | |
 | --- | --- |
+| `chaski` | Required. `(c) => c.env.CHASKI`: the app’s service binding to `ChaskiEntrypoint`. |
 | `identify` | Required. Returns the signed-in user’s id, `null` to answer 401, or a `Response`. |
 | `allowedOrigins` | Origins of your frontend when it’s served from another origin than these routes. Your app answers CORS for them: see [Browser clients](/docs/browser-clients). |
 | `groups` | The routes the mount serves: `['feed', 'push', 'preferences']` by default. A team inbox `identify` names `team:<id>` serves `['feed']`: a browser belongs to one contact, so registering it there would take it from the user’s own inbox. Leave out `preferences` when your app keeps a preferences API of its own, so the browser can’t write around its rules. |

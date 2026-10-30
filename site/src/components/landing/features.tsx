@@ -312,8 +312,8 @@ export const Features = () => (
         </h2>
       </div>
       <p className="lede max-w-[400px]">
-        No vendor between your Worker and your users. The data stays in your database, and every
-        send is a row you can open.
+        No vendor between your app and your users. The data stays in your database, and every send
+        is a row you can open.
       </p>
     </div>
 
@@ -326,7 +326,7 @@ export const Features = () => (
         delay="[--reveal-delay:0ms]"
         footer={
           <p className="font-mono text-xs leading-[18px] text-muted-foreground max-sm:hidden">
-            chaski.send()
+            env.CHASKI.send()
           </p>
         }
       >
@@ -366,9 +366,9 @@ export const Features = () => (
         <PreferencesDetail />
       </Cell>
       <Cell
-        title="From your other Workers"
-        guide="other-workers"
-        text="Export ChaskiEntrypoint, and any Worker with a service binding gets the same API over RPC."
+        title="From any of your Workers"
+        guide="connect"
+        text="Any Worker in your account binds to Chaski and gets the whole API over RPC, typed end to end."
         className="md:col-span-2 lg:col-span-1"
         delay="[--reveal-delay:350ms]"
       >

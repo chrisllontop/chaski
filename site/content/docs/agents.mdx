@@ -3,12 +3,12 @@ title: Set up with an agent
 description: Hand Chaski’s setup to your coding agent with one prompt, or add the Chaski skill to your repository.
 ---
 
-A coding agent can set Chaski up in your Worker for you. One prompt points it at the Chaski skill,
+A coding agent can set Chaski up next to your app for you. One prompt points it at the Chaski skill,
 the steps of [Install](/docs/install) written for an agent, and it follows them in your project.
 
 ## Paste the prompt
 
-Open your agent in the project that holds your Worker, and paste this:
+Open your agent in the project that holds your app’s Worker, and paste this:
 
 <SetupPrompt />
 
@@ -22,18 +22,18 @@ the next:
 
 1. Reads your project: the Worker and its Wrangler config, the Hono app, how the app knows who is
    signed in, and the frontend.
-2. Adds `chaskijs` with your package manager.
-3. Declares a D1 database and a queue, plus the bindings for the features you pick.
-4. Applies Chaski’s migrations to the local database.
-5. Mounts the dashboard behind the sign-in you choose, and the routes your frontend calls for the
-   signed-in user.
-6. Adds the push keys, when you want push.
-7. Runs your Worker with `wrangler dev`, which keeps every email on disk, and sends a first
-   notification you can open in the dashboard.
+2. Asks where the Chaski project goes, a folder of this repository or a repository of its own, and
+   creates it there: `chaskijs`, its `wrangler.jsonc` with the bindings for the features you pick,
+   and the one-line main module.
+3. Applies Chaski’s migrations to the local database.
+4. Binds your app to Chaski, and mounts the routes your frontend calls for the signed-in user.
+5. Runs both with `wrangler dev`, which keeps every email on disk, sets up the channels in the local
+   dashboard, and sends a first notification you can open there.
 
 All of that happens on your machine. Creating resources in your Cloudflare account, applying the
 migrations with `--remote`, setting secrets and deploying act on production, so the agent asks you
-before each one, and deploys only when you tell it to.
+before each one, and deploys only when you tell it to. Turning on Cloudflare Access and saving the
+production channel settings are yours, in the Cloudflare dashboard and in Chaski’s.
 
 ## Add the skill to your repository
 
@@ -49,8 +49,8 @@ reads it from disk, so it works offline. Beyond the setup, it covers:
 
 - **An audit** of the notifications your code already sends, and a plan for moving them onto
   Chaski.
-- **Troubleshooting** for a setup that fails: config errors, migrations, bindings, sign-in and the
-  dashboard’s Content-Security-Policy.
+- **Troubleshooting** for a setup that fails: config errors, migrations, bindings, Cloudflare
+  Access, local development and your frontend’s Content-Security-Policy.
 - **Sending**: sends, schedules, templates and preferences in your code.
 
 ## Which agents

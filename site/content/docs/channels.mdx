@@ -1,112 +1,75 @@
 ---
 title: Channels
-description: Email, in-app and push, web, iOS, macOS, Android and Windows. A channel is on when the config has an entry for it.
+description: Email, in-app and push, web, iOS, macOS, Android and Windows. Each channel is set up from the dashboard, and is on once it has settings.
 ---
 
-A channel is on when `channels` in the config has an entry for it, and each type’s template turns
-it on for that type. The **Channels** page in the dashboard shows what Chaski picked up from your
-config.
+Every channel starts off. It turns on when you save its settings on the **Channels** page of the
+dashboard, and each type’s template turns it on for that type. Removing a channel’s settings turns
+it off again, and its sends skip it as `channel_not_configured`. A pause is something else: it
+holds a channel’s deliveries until you resume it; see
+[Pause a channel](/docs/dashboard#pause-a-channel).
+
+Each environment’s Chaski keeps settings of its own, and the credentials among them are encrypted
+with `CHASKI_SECRET`. [Configuration](/docs/configuration#channel-settings) lists every field.
 
 ## Email
 
 Email goes out through Cloudflare Email Service, from a domain you onboarded to it, through the
-`send_email` binding you pass as `bindings.email`.
+`CHASKI_EMAIL` binding. Set its sender address, and optionally a sender name and a reply-to
+address. The address must be one the binding allows.
 
-```ts
-channels: {
-  email: {
-    from: 'notifications@example.com',
-    fromName: 'My App',
-    replyTo: 'support@example.com',
-  },
-},
-```
-
-`from` must be an address the binding allows. A send can override `fromName` and `replyTo`, and
-attach up to 10 files when `bindings.attachments` holds an R2 bucket. The HTML of every email carries a
-pixel served from your mount, which marks the delivery opened when the message is read; that’s
-why `publicUrl` must be the absolute URL of the dashboard.
+A send can override the sender name and the reply-to address, and attach up to 10 files when
+`CHASKI_ATTACHMENTS` holds an R2 bucket. The HTML of every email carries a pixel, served through
+your app’s `userRoutes()`, which marks the delivery opened when the message is read; set
+`CHASKI_PUBLIC_URL` to that mount, and without it emails carry no pixel.
 
 A contact without an email address skips the channel with `missing_email`.
 
 ## In-app
 
 The in-app channel keeps a feed per contact in the `ChaskiFeed` Durable Object, and pushes each new
-item to their open pages over a WebSocket.
-
-```ts
-channels: {
-  in_app: {},
-},
-```
-
-It has no options yet: `{}` turns it on, with `bindings.feed` set. Your frontend reads the feed
-through `chaski.userRoutes()`, as [Browser clients](/docs/browser-clients) shows; on the server,
-`chaski.feed` lists it, counts the unread items and marks them read.
+item to their open pages over a WebSocket. It has no settings: turn it on, with `CHASKI_FEED`
+bound. Your frontend reads the feed through your app’s `userRoutes()`, as
+[Browser clients](/docs/browser-clients) shows; on the server, `env.CHASKI.feed()` lists it, counts
+the unread items and marks them read.
 
 ## Push
 
 Push reaches browsers through web push, Apple devices through APNs, Android devices through FCM
-and Windows devices through WNS. Configure any of them:
+and Windows devices through WNS. Set up any of them; push is on once one is.
 
-```ts
-channels: {
-  push: {
-    vapid: {
-      subject: 'mailto:ops@example.com',
-      publicKey: env.VAPID_PUBLIC_KEY,
-      privateKey: env.VAPID_PRIVATE_KEY,
-    },
-    apns: {
-      teamId: '<Apple team id>',
-      keyId: '<APNs key id>',
-      privateKey: env.APNS_PRIVATE_KEY,
-      ios: { bundleId: 'com.example.app', environment: 'production' },
-      macos: { bundleId: 'com.example.desktop', environment: 'production' },
-    },
-    fcm: {
-      serviceAccount: env.FCM_SERVICE_ACCOUNT,
-    },
-    wns: {
-      tenantId: '<directory (tenant) id>',
-      clientId: '<application (client) id>',
-      clientSecret: env.WNS_CLIENT_SECRET,
-    },
-  },
-},
-```
-
-- `vapid` takes the key pair web-push tools print: the base64url public key and the private key,
-  or the whole private JWK as JSON. `subject` is a `mailto:` or `https:` contact the push services
-  can reach you at.
-- `apns` takes your team id, the key’s id and the contents of the `.p8` file, which send to every
-  app of your team. `ios` and `macos` each name an app: its bundle id and the APNs environment of
-  its tokens, `sandbox` for development builds and `production` for the rest.
-- `fcm` takes the contents of a service account’s JSON key file, from **Project settings → Service
-  accounts** in the Firebase console. The project it names must be the one your Android app
-  registers its tokens with.
-- `wns` takes the Microsoft Entra app registration your Windows app creates its push channel with,
-  through the Windows App SDK’s `PushNotificationManager`: its tenant id, its client id and one of
-  its client secrets.
+- **Web push** takes a subject, a `mailto:` or `https:` contact the push services can reach you
+  at, and a key pair: **Generate keys** makes one, or paste the pair you already use.
+- **APNs** takes your team id, the key’s id and the `.p8` file, which send to every app of your
+  team. The iOS app and the macOS app each take their bundle id and the APNs environment of their
+  tokens, `sandbox` for development builds and `production` for the rest.
+- **FCM** takes a service account’s JSON key file, from **Project settings → Service accounts** in
+  the Firebase console. The project it names must be the one your Android app registers its tokens
+  with.
+- **WNS** takes the Microsoft Entra app registration your Windows app creates its push channel
+  with, through the Windows App SDK’s `PushNotificationManager`: its tenant id, its client id and
+  one of its client secrets.
 
 A contact receives push on the devices registered to them. Browsers register with
 `client.push.enable()` from `chaskijs/client`; your app can register an iOS or macOS device token,
 an Android FCM token or a Windows channel URI from the server:
 
 ```ts
-await chaski.push.register({
+await env.CHASKI.push().register({
   recipient: { id: user.id },
   platform: 'android', // or 'ios', 'macos', 'windows'
   deviceToken,
 });
 ```
 
+A mobile app can also register its own token through your app’s `userRoutes()`, with
+`client.push.registerDevice()`, as the signed-in user.
+
 An Apple token belongs to the environment of the build that made it: a development build’s token
 only works in `sandbox`. Pass `environment: 'sandbox'` when that build registers, and the app’s
-environment in the config applies to every other device. When APNs refuses a token as
-`BadDeviceToken` or `DeviceTokenNotForTopic`, Chaski forgets the device and hands the reason to
-[`onError`](/docs/configuration#onerror): the token may be fine and the environment or the bundle
-id wrong.
+environment in the settings applies to every other device. When APNs refuses a token as
+`BadDeviceToken` or `DeviceTokenNotForTopic`, Chaski forgets the device and logs the reason to
+Workers Logs: the token may be fine and the environment or the bundle id wrong.
 
 An Electron app on macOS gets its token from `pushNotifications.registerForAPNSNotifications()`
 in the main process, and registers it with `client.push.registerDevice({ platform: 'macos',
@@ -145,6 +108,7 @@ On Android the notification shows on its own when the app is in the background; 
 A contact without a registered device skips the channel with `no_device_tokens`.
 
 <Callout title="Subscriptions belong to the key they were made with.">
-  Keep your VAPID key pair once browsers subscribe: a subscription made with another public key can
-  never receive this server’s pushes, and the client subscribes again when it sees one.
+  Keep your web push key pair once browsers subscribe: a subscription made with another public key
+  can never receive this Chaski’s pushes. The dashboard asks before it replaces the pair, and each
+  browser’s client subscribes again the next time it sees the new key.
 </Callout>

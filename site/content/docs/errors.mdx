@@ -15,7 +15,7 @@ change. Its routes answer with the same code, as JSON:
 | Code | HTTP status | When |
 | --- | --- | --- |
 | `validation` | 400 | The request or a template is wrong: a missing field, an unknown type, Liquid that won’t parse. |
-| `config` | 500 | The host’s setup is: a missing binding, an invalid option, migrations not applied. |
+| `config` | 500 | The Chaski Worker’s setup is: a missing binding, a channel setting it can’t use, migrations not applied. |
 | `unauthorized` | 401 | No one is signed in. |
 | `forbidden` | 403 | The signed-in user may not do this, or the request came from an origin Chaski doesn’t know. |
 | `not_found` | 404 | The template, delivery or endpoint doesn’t exist. |
@@ -27,13 +27,14 @@ change. Its routes answer with the same code, as JSON:
 ## Check for one
 
 Detect a Chaski error with `isChaskiError()`, not `instanceof`: the error keeps its `name` and
-`code` when it crosses a service binding or a queue, but not its class.
+`code` when it crosses a service binding, but not its class. Between two local `wrangler dev`
+sessions it keeps neither; see [Connect your app](/docs/connect#errors).
 
 ```ts
 import { isChaskiError } from 'chaskijs';
 
 try {
-  await chaski.send(request);
+  await env.CHASKI.send(request);
 } catch (error) {
   if (isChaskiError(error) && error.code === 'validation') {
     // the request needs fixing; trying again won't help
@@ -44,10 +45,11 @@ try {
 
 ## Retries
 
-`isRetryableChaskiError()` is the rule Chaski’s own queue consumer follows: `internal` errors are
-worth another try, every other code is permanent, and errors that aren’t Chaski’s, such as a
-network failure, are assumed to pass. `delivery_failed` and `channel_paused` count as permanent:
-they answer someone waiting on the email, and they decide whether to ask again.
+`isRetryableChaskiError()` is the rule Chaski’s own queue consumer follows, for a job of your app
+that calls Chaski: `internal` errors are worth another try, every other code is permanent, and
+errors that aren’t Chaski’s, such as a network failure, are assumed to pass. `delivery_failed` and
+`channel_paused` count as permanent: they answer someone waiting on the email, and they decide
+whether to ask again.
 
 ```ts
 import { isRetryableChaskiError } from 'chaskijs';

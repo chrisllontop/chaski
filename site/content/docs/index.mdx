@@ -1,11 +1,11 @@
 ---
 title: Introduction
-description: Chaski is notification infrastructure that runs inside your Cloudflare Worker, dashboard included.
+description: Chaski is notification infrastructure that runs as a Worker of its own on your Cloudflare account, dashboard included.
 ---
 
-Chaski lives inside your Worker. You mount it on a route of your app, and it runs on your own
-Cloudflare resources: it deploys with your Worker, and your data stays in your account. It’s a
-library you mount, not another service.
+Chaski is a Worker of its own. You deploy it to your Cloudflare account next to your app, one per
+environment, and your app sends through it over a service binding. It runs on your own Cloudflare
+resources, so your data stays in your account, with no vendor in between.
 
 ## What it does
 
@@ -17,35 +17,38 @@ library you mount, not another service.
 - **Preferences** that let each contact mute the notifications they don’t want.
 - **Scheduling** for notifications that go out later, with cancellation.
 - **Retries** for deliveries that fail along the way, and a replay for the ones that run out.
-- **A dashboard**, served from the same route, behind the sign-in you choose.
+- **A dashboard** at the Worker’s own URL, behind Cloudflare Access, where your team sets up the
+  channels and follows every delivery.
 
 ## How it fits together
 
-Your Worker declares the bindings Chaski uses and hands them over in a config function. A send
-records the notification in your database, then puts one delivery per channel on your queue. Your
-Worker’s queue consumer passes those batches back to Chaski, which renders each template and hands
-it to the provider, retrying what fails.
+The Chaski Worker holds the database, the queue and everything else Chaski runs on. Your app’s
+Worker binds to it, and a send is one call:
 
 ```ts title="src/billing.ts"
-await chaski.send({
+await env.CHASKI.send({
   type: 'payment_received',
   recipient: { id: user.id, email: user.email },
   payload: { amount: '$15.00' },
 });
 ```
 
-Three entry points serve the rest:
+Chaski records the notification, then puts one delivery per channel on its queue. Its own consumer
+renders each template and hands it to the provider, retrying what fails.
 
-- `chaski.routes()` mounts the dashboard and its API, for your team.
-- `chaski.userRoutes()` mounts the endpoints your frontend calls for the signed-in user: their
-  feed, their devices and their preferences.
-- `ChaskiEntrypoint` gives your other Workers the same API over RPC.
+Three surfaces serve the rest:
+
+- **The dashboard**, at the Chaski Worker’s URL, for your team.
+- **`ChaskiEntrypoint`**, the API your Workers call over a service binding: sends, schedules,
+  feeds, preferences, devices and templates.
+- **`userRoutes()`**, which your app mounts for its frontend: the signed-in user’s feed, devices
+  and preferences, forwarded to Chaski for the user your app says is signed in.
 
 ## Where to go next
 
-- [Install](/docs/install) adds Chaski to a Worker you already have.
+- [Install](/docs/install) deploys a Chaski Worker.
+- [Connect your app](/docs/connect) binds your app to it and mounts the user routes.
 - [Sending](/docs/sending) covers what a send does and how deliveries move.
-- [Configuration](/docs/configuration) lists every option `createChaski()` accepts.
 
 Chaski is open source under the MIT license. Its code, issues and releases live on
 [GitHub](https://github.com/chrisllontop/chaski).

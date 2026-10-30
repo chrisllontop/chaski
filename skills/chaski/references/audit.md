@@ -10,7 +10,8 @@ the project.
 
 List every deployable unit in the repository and its runtime: each Worker (one per Wrangler
 config), server, frontend, mobile app, background job and script. Note which ones run on
-Cloudflare Workers, and which Worker would host Chaski.
+Cloudflare Workers, since only those can bind to a Chaski Worker, and whether a Chaski project or
+a `CHASKI` service binding already exists.
 
 **Done when** every folder holding code that runs somewhere is on the list with its runtime, and
 so is every runtime the code implies but the repository doesn’t hold (a service worker with no
@@ -48,7 +49,7 @@ like a sender or matches a setting’s prefix, and the `*_API_KEY`, `*_SECRET`, 
 past it:
 
 - **Wrappers.** For every module that imports a provider SDK, calls a provider’s API or writes to
-  an in-app notifications table of the host’s own, list the functions it exports, then find every
+  an in-app notifications table of the app’s own, list the functions it exports, then find every
   call of each. The call sites are the flows; the wrapper is only the provider.
 - **Handlers.** Read every `scheduled` and `queue` handler, every Cron Trigger in the Wrangler
   configs and every job runner’s jobs to the end: digests and reminders hide there.
@@ -62,6 +63,10 @@ past it:
   steps the code only names by id. Automations configured in a provider’s dashboard, such as an
   email sequence, send with no call site at all. List each id you find, and ask the user about
   what lives only in a dashboard.
+- **Chaski itself**, when step 1 found it. The Chaski project’s folder, its `CHASKI_*` settings and
+  the `chaskijs` package are Chaski’s own: dismiss their hits. The flows already on Chaski are the
+  calls through the binding, which the finder has no pattern for: search for `CHASKI.send(` and
+  `CHASKI.schedule(`, and record each as a flow that has moved.
 
 **Done when** every line the finder printed belongs to a flow in step 3 or is dismissed with a
 reason (a test, a type, a comment, an unrelated match), and every wrapper’s callers are found.
