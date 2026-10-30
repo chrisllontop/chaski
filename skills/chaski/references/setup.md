@@ -171,6 +171,10 @@ In the app’s project:
    - `allowPush: (c, id) => boolean` answers 403 to contacts that may not register a device.
    - An app with no frontend for notifications still mounts it for the email open pixel
      (`GET <mount>/t/o/:id`), with `groups: []` and `identify: () => null`.
+   - An app that puts its routes behind a session or an origin check registers that pixel-only
+     mount, `userRoutes({ chaski, identify: () => null, groups: [] })`, at the same path ahead of
+     those gates: email clients load the pixel without a session, and webmail sends it
+     `Sec-Fetch-Site: cross-site`.
 
    `CHASKI_PUBLIC_URL` in the Chaski project is this mount’s absolute URL: its production URL in
    `vars`, its local one in `.dev.vars`.
