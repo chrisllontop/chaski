@@ -435,7 +435,11 @@ const LanguagesPanel = () => {
               <Button variant="outline" size="xs" onClick={() => setDialog('default')}>
                 Change
               </Button>
-            ) : null
+            ) : (
+              <span className="whitespace-nowrap text-muted-foreground text-xs">
+                Fixed while templates have translations
+              </span>
+            )
           }
         >
           <Pill tone="neutral">Default</Pill>
