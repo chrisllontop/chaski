@@ -6,10 +6,14 @@ import { TemplateService } from '../src/server/services/template.service';
 import { fixtureConfig } from './fixture/worker';
 import { api, useConfig } from './helpers';
 
+// A database whose migrations table lists these names, as wrangler would have recorded them.
+const appliedAs = (names: string[]) =>
+  ({
+    prepare: () => ({ all: async () => ({ results: names.map((name) => ({ name })) }) }),
+  }) as unknown as D1Database;
+
 // A database where wrangler applied nothing yet.
-const fresh = {
-  prepare: () => ({ all: async () => ({ results: [] }) }),
-} as unknown as D1Database;
+const fresh = appliedAs([]);
 
 const useFreshDatabase = () => {
   const config = fixtureConfig(env);
@@ -29,11 +33,25 @@ describe('migrations', () => {
     await expect(ensureMigrations(fresh)).rejects.toMatchObject({
       code: 'config',
       message: expect.stringContaining(
-        'missing migrations 0000_init.sql, 0001_delivery_latency.sql, 0002_channel_pauses.sql, ' +
-          '0003_push_silent.sql, 0004_notification_data.sql, 0005_channel_settings.sql. Apply them ' +
-          'with `wrangler d1 migrations apply CHASKI_DB --remote`, or `--local` under `wrangler dev`.',
+        'missing migrations 0000_init.sql. Apply them with ' +
+          '`wrangler d1 migrations apply CHASKI_DB --remote`, or `--local` under `wrangler dev`.',
       ),
     });
+  });
+
+  // The pre-release migrations became 0000_init.sql under its old name, so a database that applied
+  // them, and holds the same schema, keeps running without applying anything.
+  it('passes a database that applied the pre-release migrations', async () => {
+    const preRelease = appliedAs([
+      '0000_init.sql',
+      '0001_delivery_latency.sql',
+      '0002_channel_pauses.sql',
+      '0003_push_silent.sql',
+      '0004_notification_data.sql',
+      '0005_channel_settings.sql',
+    ]);
+
+    await expect(ensureMigrations(preRelease)).resolves.toBeUndefined();
   });
 
   it('answers the API with the config error before touching storage', async () => {

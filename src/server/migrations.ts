@@ -4,15 +4,10 @@ import { SettingsService } from './services/settings.service';
 
 // The files the package ships in migrations/; a test keeps this list in sync.
 // They go in with `wrangler d1 migrations apply`, and Chaski refuses to run
-// against a database that is missing any of them.
-export const MIGRATIONS: readonly string[] = [
-  '0000_init.sql',
-  '0001_delivery_latency.sql',
-  '0002_channel_pauses.sql',
-  '0003_push_silent.sql',
-  '0004_notification_data.sql',
-  '0005_channel_settings.sql',
-];
+// against a database that is missing any of them. The pre-release migrations
+// were folded into 0000_init.sql, which keeps its name: a database that applied
+// them has the same schema and still lists it.
+export const MIGRATIONS: readonly string[] = ['0000_init.sql'];
 
 // Wrangler's own table: Chaski's wrangler.jsonc leaves migrations_table unset.
 const MIGRATIONS_TABLE = 'd1_migrations';
