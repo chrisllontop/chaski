@@ -39,6 +39,10 @@ const dateTime = new Intl.DateTimeFormat('en-US', {
 
 export const formatDateTime = (iso: string | null) => (iso ? dateTime.format(new Date(iso)) : '–');
 
+const day = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
+
+export const formatDay = (iso: string) => day.format(new Date(iso));
+
 const utcDay = new Intl.DateTimeFormat('en-US', {
   month: 'short',
   day: 'numeric',
