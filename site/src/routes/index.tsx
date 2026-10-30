@@ -10,6 +10,7 @@ import { HowItWorks } from '~/components/landing/how-it-works';
 import { ProductShot } from '~/components/landing/product-shot';
 import { SiteFooter } from '~/components/landing/site-footer';
 import { SiteHeader } from '~/components/landing/site-header';
+import { Usage } from '~/components/landing/usage';
 import { useEntrances } from '~/lib/motion';
 import { seo } from '~/lib/seo';
 
@@ -29,6 +30,7 @@ const Landing = () => {
         <Hero />
         <ProductShot />
         <HowItWorks />
+        <Usage />
         <Agent />
         <Features />
         <Browser />

@@ -10,8 +10,9 @@ export const ProductShot = () => (
       <div className="flex h-11 items-center justify-center border-b border-border">
         <div className="flex h-[26px] items-center gap-2 rounded-md bg-muted px-3 font-mono text-xs leading-4">
           <LockIcon size={12} className="text-muted-foreground" />
-          <span className="text-muted-foreground">app.example.com</span>
-          <span>/admin/notifications</span>
+          <span>
+            chaski<span className="text-muted-foreground">.example.workers.dev</span>
+          </span>
         </div>
       </div>
       <img
