@@ -40,4 +40,6 @@ In every case, add a comment at the column explaining the reason and the invaria
 
 - Ship every change as a generated migration under `migrations/` (`drizzle-kit generate --name <name>`), hand-adjusted for D1 if needed: D1 supports `PRAGMA defer_foreign_keys` (checks deferred, **cascade actions still fire**), not `PRAGMA foreign_keys=OFF`. When recreating a parent table, stash and restore its children.
 - Never edit a migration that a release already shipped; a deployed Chaski may have applied it. Add a new one.
+  `0000_init.sql` is the schema as of 0.1.0: the pre-release migrations were folded into it, under its
+  old name, before any deployed Chaski depended on them.
 - When normalizing an existing JSON or duplicated column, backfill the new table **in the same migration** before dropping the column.
