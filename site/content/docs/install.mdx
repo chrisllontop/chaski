@@ -149,17 +149,18 @@ before it does any of it:
    attachments, the bucket. It writes the database’s id into `wrangler.jsonc`.
 2. **Applies Chaski’s migrations** to the database. They go before the code, since a new version
    may need a new table, and they only add.
-3. **Deploys** the Worker.
-4. **Sets `CHASKI_SECRET`** to a random value, when the Worker has none. It encrypts the push keys
-   and credentials you save in the dashboard, such as your APNs key, so the database alone never
-   holds them in the clear. It goes last, once the deploy went through: until the Worker exists,
-   `secret put` creates an empty one under its name.
+3. **Deploys** the Worker, with a random `CHASKI_SECRET` on its first deploy. The secret encrypts
+   the push keys and credentials you save in the dashboard, such as your APNs key, so the database
+   alone never holds them in the clear. It travels with the Worker’s first version, so the Worker
+   never runs without one. A Worker that already runs without it gets one right after the
+   deploy.
 
 It prints the Worker’s URL, such as `https://chaski.<your-subdomain>.workers.dev`, which serves
 the dashboard. Run it again after every change or upgrade: it creates only what’s missing, and
 always migrates before it deploys. `--yes` answers its question, for a deploy job.
 
-Each step is a Wrangler command, should you rather run them yourself, in this order:
+Each step is a Wrangler command, should you rather run them yourself, in this order. The first
+deploy uploads the secret with the Worker, from a file only you can read:
 
 ```bash
 npx wrangler d1 create chaski                      # its id goes in database_id
@@ -167,10 +168,14 @@ npx wrangler queues create chaski-deliveries
 npx wrangler queues create chaski-deliveries-dlq
 npx wrangler r2 bucket create chaski-attachments   # only with attachments
 npx wrangler d1 migrations apply CHASKI_DB --remote
-npx wrangler deploy
-# After the deploy: until the Worker exists, secret put creates an empty one under its name.
-openssl rand -base64 32 | npx wrangler secret put CHASKI_SECRET
+(umask 077; printf 'CHASKI_SECRET=%s\n' "$(openssl rand -base64 32)" > chaski-secret.env)
+npx wrangler deploy --secrets-file chaski-secret.env
+rm chaski-secret.env
 ```
+
+To give a Worker that already runs a secret, deploy first, then
+`openssl rand -base64 32 | npx wrangler secret put CHASKI_SECRET`: until the Worker exists,
+`secret put` creates an empty one under its name.
 
 <Callout title="Keep the secret as it is.">
   With another `CHASKI_SECRET`, Chaski can’t open the credentials saved under this one: the

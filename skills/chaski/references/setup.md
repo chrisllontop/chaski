@@ -283,19 +283,22 @@ npx chaskijs deploy
 ```
 
 Show the user that list: the resources it creates (database, queues, the bucket with
-attachments), the migrations it applies to the deployed database, the deploy, and the
-`CHASKI_SECRET` it sets when the Worker has none. With their yes, and only then:
+attachments), the migrations it applies to the deployed database, and the deploy, which carries a
+new `CHASKI_SECRET` on the Worker’s first deploy. With their yes, and only then:
 
 ```sh
 npx chaskijs deploy --yes
 ```
 
 It writes the new database’s id into `wrangler.jsonc`, applies the migrations before the code, and
-prints the Worker’s URL. It sets `CHASKI_SECRET` last, once the deploy went through in the same
-run. Never run `wrangler secret put` against a Worker that hasn’t been deployed: until the Worker
-exists, `secret put` creates an empty one under that name, and an app deployed then binds to a
-Worker without `ChaskiEntrypoint`. The local database follows `database_id`, so `wrangler dev` starts over
-on a new one, which the deploy migrates. The app deploys its binding after Chaski is up, since a
+prints the Worker’s URL. On the first deploy, the secret goes up with the Worker
+(`wrangler deploy --secrets-file`, from a file it writes readable by the user only and deletes), so
+the Worker never runs without one. A Worker that already runs without it gets `secret put` right
+after the deploy. By hand, keep the same order: never run `wrangler secret put` against a Worker
+that hasn’t been deployed. Until the Worker exists, `secret put` creates an empty one under
+that name, and an app deployed then binds to a Worker without `ChaskiEntrypoint`. The local
+database follows `database_id`, so `wrangler dev` starts over on a new one, which the deploy
+migrates. The app deploys its binding after Chaski is up, since a
 service binding needs its Worker to exist; that deploy is the user’s, like any other of the app.
 The template file then loads into production with `--remote` ([sending.md](sending.md)); ask for
 that too.
@@ -329,10 +332,11 @@ It adds `env.staging` to `wrangler.jsonc`, repeating every binding with that env
 (`chaski-staging`, `chaski-staging-deliveries`, `chaski-staging-scheduler`), since Wrangler carries
 neither bindings nor vars into an environment. Wrangler names its Worker `chaski-staging`. Then, as
 in step 7, show the user the plan of `npx chaskijs deploy --env staging`, and run it with `--yes`
-only on their yes. It sets that Worker’s `CHASKI_SECRET` after its deploy; any
-`wrangler secret put --env staging` of your own comes after that first deploy too, since until the
-Worker exists, `secret put` creates an empty one under its name. The app’s `env.staging` block binds `CHASKI` to `chaski-staging`, and Access and
-the channel settings of that Worker are the user’s again: settings never move between
+only on their yes. Its first deploy carries that Worker’s own `CHASKI_SECRET`
+(`wrangler deploy --env staging --secrets-file <file>` by hand); `wrangler secret put --env
+staging` comes only once `chaski-staging` runs, since until the Worker exists, `secret put` creates
+an empty one under its name. The app’s `env.staging` block binds `CHASKI` to `chaski-staging`, and
+Access and the channel settings of that Worker are the user’s again: settings never move between
 environments.
 
 **Done when** each environment’s deploy printed its URL and the app’s matching environment binds to
