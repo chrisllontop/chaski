@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, sep } from 'node:path';
-import { type Context, runOrFail } from './context';
+import { CliError, type Context, runOrFail } from './context';
 import { addArgs, forProject } from './package-manager';
 import { findPackage } from './runner';
 import { DURABLE_OBJECT_CLASSES, MAIN_MODULE, MIGRATIONS_DIR, WORKER_EXPORTS } from './scaffold';
@@ -18,9 +18,50 @@ import {
   writeConfig,
 } from './wrangler-config';
 
+/** Orders versions such as `0.1.0` and `0.1.0-rc.3`, a pre-release before its release. */
+export const compareVersions = (a: string, b: string) => {
+  const parts = (version: string) => {
+    const [core = '', pre] = version.split('-', 2);
+    return { core: core.split('.').map(Number), pre: pre?.split('.') };
+  };
+  const left = parts(a);
+  const right = parts(b);
+  for (let i = 0; i < 3; i += 1) {
+    const diff = (left.core[i] ?? 0) - (right.core[i] ?? 0);
+    if (diff) return Math.sign(diff);
+  }
+  if (!left.pre || !right.pre) return left.pre ? -1 : right.pre ? 1 : 0;
+  for (let i = 0; i < Math.max(left.pre.length, right.pre.length); i += 1) {
+    const [x, y] = [left.pre[i], right.pre[i]];
+    if (x === undefined || y === undefined) return x === undefined ? -1 : 1;
+    const diff = /^\d+$/.test(x) && /^\d+$/.test(y) ? Number(x) - Number(y) : x.localeCompare(y);
+    if (diff) return Math.sign(diff);
+  }
+  return 0;
+};
+
 /** Installs chaskijs, then has the copy it installed bring the project up to that version. */
 export const upgrade = async (context: Context, tag = 'latest') => {
   const cwd = dirname(readConfig(context.cwd).path);
+  const installedRoot = findPackage(cwd, 'chaskijs');
+  const installed = installedRoot
+    ? (JSON.parse(readFileSync(join(installedRoot, 'package.json'), 'utf8')) as { version: string })
+        .version
+    : undefined;
+  // A tag can point behind the installed version, as `latest` does while a release is in
+  // pre-release, and an older chaskijs can't undo what a newer one changed.
+  const view = await context.run('npm', ['view', `chaskijs@${tag}`, 'version'], {
+    cwd,
+    capture: true,
+  });
+  const target = view.code === 0 ? view.stdout.trim().split('\n').at(-1)?.trim() : undefined;
+  if (installed && target && compareVersions(target, installed) < 0) {
+    throw new CliError(
+      `chaskijs@${tag} is ${target}, older than the ${installed} installed here. ` +
+        'Name a newer one with --tag, such as --tag next for the pre-release.',
+    );
+  }
+
   const packageManager = forProject(cwd, context.env.npm_config_user_agent);
   context.print(`Installing chaskijs@${tag} with ${packageManager.name}…`);
   await runOrFail(context, packageManager.name, addArgs(packageManager, `chaskijs@${tag}`), {

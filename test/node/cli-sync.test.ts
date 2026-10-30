@@ -8,7 +8,14 @@ import {
   MAIN_MODULE,
   WORKER_EXPORTS,
 } from '../../src/cli/scaffold';
-import { migrationsDir, sync, syncConfig, syncMainModule, upgrade } from '../../src/cli/upgrade';
+import {
+  compareVersions,
+  migrationsDir,
+  sync,
+  syncConfig,
+  syncMainModule,
+  upgrade,
+} from '../../src/cli/upgrade';
 import type { WranglerConfig } from '../../src/cli/wrangler-config';
 import { fakeContext, readConfigAt, tempDir, writeFiles } from './cli-helpers';
 
@@ -170,20 +177,57 @@ describe('chaskijs sync', () => {
 });
 
 describe('chaskijs upgrade', () => {
+  const npmView =
+    (version: string) =>
+    ({ command, args }: { command: string; args: string[] }) =>
+      command === 'npm' && args[0] === 'view'
+        ? { code: 0, stdout: `${version}\n`, stderr: '' }
+        : undefined;
+
   it('installs with the project’s package manager, then syncs with the chaskijs it installed', async () => {
     const root = tempDir();
-    writeFiles(root, { 'wrangler.jsonc': OLD_CONFIG, 'pnpm-lock.yaml': '' });
+    writeFiles(root, {
+      'wrangler.jsonc': OLD_CONFIG,
+      'pnpm-lock.yaml': '',
+      'node_modules/chaskijs/package.json': '{ "name": "chaskijs", "version": "0.1.0-rc.3" }',
+    });
     const { context, calls } = fakeContext({
       cwd: root,
       env: { npm_config_user_agent: 'npm/11.6.0 node/v24.14.0 darwin arm64' },
+      respond: npmView('0.1.0'),
     });
 
     await upgrade(context, 'next');
 
     expect(calls.map(({ command, args }) => [command, ...args].join(' '))).toEqual([
+      'npm view chaskijs@next version',
       'pnpm add chaskijs@next',
       'chaskijs sync',
     ]);
+  });
+
+  it('refuses a tag that points behind the version installed', async () => {
+    const root = tempDir();
+    writeFiles(root, {
+      'wrangler.jsonc': OLD_CONFIG,
+      'node_modules/chaskijs/package.json': '{ "name": "chaskijs", "version": "0.1.0-rc.3" }',
+    });
+    const { context, calls } = fakeContext({ cwd: root, respond: npmView('0.0.1') });
+
+    await expect(upgrade(context)).rejects.toThrow(
+      'chaskijs@latest is 0.0.1, older than the 0.1.0-rc.3 installed here.',
+    );
+    expect(calls).toHaveLength(1);
+  });
+
+  it('orders releases and pre-releases', () => {
+    const ordered = ['0.0.1', '0.1.0-rc.2', '0.1.0-rc.10', '0.1.0', '0.1.1', '1.0.0-beta', '1.0.0'];
+
+    expect(
+      ['1.0.0', '0.1.0-rc.10', '0.0.1', '1.0.0-beta', '0.1.1', '0.1.0', '0.1.0-rc.2'].toSorted(
+        compareVersions,
+      ),
+    ).toEqual(ordered);
   });
 });
 
