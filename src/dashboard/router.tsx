@@ -69,6 +69,10 @@ const routeTree = rootRoute.addChildren([
   createRoute({
     getParentRoute: () => rootRoute,
     path: '/templates/$templateId',
+    // The language being edited, so a link can open a template in it.
+    validateSearch: (search: Record<string, unknown>): { locale?: string } => ({
+      locale: typeof search.locale === 'string' && search.locale ? search.locale : undefined,
+    }),
     component: lazyRouteComponent(() => import('./routes/template-editor'), 'TemplateEditorPage'),
     staticData: { crumbs: [{ label: 'Templates', to: '/templates' }] },
   }),
