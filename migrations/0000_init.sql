@@ -1,3 +1,19 @@
+CREATE TABLE `channel_pauses` (
+	`channel` text PRIMARY KEY NOT NULL,
+	`paused_by_id` text NOT NULL,
+	`paused_by_name` text,
+	`paused_at` integer DEFAULT (cast(unixepoch('subsecond') * 1000 as integer)) NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE `settings` (
+	`section` text PRIMARY KEY NOT NULL,
+	`value` text NOT NULL,
+	`secret` text,
+	`updated_by_id` text NOT NULL,
+	`updated_by_name` text,
+	`updated_at` integer DEFAULT (cast(unixepoch('subsecond') * 1000 as integer)) NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE `contacts` (
 	`recipient_id` text PRIMARY KEY NOT NULL,
 	`email` text,
@@ -38,6 +54,7 @@ CREATE TABLE `deliveries` (
 	`error_code` text,
 	`provider_message_id` text,
 	`sent_at` integer,
+	`provider_ms` integer,
 	`opened_at` integer,
 	`updated_at` integer DEFAULT (cast(unixepoch('subsecond') * 1000 as integer)) NOT NULL,
 	FOREIGN KEY (`notification_id`) REFERENCES `notifications`(`id`) ON UPDATE no action ON DELETE no action
@@ -47,6 +64,7 @@ CREATE UNIQUE INDEX `uq_deliveries_channel` ON `deliveries` (`notification_id`,`
 CREATE INDEX `idx_deliveries_status` ON `deliveries` (`status`,`updated_at`);--> statement-breakpoint
 CREATE INDEX `idx_deliveries_updated` ON `deliveries` (`updated_at`);--> statement-breakpoint
 CREATE INDEX `idx_deliveries_opened` ON `deliveries` (`opened_at`) WHERE opened_at IS NOT NULL;--> statement-breakpoint
+CREATE INDEX `idx_deliveries_sent` ON `deliveries` (`sent_at`) WHERE sent_at IS NOT NULL;--> statement-breakpoint
 CREATE TABLE `feed_items` (
 	`id` text PRIMARY KEY NOT NULL,
 	`recipient_id` text NOT NULL,
@@ -69,6 +87,9 @@ CREATE TABLE `notifications` (
 	`contact_snapshot` text NOT NULL,
 	`attachments` text,
 	`email_overrides` text,
+	`push_silent` integer DEFAULT false NOT NULL,
+	`push_collapse_id` text,
+	`data` text,
 	`transactional` integer DEFAULT false NOT NULL,
 	`idempotency_key` text,
 	`created_at` integer DEFAULT (cast(unixepoch('subsecond') * 1000 as integer)) NOT NULL
@@ -86,6 +107,9 @@ CREATE TABLE `scheduled_notifications` (
 	`contact_snapshot` text NOT NULL,
 	`attachments` text,
 	`email_overrides` text,
+	`push_silent` integer DEFAULT false NOT NULL,
+	`push_collapse_id` text,
+	`data` text,
 	`transactional` integer DEFAULT false NOT NULL,
 	`idempotency_key` text,
 	`group_key` text,
