@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createChaskiClient } from '../../src/client';
-import { fakeFetch } from './fakes';
+import { fakeFetch, socketFactory } from './fakes';
 
 // The VAPID key the server hands out, and its bytes.
 const VAPID_KEY = 'BAECAwQ';
@@ -190,6 +190,37 @@ describe('push client', () => {
       },
     ]);
     expect(fake.serviceWorker.register).not.toHaveBeenCalled();
+  });
+
+  it('names a device on the feed socket while it takes over the device’s pushes', async () => {
+    const sockets = socketFactory();
+    const network = fakeFetch({
+      'POST /me/notifications/push/subscriptions': () => ({ id: 'dt_0123456789abcdef' }),
+      'DELETE /me/notifications/push/subscriptions': () => ({ unregistered: 1 }),
+    });
+    const chaski = createChaskiClient({
+      baseUrl: '/me/notifications',
+      fetch: network.fetch,
+      feed: { socketFactory: sockets.factory },
+    });
+    chaski.feed.subscribe(() => {});
+    const token = 'ab'.repeat(32);
+
+    expect(await chaski.push.registerDevice({ platform: 'macos', deviceToken: token })).toEqual({
+      id: 'dt_0123456789abcdef',
+    });
+    expect(sockets.sockets).toHaveLength(1);
+    await chaski.push.registerDevice(
+      { platform: 'macos', deviceToken: token },
+      { feedWhileOpen: true },
+    );
+    await chaski.push.unregisterDevice(token);
+
+    expect(sockets.sockets.map((socket) => [socket.url, socket.closed])).toEqual([
+      ['wss://app.example.com/me/notifications/feed/socket', true],
+      ['wss://app.example.com/me/notifications/feed/socket?device=dt_0123456789abcdef', true],
+      ['wss://app.example.com/me/notifications/feed/socket', false],
+    ]);
   });
 
   it('reports a browser without push', async () => {

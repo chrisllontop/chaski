@@ -1,5 +1,6 @@
 import type { PushPayload } from '../../../contract/contract';
 import type { ResolvedPush } from '../../config';
+import { feedStub } from '../../durable/feed';
 import {
   type ApnsApp,
   type ApnsCredentials,
@@ -200,6 +201,29 @@ const sendWns = async (
 export class PushAdapter extends BaseService {
   protected static override name = 'push';
 
+  // A device whose app holds its feed open gets the item there and shows it itself, so a push
+  // would show the same event twice. That holds only when the notification goes to the feed at
+  // all; a feed that doesn't answer leaves every device to push.
+  private static devicesInFeed = async (
+    notificationId: string,
+    recipientId: string,
+  ): Promise<Set<string>> => {
+    if (!PushAdapter.bindings.feed) return new Set();
+    const inApp = await PushAdapter.client.deliveries.findFirst({
+      where: { notificationId, channel: 'in_app' },
+    });
+    if (inApp?.status !== 'pending' && inApp?.status !== 'sent') return new Set();
+    try {
+      return new Set(await feedStub(recipientId).openDevices());
+    } catch (error) {
+      PushAdapter.log.warn('feed did not say which devices are open', {
+        notificationId,
+        err: error instanceof Error ? error.message : String(error),
+      });
+      return new Set();
+    }
+  };
+
   static deliver = async (ctx: AdapterContext): Promise<AdapterResult> => {
     const { notification } = ctx;
     const config = PushAdapter.config;
@@ -232,14 +256,19 @@ export class PushAdapter extends BaseService {
     ]);
 
     const platforms = PushSubscriptionService.configuredPlatforms();
-    const devices = (
+    const registered = (
       await PushSubscriptionService.listForRecipient(notification.recipientId)
     ).filter((device) => platforms.includes(device.platform));
-    if (devices.length === 0) {
+    if (registered.length === 0) {
       throw new DeliveryError('no_device_tokens', 'the recipient has no device push can reach', {
         permanent: true,
       });
     }
+    const inFeed = await PushAdapter.devicesInFeed(notification.id, notification.recipientId);
+    const devices = registered.filter((device) => !inFeed.has(device.id));
+    const viaFeed = registered.length - devices.length;
+    const feedNote = viaFeed > 0 ? ` feed:${viaFeed}` : '';
+    if (devices.length === 0) return { providerMessageId: `push:0/0${feedNote}` };
 
     const sendData = parseJson<Record<string, string> | null>(notification.data, null);
     const message: PushPayload = {
@@ -330,7 +359,9 @@ export class PushAdapter extends BaseService {
     await PushSubscriptionService.removeByIds(droppedIds);
 
     const delivered = devices.filter((_, i) => outcome(i) === 'delivered').length;
-    if (delivered > 0) return { providerMessageId: `push:${delivered}/${devices.length}` };
+    if (delivered > 0) {
+      return { providerMessageId: `push:${delivered}/${devices.length}${feedNote}` };
+    }
     if (droppedIds.length === devices.length) {
       throw new DeliveryError(
         'no_device_tokens',

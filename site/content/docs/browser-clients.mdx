@@ -154,6 +154,27 @@ client registers the channel’s URI, on every launch, since WNS channels expire
 await client.push.registerDevice({ platform: 'windows', deviceToken: channelUri });
 ```
 
+## While the app runs
+
+macOS and Windows show a push even while its app is in front, and the app can’t stop them. An app
+that shows its own notification for each new feed item while it runs would show the same event
+twice. Register its device with `feedWhileOpen`, from the same client that subscribes to the feed:
+
+```ts
+const deviceToken = await pushNotifications.registerForAPNSNotifications();
+await client.push.registerDevice({ platform: 'macos', deviceToken }, { feedWhileOpen: true });
+const stop = client.feed.subscribe((event) => {
+  if (event?.type === 'feed_item.created') new Notification({ title: event.item.title }).show();
+});
+```
+
+While that client’s feed socket is open, a notification that also goes to the feed skips that
+device’s push, and the app shows it from the feed. A notification whose template has no in-app
+content still pushes, and so do the contact’s other devices: another computer with the app closed
+gets its push. `unregisterDevice()` lets go. A socket that drops without closing, as when a laptop
+sleeps, counts as open until the server notices, and the items it missed arrive when the client
+reconnects, with the signal above.
+
 ## Electron’s main process
 
 The client runs in Electron’s main process, on Node’s `fetch` and `WebSocket`, for an app whose

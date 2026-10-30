@@ -238,6 +238,12 @@ const chaskiClient = createChaskiClient({
 `identify` reads that header. A renderer with network authenticates with a `SameSite=None; Secure`
 cookie instead: the browser’s WebSocket can’t carry a header.
 
+macOS and Windows show a push even while its app is in front. An app that shows its own
+notification for each new feed item registers its device with
+`client.push.registerDevice(device, { feedWhileOpen: true })` on the client that subscribes to the
+feed: while that socket is open, a notification that also goes to the feed skips that device’s
+push. Other devices of the contact, and notifications without in-app content, still push.
+
 ## A Windows app
 
 Windows apps, Electron ones included, get a WNS channel URI from the Windows App SDK’s

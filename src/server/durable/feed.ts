@@ -10,6 +10,9 @@ export const feedStub = (recipientId: string) => {
   return namespace.get(namespace.idFromName(recipientId));
 };
 
+// A socket's tag names the device its app registered, so a push can leave that device to the feed.
+const DEVICE_TAG = 'device:';
+
 /** Holds a recipient's open feed sockets and signals new items to them. */
 export class ChaskiFeed extends DurableObject<unknown> {
   constructor(ctx: DurableObjectState, env: unknown) {
@@ -25,9 +28,20 @@ export class ChaskiFeed extends DurableObject<unknown> {
         { status: 426 },
       );
     }
+    const device = new URL(request.url).searchParams.get('device');
     const pair = new WebSocketPair();
-    this.ctx.acceptWebSocket(pair[1]);
+    this.ctx.acceptWebSocket(pair[1], device ? [`${DEVICE_TAG}${device}`] : []);
     return new Response(null, { status: 101, webSocket: pair[0] });
+  }
+
+  /** The devices whose app holds a feed socket open right now. */
+  openDevices(): string[] {
+    const tags = this.ctx.getWebSockets().flatMap((ws) => this.ctx.getTags(ws));
+    return [
+      ...new Set(
+        tags.filter((tag) => tag.startsWith(DEVICE_TAG)).map((tag) => tag.slice(DEVICE_TAG.length)),
+      ),
+    ];
   }
 
   publish(event: FeedSocketEvent): void {

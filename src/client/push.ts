@@ -1,4 +1,5 @@
 import type { NativeDevice } from '../contract/contract';
+import type { FeedDeviceLink } from './feed';
 import type { Request } from './http';
 
 export type PushOptions = {
@@ -16,6 +17,14 @@ export type PushState = {
   permission: NotificationPermission | 'unsupported';
 };
 
+export type RegisterDeviceOptions = {
+  /**
+   * While this client's feed socket is open, the device gets the notifications that also go to
+   * the feed through the feed instead of a push, for an app that shows them itself while it runs.
+   */
+  feedWhileOpen?: boolean;
+};
+
 export type PushClient = {
   isSupported(): boolean;
   state(): Promise<PushState>;
@@ -27,7 +36,7 @@ export type PushClient = {
    * Registers an app's device token for the signed-in user, such as the APNs token Electron's
    * `pushNotifications.registerForAPNSNotifications()` resolves with.
    */
-  registerDevice(device: NativeDevice): Promise<void>;
+  registerDevice(device: NativeDevice, options?: RegisterDeviceOptions): Promise<{ id: string }>;
   /** Unregisters a device token of the signed-in user, when they sign out of the app. */
   unregisterDevice(deviceToken: string): Promise<void>;
 };
@@ -53,8 +62,18 @@ const sameKey = (key: ArrayBuffer | null | undefined, expected: Uint8Array) => {
   return bytes.every((byte, index) => byte === expected[index]);
 };
 
-export const createPushClient = (request: Request, options: PushOptions = {}): PushClient => {
+export const createPushClient = (
+  request: Request,
+  options: PushOptions = {},
+  feed?: FeedDeviceLink,
+): PushClient => {
   const scope = options.serviceWorkerScope ?? '/';
+  // The device this client's feed socket names, by its token, so unregistering it lets go.
+  let linkedToken: string | null = null;
+  const link = (token: string | null, id: string | null) => {
+    linkedToken = token;
+    feed?.setDevice(id);
+  };
 
   // The server's key, asked for once; a failed request is asked again next time.
   let serverKey: Promise<Uint8Array<ArrayBuffer> | null> | null = null;
@@ -141,11 +160,15 @@ export const createPushClient = (request: Request, options: PushOptions = {}): P
       await request('DELETE', '/push/subscriptions', { endpoint: subscription.endpoint });
       await subscription.unsubscribe();
     },
-    registerDevice: async (device) => {
-      await request('POST', '/push/subscriptions', device);
+    registerDevice: async (device, { feedWhileOpen = false } = {}) => {
+      const { id } = await request<{ id: string }>('POST', '/push/subscriptions', device);
+      if (feedWhileOpen) link(device.deviceToken, id);
+      else if (linkedToken === device.deviceToken) link(null, null);
+      return { id };
     },
     unregisterDevice: async (deviceToken) => {
       await request('DELETE', '/push/subscriptions', { deviceToken });
+      if (linkedToken === deviceToken) link(null, null);
     },
   };
 };

@@ -58,11 +58,14 @@ const parseEvent = (raw: unknown): FeedSocketEvent | null => {
   }
 };
 
+/** Names, on the socket, the device whose pushes the open feed takes over. */
+export type FeedDeviceLink = { setDevice(id: string | null): void };
+
 export const createFeedClient = (
   request: Request,
   baseUrl: string,
   options: FeedOptions = {},
-): FeedClient => {
+): FeedClient & FeedDeviceLink => {
   const minDelayMs = options.reconnect?.minDelayMs ?? 1_000;
   const maxDelayMs = options.reconnect?.maxDelayMs ?? 30_000;
   const maxAttempts = options.reconnect?.maxAttempts ?? 5;
@@ -84,6 +87,7 @@ export const createFeedClient = (
   // The subscriber's own first load covers the first connection; any later one may have missed
   // items while no socket was open.
   let connectedBefore = false;
+  let device: string | null = null;
 
   const setStatus = (next: FeedConnectionStatus) => {
     if (status === next) return;
@@ -102,11 +106,12 @@ export const createFeedClient = (
   };
 
   const socketUrl = () => {
+    const path = `${baseUrl}/feed/socket${device ? `?device=${encodeURIComponent(device)}` : ''}`;
     const base = typeof location === 'undefined' ? undefined : location.href;
     // Outside a browser a relative baseUrl has no page to resolve against, so the factory gets
     // the path.
-    if (base === undefined && !URL.canParse(baseUrl)) return `${baseUrl}/feed/socket`;
-    const url = new URL(`${baseUrl}/feed/socket`, base);
+    if (base === undefined && !URL.canParse(baseUrl)) return path;
+    const url = new URL(path, base);
     url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
     return url.toString();
   };
@@ -291,5 +296,13 @@ export const createFeedClient = (
       };
     },
     status: () => status,
+    setDevice: (id) => {
+      if (id === device) return;
+      device = id;
+      // The open socket names the old device, or none: the server only reads it on connect.
+      if (!socket) return;
+      dropSocket();
+      openSocket();
+    },
   };
 };
