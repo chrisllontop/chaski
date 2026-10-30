@@ -13,6 +13,7 @@ import { METRIC_PERIODS, MetricsService } from '../services/metrics.service';
 import { ScheduleService } from '../services/schedule.service';
 import { mutedTypesSchema, SettingsService } from '../services/settings.service';
 import { TemplateService } from '../services/template.service';
+import { TranslationService } from '../services/translation.service';
 import { channels } from './channels';
 
 const templateInputSchema = z.object({
@@ -183,32 +184,30 @@ const translationParams = (c: Context) => ({
 
 admin.get('/templates/:id/channels/:channel/translations/:locale', async (c) => {
   const { id, channel, locale } = translationParams(c);
-  return c.json({ translation: await TemplateService.getTranslation(id, channel, locale) });
+  return c.json({ translation: await TranslationService.get(id, channel, locale) });
 });
 
 admin.put('/templates/:id/channels/:channel/translations/:locale', async (c) => {
   const { id, channel, locale } = translationParams(c);
   const input = parseInput(translationSchema, await c.req.json());
-  return c.json({
-    translation: await TemplateService.saveTranslation(id, channel, locale, input),
-  });
+  return c.json({ translation: await TranslationService.save(id, channel, locale, input) });
 });
 
 admin.post('/templates/:id/channels/:channel/translations/:locale/mark-current', async (c) => {
   const { id, channel, locale } = translationParams(c);
-  return c.json({ translation: await TemplateService.markTranslationCurrent(id, channel, locale) });
+  return c.json({ translation: await TranslationService.markCurrent(id, channel, locale) });
 });
 
 admin.delete('/templates/:id/channels/:channel/translations/:locale', async (c) => {
   const { id, channel, locale } = translationParams(c);
-  await TemplateService.deleteTranslation(id, channel, locale);
+  await TranslationService.delete(id, channel, locale);
   return c.json({ id: locale, channel, deleted: true as const });
 });
 
 // Removes a language from the template: its translation on every channel.
 admin.delete('/templates/:id/translations/:locale', async (c) => {
   const locale = parseInput(localeSchema, c.req.param('locale'));
-  const channels = await TemplateService.deleteLanguage(c.req.param('id'), locale);
+  const channels = await TranslationService.deleteLanguage(c.req.param('id'), locale);
   return c.json({ id: locale, channels, deleted: true as const });
 });
 

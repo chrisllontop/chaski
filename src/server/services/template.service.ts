@@ -1,7 +1,6 @@
 import { and, eq, isNotNull, sql } from 'drizzle-orm';
 import type { Channel } from '../../contract/contract';
 import { ChaskiError } from '../../contract/errors';
-import { languageOf, type TranslationStatus } from '../../contract/locales';
 import {
   TEMPLATE_FILE_FORMAT,
   TEMPLATE_FILE_VERSION,
@@ -17,19 +16,20 @@ import {
   notifications,
   type templateChannels,
   templates,
-  templateTranslations,
+  type templateTranslations,
 } from '../db/schema';
 import { publishAdminEvents } from '../lib/admin-events';
 import { DeliveryError } from '../lib/errors';
 import { OUTDATED_HASH, sourceHash } from '../lib/fingerprint';
 import { newId } from '../lib/ids';
 import { parseJson } from '../lib/json';
-import { assertTemplates, type ChannelFields, localeFormat, renderFields } from '../lib/render';
+import { assertTemplates, localeFormat, renderFields } from '../lib/render';
 import { parseInput } from '../lib/validate';
 import type { NotificationRow } from './adapters/types';
 import { BaseService } from './base.service';
 import type { ContactSnapshot } from './contact.service';
 import { EmailSenderService, senderAddress } from './email-sender.service';
+import { type ResolvedContent, TranslationService } from './translation.service';
 
 export type ChannelContentInput = {
   enabled?: boolean;
@@ -38,24 +38,11 @@ export type ChannelContentInput = {
   textBody?: string | null;
 };
 
-/** Omitted keeps the saved field, null clears it; a translation can't be left without a body. */
-export type TranslationInput = {
-  subject?: string | null;
-  body?: string;
-  textBody?: string | null;
-};
-
 export type RenderedPreview = {
   subject: string;
   html: string;
   text?: string;
   /** The language the content rendered in; null while the Worker has no languages. */
-  locale: string | null;
-};
-
-/** A channel's content as a contact gets it, and the language it's in. */
-export type ResolvedContent = ChannelFields & {
-  /** A translation's locale, or the default language; null while the Worker has no languages. */
   locale: string | null;
 };
 
@@ -76,39 +63,6 @@ const isLive = (row: {
 const TEMPLATE_FIELDS = ['description', 'topic', 'sampleData'] as const;
 const CHANNEL_FIELDS = ['enabled', 'subject', 'body', 'textBody'] as const;
 const TRANSLATION_FIELDS = ['subject', 'body', 'textBody'] as const;
-
-const statusOf = (
-  row: TranslationRow,
-  currentHash: string,
-): Exclude<TranslationStatus, 'missing'> =>
-  row.sourceHash === currentHash ? 'complete' : 'outdated';
-
-const presentTranslation = (
-  row: TranslationRow,
-  channel: Channel,
-  currentHash: string,
-  supported: string[],
-) => ({
-  channel,
-  locale: row.locale,
-  subject: row.subject,
-  body: row.body,
-  textBody: row.textBody,
-  status: statusOf(row, currentHash),
-  // A language removed from the Worker keeps its translations, unused until it comes back.
-  supported: supported.includes(row.locale),
-  createdAt: row.createdAt.toISOString(),
-  updatedAt: row.updatedAt.toISOString(),
-});
-
-// The locales that can serve a contact asking for `requested`, closest first: the exact tag, then
-// its language. Only the Worker's other languages take part; anything else gets the default.
-const candidatesFor = (requested: string | null, supported: string[]): string[] =>
-  requested
-    ? [...new Set([requested, languageOf(requested)])].filter((locale) =>
-        supported.includes(locale),
-      )
-    : [];
 
 type ImportedTranslation = {
   channel: Channel;
@@ -210,34 +164,6 @@ export class TemplateService extends BaseService {
       .map(([topic, types]) => ({ topic, types }));
   };
 
-  /**
-   * The content a contact asking for `requested` gets on this channel: the translation in that
-   * locale, else in its language, else the default content. Each channel resolves on its own.
-   */
-  private static resolve = async (
-    row: ChannelRow & { body: string },
-    requested: string | null,
-  ): Promise<ResolvedContent> => {
-    const locales = TemplateService.config.locales;
-    const candidates = candidatesFor(requested, locales?.supported ?? []);
-    const translations =
-      candidates.length > 0
-        ? await TemplateService.client.templateTranslations.findMany({
-            where: { templateChannelId: row.id, locale: { in: candidates } },
-          })
-        : [];
-    const translation = candidates
-      .map((locale) => translations.find((t) => t.locale === locale))
-      .find((t) => t !== undefined);
-    const content = translation ?? row;
-    return {
-      subject: content.subject,
-      body: content.body,
-      textBody: content.textBody,
-      locale: translation?.locale ?? locales?.default ?? null,
-    };
-  };
-
   static findActiveContent = async (
     type: string,
     channel: Channel,
@@ -249,7 +175,7 @@ export class TemplateService extends BaseService {
       where: { templateId: template.id, channel },
     });
     if (!row || !isLive(row)) return null;
-    return { templateId: template.id, ...(await TemplateService.resolve(row, requested)) };
+    return { templateId: template.id, ...(await TranslationService.resolve(row, requested)) };
   };
 
   /**
@@ -294,18 +220,11 @@ export class TemplateService extends BaseService {
   static list = async () => {
     const rows = await TemplateService.client.templates.findMany({ orderBy: [{ type: 'asc' }] });
     if (rows.length === 0) return [];
-    const supported = TemplateService.config.locales?.supported ?? [];
-    const [channels, translations, lastUsedRows] = await Promise.all([
+    const [channels, lastUsedRows] = await Promise.all([
       TemplateService.client.templateChannels.findMany({
         where: { templateId: { in: rows.map((row) => row.id) } },
         orderBy: [{ channel: 'asc' }],
       }),
-      // By locale rather than by channel, which would bind a parameter per channel.
-      supported.length > 0
-        ? TemplateService.client.templateTranslations.findMany({
-            where: { locale: { in: supported } },
-          })
-        : Promise.resolve([]),
       TemplateService.db
         .select({
           type: notifications.type,
@@ -315,30 +234,10 @@ export class TemplateService extends BaseService {
         .groupBy(notifications.type)
         .all(),
     ]);
-    const translated = new Set(translations.map((t) => t.templateChannelId));
-    const hashes = new Map(
-      await Promise.all(
-        channels
-          .filter((c) => translated.has(c.id))
-          .map(async (c) => [c.id, await sourceHash(c)] as const),
-      ),
-    );
-    // Each supported language of each channel: whether a contact asking for it gets it.
-    const statuses = (channel: ChannelRow): Record<string, TranslationStatus> =>
-      Object.fromEntries(
-        supported.map((locale) => {
-          const row = translations.find(
-            (t) => t.templateChannelId === channel.id && t.locale === locale,
-          );
-          return [locale, row ? statusOf(row, hashes.get(channel.id) ?? '') : 'missing'];
-        }),
-      );
+    const languages = await TranslationService.statuses(channels);
     const lastUsedByType = new Map(lastUsedRows.map((row) => [row.type, row.lastUsedAt]));
     return rows.map((row) => {
       const own = channels.filter((c) => c.templateId === row.id);
-      const translationsOf = translations.filter((t) =>
-        own.some((c) => c.id === t.templateChannelId),
-      );
       return {
         ...row,
         // Editing a channel's content, or a translation, stamps only that row, so the template
@@ -346,8 +245,7 @@ export class TemplateService extends BaseService {
         contentUpdatedAt: new Date(
           Math.max(
             row.updatedAt.getTime(),
-            ...own.map((c) => c.updatedAt.getTime()),
-            ...translationsOf.map((t) => t.updatedAt.getTime()),
+            ...own.map((c) => languages.get(c.id)?.updatedAt ?? c.updatedAt.getTime()),
           ),
         ).toISOString(),
         lastUsedAt:
@@ -357,7 +255,7 @@ export class TemplateService extends BaseService {
         channels: own.map((c) => ({
           channel: c.channel,
           enabled: isLive(c),
-          translations: statuses(c),
+          translations: languages.get(c.id)?.statuses ?? {},
         })),
       };
     });
@@ -643,28 +541,13 @@ export class TemplateService extends BaseService {
       where: { templateId },
       orderBy: [{ channel: 'asc' }],
     });
-    const translations =
-      channels.length > 0
-        ? await TemplateService.client.templateTranslations.findMany({
-            where: { templateChannelId: { in: channels.map((c) => c.id) } },
-            orderBy: [{ locale: 'asc' }],
-          })
-        : [];
-    const supported = TemplateService.config.locales?.supported ?? [];
+    const translations = await TranslationService.ofChannels(channels);
     return {
       template,
-      channels: await Promise.all(
-        channels.map(async (channel) => {
-          const own = translations.filter((t) => t.templateChannelId === channel.id);
-          const currentHash = own.length > 0 ? await sourceHash(channel) : OUTDATED_HASH;
-          return {
-            ...channel,
-            translations: own.map((t) =>
-              presentTranslation(t, channel.channel as Channel, currentHash, supported),
-            ),
-          };
-        }),
-      ),
+      channels: channels.map((channel) => ({
+        ...channel,
+        translations: translations.get(channel.id) ?? [],
+      })),
     };
   };
 
@@ -736,146 +619,6 @@ export class TemplateService extends BaseService {
     return row;
   };
 
-  // ─── Translations ─────────────────────────────────────────────────────────
-
-  private static channelRow = async (templateId: string, channel: Channel) => {
-    await TemplateService.get(templateId);
-    const row = await TemplateService.client.templateChannels.findFirst({
-      where: { templateId, channel },
-    });
-    if (!row) {
-      throw new ChaskiError('not_found', `the template has no ${channel} content to translate`);
-    }
-    return row;
-  };
-
-  private static translationRow = async (row: ChannelRow, locale: string) => {
-    const translation = await TemplateService.client.templateTranslations.findFirst({
-      where: { templateChannelId: row.id, locale },
-    });
-    if (!translation) {
-      throw new ChaskiError('not_found', `the ${row.channel} content has no ${locale} translation`);
-    }
-    return translation;
-  };
-
-  private static present = async (row: ChannelRow, translation: TranslationRow) =>
-    presentTranslation(
-      translation,
-      row.channel as Channel,
-      await sourceHash(row),
-      TemplateService.config.locales?.supported ?? [],
-    );
-
-  static getTranslation = async (templateId: string, channel: Channel, locale: string) => {
-    const row = await TemplateService.channelRow(templateId, channel);
-    return TemplateService.present(row, await TemplateService.translationRow(row, locale));
-  };
-
-  /** Saves a translation from the channel's current default content, which makes it current. */
-  static saveTranslation = async (
-    templateId: string,
-    channel: Channel,
-    locale: string,
-    input: TranslationInput,
-  ) => {
-    const locales = TemplateService.config.locales;
-    if (!locales) {
-      throw new ChaskiError(
-        'validation',
-        'this Chaski has no languages yet: save them on the Channels page first',
-      );
-    }
-    if (locale === locales.default) {
-      throw new ChaskiError(
-        'validation',
-        `${locale} is the default language: edit the channel's own content instead`,
-      );
-    }
-    if (!locales.supported.includes(locale)) {
-      throw new ChaskiError(
-        'validation',
-        `${locale} isn't one of this Chaski's languages: add it on the Channels page first`,
-      );
-    }
-    assertTemplates({ subject: input.subject, body: input.body, textBody: input.textBody });
-    const row = await TemplateService.channelRow(templateId, channel);
-    const existing = await TemplateService.client.templateTranslations.findFirst({
-      where: { templateChannelId: row.id, locale },
-    });
-    const body = input.body ?? existing?.body;
-    if (!body?.trim()) throw new ChaskiError('validation', 'body: a translation needs a body');
-    await TemplateService.client.templateTranslations.upsertMany({
-      data: [
-        {
-          templateChannelId: row.id,
-          locale,
-          subject: input.subject === undefined ? (existing?.subject ?? null) : input.subject,
-          body,
-          textBody: input.textBody === undefined ? (existing?.textBody ?? null) : input.textBody,
-          sourceHash: await sourceHash(row),
-        },
-      ],
-      target: ['templateChannelId', 'locale'],
-      update: ['subject', 'body', 'textBody', 'sourceHash', 'updatedAt'],
-    });
-    await publishAdminEvents(['templates', 'locales']);
-    return TemplateService.present(row, await TemplateService.translationRow(row, locale));
-  };
-
-  /** Takes the translation as written from the channel's current content, without changing it. */
-  static markTranslationCurrent = async (templateId: string, channel: Channel, locale: string) => {
-    const row = await TemplateService.channelRow(templateId, channel);
-    await TemplateService.translationRow(row, locale);
-    await TemplateService.client.templateTranslations.update({
-      where: { templateChannelId: row.id, locale },
-      data: { sourceHash: await sourceHash(row) },
-    });
-    await publishAdminEvents(['templates']);
-    return TemplateService.present(row, await TemplateService.translationRow(row, locale));
-  };
-
-  static deleteTranslation = async (
-    templateId: string,
-    channel: Channel,
-    locale: string,
-  ): Promise<void> => {
-    const row = await TemplateService.channelRow(templateId, channel);
-    const result = await TemplateService.db
-      .delete(templateTranslations)
-      .where(
-        and(
-          eq(templateTranslations.templateChannelId, row.id),
-          eq(templateTranslations.locale, locale),
-        ),
-      );
-    if (result.meta.changes === 0) {
-      throw new ChaskiError('not_found', `the ${channel} content has no ${locale} translation`);
-    }
-    await publishAdminEvents(['templates', 'locales']);
-  };
-
-  /** Removes a language from a template: its translation on every channel. */
-  static deleteLanguage = async (templateId: string, locale: string): Promise<number> => {
-    const { channels } = await TemplateService.get(templateId);
-    const ids = channels.filter((c) => c.translations.some((t) => t.locale === locale));
-    if (ids.length === 0) {
-      throw new ChaskiError('not_found', `the template has no ${locale} translation`);
-    }
-    for (const channel of ids) {
-      await TemplateService.db
-        .delete(templateTranslations)
-        .where(
-          and(
-            eq(templateTranslations.templateChannelId, channel.id),
-            eq(templateTranslations.locale, locale),
-          ),
-        );
-    }
-    await publishAdminEvents(['templates', 'locales']);
-    return ids.length;
-  };
-
   // ─── Preview and test send ────────────────────────────────────────────────
 
   /**
@@ -903,7 +646,7 @@ export class TemplateService extends BaseService {
         locale: requested ?? TemplateService.config.locales?.default ?? null,
       };
     } else if (row?.body) {
-      resolved = await TemplateService.resolve({ ...row, body: row.body }, requested);
+      resolved = await TranslationService.resolve({ ...row, body: row.body }, requested);
     }
     if (!resolved?.body) {
       throw new ChaskiError('not_found', `template has no ${channel} content to preview`);

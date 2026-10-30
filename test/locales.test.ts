@@ -5,6 +5,7 @@ import { api as chaski } from '../src/server/api';
 import { getClient } from '../src/server/db';
 import { ScheduleService } from '../src/server/services/schedule.service';
 import { TemplateService } from '../src/server/services/template.service';
+import { TranslationService } from '../src/server/services/translation.service';
 import {
   api,
   processDeliveries,
@@ -159,7 +160,7 @@ describe('the language a send goes out in', () => {
     await TemplateService.upsertChannel(template.id, 'email', {
       subject: "{{ amount | currency: 'USD' }} · {{ paidAt | format_date }} · {{ locale }}",
     });
-    await TemplateService.saveTranslation(template.id, 'email', 'es', {
+    await TranslationService.save(template.id, 'email', 'es', {
       subject: "{{ amount | currency: 'USD' }} · {{ paidAt | format_date }} · {{ locale }}",
     });
     const payload = { amount: 1500, paidAt: '2026-10-30T03:30:00Z', locale: 'payload' };
@@ -258,8 +259,8 @@ describe('the Worker’s languages', () => {
       },
     });
 
-    await TemplateService.deleteLanguage(await templateId(), 'es');
-    await TemplateService.deleteLanguage(await templateId(), 'pt-BR');
+    await TranslationService.deleteLanguage(await templateId(), 'es');
+    await TranslationService.deleteLanguage(await templateId(), 'pt-BR');
     const free = await json('/settings/locales', {
       method: 'PUT',
       body: JSON.stringify({ default: 'es', supported: ['en'] }),
@@ -478,7 +479,7 @@ describe('translations in the template file', () => {
   it('exports them in a version 2 file that imports back unchanged', async () => {
     const id = await templateId();
     await TemplateService.upsertChannel(id, 'email', { subject: 'Changed' });
-    await TemplateService.markTranslationCurrent(id, 'email', 'pt-BR');
+    await TranslationService.markCurrent(id, 'email', 'pt-BR');
     const exported = await chaski.templates.export();
 
     expect(exported).toMatchObject({ version: 2, defaultLocale: 'en' });
