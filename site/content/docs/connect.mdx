@@ -94,6 +94,20 @@ Set `CHASKI_PUBLIC_URL` in the Chaski Worker’s `vars` to the absolute URL of t
 and Chaski leaves the pixel out without it. [Browser clients](/docs/browser-clients) covers the
 frontend, and [Configuration](/docs/configuration#userroutes) every option.
 
+The pixel is `GET <mount>/t/o/:deliveryId`, and an email client loads it with no session, from
+another site. When your app puts its routes behind a session or an origin check, that path has to
+pass them: register a mount that serves only the pixel, at the same path, ahead of them.
+
+```ts title="src/index.ts"
+// Only the open pixel: no groups, so identify never runs.
+app.route(
+  '/me/notifications',
+  userRoutes({ chaski: (c) => c.env.CHASKI, identify: () => null, groups: [] }),
+);
+app.use('*', requireSession); // your app's own gates
+app.route('/me/notifications', userRoutes({ chaski: (c) => c.env.CHASKI, identify }));
+```
+
 ## Errors
 
 Chaski’s errors cross the binding with their `name` (`ChaskiError`), `message` and `code`, such as
