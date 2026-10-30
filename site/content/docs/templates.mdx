@@ -1,6 +1,6 @@
 ---
 title: Templates
-description: Each notification type has a template with content for each channel, written in Liquid and edited in the dashboard.
+description: Each notification type has a template with content for each channel, in each language it sends in, written in Liquid and edited in the dashboard.
 ---
 
 ## Create a template
@@ -30,7 +30,30 @@ Thanks, {{ recipient.name }}. We received your payment of {{ amount }}.
 ```
 
 `recipient` holds the fields the send gave it: `id`, and `email`, `name`, `phone`, `timezone` and
-`locale` when present. A key the payload lacks renders empty instead of failing the delivery.
+`locale` when present. A key the payload lacks renders empty instead of failing the delivery. Once
+your Chaski has [languages](#languages), templates also see `locale`, the language the channel
+renders in.
+
+### Numbers, money and dates
+
+Send values as they are, and let the template format them for the reader:
+
+```liquid
+{{ count | number }} items, {{ amount | currency: 'USD' }}, paid {{ paidAt | format_date }}
+```
+
+| Filter | Writes |
+| --- | --- |
+| `number` | `1,500` in English, `1.500` in German. `number: 2` shows exactly two decimals. |
+| `currency: 'USD'` | The amount in that currency, as the language writes money: `$1,500.00`, `1500,00 US$`. |
+| `format_date` | The date in the long style: `October 30, 2026`, `30 de octubre de 2026`. `format_date: 'medium', 'short'` adds the time, and `format_date: 'none', 'short'` shows the time alone; the styles are `full`, `long`, `medium`, `short` and `none`. |
+
+They format in the language the content renders in, with the region the send asked for when the
+content is in its language: a contact in `es-PE` reading Spanish content gets Peru’s format. With
+no languages saved, they format in English. Dates show in the contact’s `timezone`, or UTC
+without one, and a number, or a string of digits, counts seconds since the epoch, as Liquid’s
+`date` filter reads it. A value they can’t read prints as it came; a filter written wrong, such as
+`currency` without a code, fails the delivery for good, as a template Liquid can’t parse does.
 
 In Liquid only `nil` and `false` are false, so an empty string passes `{% if note %}`. A branch on
 an optional value tests `{% if note != blank %}`, which an empty string and a missing key both
@@ -61,6 +84,36 @@ The editor previews each channel as you type, rendered with sample data you keep
 template. For email, **Send test** delivers the saved content, rendered with the sample data, to the
 address you enter.
 
+## Languages
+
+Your Chaski sends in a **default language**, the one every template is written in first, and in
+the other languages you add under **Languages** on the dashboard’s
+[Channels](/docs/configuration#languages) page. Each channel of a template then keeps its content
+in each of them: a **translation** with the same three fields. Every field is the translation’s
+own: one it leaves empty goes out empty, never in the default language.
+
+A send asks for a language with its own `locale`, or else the contact’s `recipient.locale`. Each
+channel then picks its closest content on its own:
+
+1. the translation in that locale, such as `es-PE`;
+2. else the translation in its language, `es`;
+3. else the default content.
+
+Only your Chaski’s languages take part, so one you take off keeps its translations unused until it
+comes back. A send can email in Spanish while its in-app item goes out in English, when only the
+email has Spanish. Every delivery records the language it went out in, next to the one the send
+asked for: **Deliveries** shows both, **Templates** shows each template’s languages, complete,
+outdated or missing, and the **Overview** counts the deliveries that fell back to another
+language. A locale that isn’t a [BCP 47](https://www.rfc-editor.org/info/bcp47) tag counts as
+absent, so the send goes out in the default language rather than failing.
+
+A translation remembers the default content it was written from. When that content changes, the
+translation shows as **outdated** until you save it again or mark it up to date. It keeps going
+out meanwhile, as written.
+
+The default language changes only while no template has a translation: each one was written from
+the default content.
+
 ## Keep templates in a file
 
 Templates can also live in your repository, as a JSON file your app loads over its binding with
@@ -84,7 +137,8 @@ running, before `wrangler dev` or from a deploy job, turn it into SQL with
 ```json title="chaski-templates.json"
 {
   "format": "chaski.templates",
-  "version": 1,
+  "version": 2,
+  "defaultLocale": "en",
   "templates": [
     {
       "type": "payment_received",
@@ -93,11 +147,25 @@ running, before `wrangler dev` or from a deploy job, turn it into SQL with
         {
           "channel": "email",
           "enabled": true,
-          "subject": "Payment of {{ amount }} received",
-          "body": "<p>Thanks, {{ recipient.name }}.</p>"
+          "subject": "Payment of {{ amount | currency: 'USD' }} received",
+          "body": "<p>Thanks, {{ recipient.name }}.</p>",
+          "translations": {
+            "es": {
+              "subject": "Recibimos tu pago de {{ amount | currency: 'USD' }}",
+              "body": "<p>Gracias, {{ recipient.name }}.</p>"
+            }
+          }
         }
       ]
     }
   ]
 }
 ```
+
+`defaultLocale` names the language of each channel’s own content, and `translations` holds the
+channel in your other languages. A file with translations loads only into a Chaski whose
+languages are saved with that default, and a translation the file leaves out keeps what it has.
+An export writes `"outdated": true` on a translation written from older content, and loading it
+keeps it so. A file in one language can leave both keys out. Files of `"version": 1`, the format
+before languages, still load; one that carries `translations` is refused rather than loaded
+without them.

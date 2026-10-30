@@ -31,12 +31,33 @@ the dashboard shows it as it moves.
 | `transactional` | Sends regardless of the contact’s preferences, for receipts and password resets. |
 | `email` | Per-send email options: `fromName`, `replyTo` and up to 10 `attachments`. |
 | `push` | Per-send push options: `silent: true` shows the alert without a sound, and `collapseId` replaces a push already shown with the same id. |
+| `locale` | The language of this send alone, ahead of the contact’s `recipient.locale`, which it doesn’t change; see [Languages](/docs/templates#languages). |
 | `data` | Up to 20 string values for your clients, such as your own event id. Every push and the feed item carry them as they came. |
 | `idempotencyKey` | Makes the send safe to repeat: the same key returns the first send’s result. |
 | `inline` | Delivers the email before `send()` returns, for someone waiting on it; see [below](#inline). |
 
 The recipient’s fields are saved with the notification, so a retry later delivers to the address
 the send named even if the contact changes in between.
+
+## Send in the reader’s language [#languages]
+
+Give the contact’s language as `recipient.locale`, and each channel goes out in the closest
+[language](/docs/templates#languages) its template has, falling back to the default:
+
+```ts
+await env.CHASKI.send({
+  type: 'payment_received',
+  recipient: { id: user.id, email: user.email, locale: user.locale }, // 'es-PE'
+  payload: { amount: 1500 },
+});
+
+// This send alone in Spanish, whatever the contact's language.
+await env.CHASKI.send({ type: 'payment_received', recipient, payload, locale: 'es' });
+```
+
+Send the text your app would translate as part of the template, not the payload: the template’s
+translations hold it per language, and the payload carries the values, which
+[filters](/docs/templates#numbers-money-and-dates) format for the reader.
 
 ## What a send returns
 

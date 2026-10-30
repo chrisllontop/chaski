@@ -25,8 +25,8 @@ methods: `env.CHASKI.feed().list(query)` is still a single round trip.
 | `push().register(request)` | `{ id }` | Registers a web push subscription, an iOS or macOS device token, an Android FCM token or a Windows channel URI. |
 | `push().unregister(query)` | `{ unregistered }` | By `recipientId`, `endpoint` or `deviceToken`. |
 | `push().vapidPublicKey()` | `{ publicKey }` | The key for `pushManager.subscribe()`, or `null`. |
-| `templates().import(file, { preview? })` | `TemplateImportResult` | Creates or updates templates by type from a [template file](/docs/templates#keep-templates-in-a-file); `preview` only reports. |
-| `templates().export()` | `TemplateFile` | Every template, as the file `templates().import()` takes. |
+| `templates().import(file, { preview? })` | `TemplateImportResult` | Creates or updates templates by type, and their translations, from a [template file](/docs/templates#keep-templates-in-a-file); `preview` only reports. Takes version 1 and 2 files. |
+| `templates().export()` | `TemplateFile` | Every template with its translations, as a version 2 file `templates().import()` takes. |
 
 `ready()` suits a health route of your app: it asks the database each time, so a database that
 doesn’t answer fails it too. `templates` counts the templates outside the trash; at `0`, every send
@@ -63,6 +63,9 @@ type SendRequest = {
   // For your clients, as is: the feed item and every push carry it. Strings only, since FCM
   // data and WNS launch arguments hold nothing else; up to 20 keys.
   data?: Record<string, string>;
+  // The language of this send alone, ahead of recipient.locale; a BCP 47 tag. One that isn't
+  // counts as absent.
+  locale?: string;
   idempotencyKey?: string;
   // Delivers the one transactional email before send() returns; see Sending.
   inline?: boolean;
