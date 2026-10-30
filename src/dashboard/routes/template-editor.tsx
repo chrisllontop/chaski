@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
 import { cn } from 'cn';
 import { ChevronDown, Copy, Info, Languages, Plus, Send, Trash2 } from 'lucide-react';
@@ -487,6 +487,7 @@ export const TemplateEditorPage = () => {
     enabled:
       Boolean(debounced.content ? debounced.content.body : row?.body) && debounced.sample !== null,
     retry: false,
+    placeholderData: keepPreviousData,
   });
 
   const refresh = async () => {
