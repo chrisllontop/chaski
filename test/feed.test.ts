@@ -1,8 +1,9 @@
 import { env } from 'cloudflare:workers';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { api as chaski } from '../src/server/api';
 import { getClient } from '../src/server/db';
 import { NotificationService } from '../src/server/services/notification.service';
-import { chaski, fixtureConfig } from './fixture/worker';
+import { fixtureConfig } from './fixture/worker';
 import { processDeliveries, recipient, seedTemplate, useConfig } from './helpers';
 
 const sendInApp = async (amount = 1500, recipientId = 'user_1') => {
@@ -137,14 +138,14 @@ describe('in-app channel', () => {
 
   it('keeps the delivery sent when the realtime signal fails', async () => {
     await seedTemplate('payment_received', 'in_app');
-    const onError = vi.fn();
+    const error = vi.spyOn(console, 'error');
     const config = fixtureConfig(env);
     const broken = {
       idFromName: () => {
         throw new Error('feed namespace unavailable');
       },
     } as unknown as DurableObjectNamespace<never>;
-    useConfig({ bindings: { ...config.bindings, feed: broken }, onError });
+    useConfig({ bindings: { ...config.bindings, feed: broken } });
 
     const result = await sendInApp();
 
@@ -152,10 +153,10 @@ describe('in-app channel', () => {
       where: { notificationId: result.notificationId, channel: 'in_app' },
     });
     expect(delivery?.status).toBe('sent');
-    expect(onError).toHaveBeenCalledWith(
-      expect.objectContaining({ message: 'feed namespace unavailable' }),
-      expect.objectContaining({ source: 'feed', channel: 'in_app' }),
-    );
+    expect(error).toHaveBeenCalledWith('[chaski:in_app]', 'feed signal failed', {
+      feedItemId: expect.any(String),
+      err: 'feed namespace unavailable',
+    });
   });
 
   it('answers a plain request to the feed object with 426', async () => {

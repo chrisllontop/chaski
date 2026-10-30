@@ -2,8 +2,8 @@ import { env } from 'cloudflare:workers';
 import { describe, expect, it } from 'vitest';
 import type { TemplateFile } from '../src';
 import { templatesToSql } from '../src/cli/templates-sql';
+import { api as chaski } from '../src/server/api';
 import { TemplateService } from '../src/server/services/template.service';
-import { chaski } from './fixture/worker';
 
 const BASE: TemplateFile = {
   format: 'chaski.templates',

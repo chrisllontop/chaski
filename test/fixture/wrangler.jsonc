@@ -1,10 +1,17 @@
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
-  "name": "chaski-fixture-host",
+  "name": "chaski-fixture",
   "main": "worker.ts",
   "compatibility_date": "2026-10-15",
   "vars": {
-    "CHASKI_PUBLIC_URL": "http://localhost:8787/chaski"
+    "CHASKI_PUBLIC_URL": "http://localhost:8787/app/notifications"
+  },
+  // wrangler dev signs this identity in, as Cloudflare Access would; the tests send their own.
+  "access": {
+    "dev": {
+      "aud": "chaski-fixture",
+      "identity": { "email": "admin@chaski.test", "name": "Fixture admin" }
+    }
   },
   "d1_databases": [
     {

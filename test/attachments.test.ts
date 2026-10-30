@@ -1,9 +1,9 @@
 import { introspectWorkflow } from 'cloudflare:test';
 import { env } from 'cloudflare:workers';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { api as chaski } from '../src/server/api';
 import { getClient } from '../src/server/db';
 import { NotificationService } from '../src/server/services/notification.service';
-import { chaski } from './fixture/worker';
 import { processDeliveries, recipient, seedTemplate, stubEmail } from './helpers';
 
 const attachment = (filename: string) => ({

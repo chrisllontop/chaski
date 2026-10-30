@@ -1,18 +1,26 @@
+import { exports } from 'cloudflare:workers';
 import { Hono } from 'hono';
+import { userRoutes } from '../../src';
+import { api } from '../../src/server/api';
 import {
   type ChaskiConfig,
-  type ChaskiEvents,
-  type ChaskiFeed,
-  createChaski,
-  type DeliveryMessage,
-  type ScheduleParams,
-  type SendEmailBinding,
-} from '../../src';
+  type ChaskiEnv,
+  configFromEnv,
+  setConfigure,
+} from '../../src/server/config';
+import type {
+  ChaskiEvents,
+  ChaskiFeed,
+  DeliveryMessage,
+  ScheduleParams,
+  SendEmailBinding,
+} from '../../src/worker';
+import worker from '../../src/worker';
 import { seed } from './seed';
 
+// The Chaski Worker as its project declares it, every binding included; the tests and `pnpm dev`
+// both run it.
 export type FixtureEnv = {
-  CHASKI_PUBLIC_URL: string;
-  ENVIRONMENT?: string;
   CHASKI_DB: D1Database;
   CHASKI_QUEUE: Queue<DeliveryMessage>;
   CHASKI_EMAIL: SendEmailBinding;
@@ -20,59 +28,35 @@ export type FixtureEnv = {
   CHASKI_FEED: DurableObjectNamespace<ChaskiFeed>;
   CHASKI_EVENTS: DurableObjectNamespace<ChaskiEvents>;
   CHASKI_SCHEDULER: Workflow<ScheduleParams>;
+  CHASKI_ENVIRONMENT?: string;
+  CHASKI_PUBLIC_URL?: string;
 };
 
-export const fixtureConfig = (env: FixtureEnv): ChaskiConfig => ({
-  publicUrl: env.CHASKI_PUBLIC_URL,
-  bindings: {
-    db: env.CHASKI_DB,
-    queue: env.CHASKI_QUEUE,
-    email: env.CHASKI_EMAIL,
-    attachments: env.CHASKI_ATTACHMENTS,
-    feed: env.CHASKI_FEED,
-    events: env.CHASKI_EVENTS,
-    scheduler: env.CHASKI_SCHEDULER,
-  },
+export const fixtureConfig = (env: ChaskiEnv): ChaskiConfig => ({
+  ...configFromEnv(env),
   channels: {
     email: { from: 'notifications@host.test', fromName: 'Fixture host' },
     in_app: {},
   },
-  environment: env.ENVIRONMENT,
 });
 
-// The host's main module re-exports Chaski's classes so its bindings, and the
-// service bindings of its other Workers, can find them.
-export { ChaskiEntrypoint, ChaskiEvents, ChaskiFeed, ChaskiScheduler } from '../../src';
+setConfigure(fixtureConfig);
 
-export const chaski = createChaski(fixtureConfig);
+export { ChaskiEntrypoint, ChaskiEvents, ChaskiFeed, ChaskiScheduler } from '../../src/worker';
 
-// Tests pick the authorize verdict per request; the browser gets the default and sees the dashboard.
-const dashboard = chaski.routes({
-  dashboard: {
-    authorize: (c) => {
-      const verdict = c.req.header('x-fixture-authorize');
-      if (verdict === 'deny') {
-        return null;
-      }
-      if (verdict === 'redirect') {
-        return c.redirect('/login', 302);
-      }
-      return { id: c.req.header('x-fixture-actor') ?? 'admin@host.test', name: 'Fixture admin' };
-    },
-    // Everyone may pause here, unless a test says otherwise; a host checks the actor's role.
-    canPauseChannels: (c) => c.req.header('x-fixture-can-pause') !== 'no',
-  },
-});
-
-// The signed-in user comes from a header here; a real host reads its session.
-const notifications = chaski.userRoutes({
+// An app's routes, in this Worker so one `wrangler dev` serves both. They reach Chaski through the
+// loopback binding to ChaskiEntrypoint, the way an app's own service binding would. The signed-in
+// user comes from a header here; a real app reads its session.
+const notifications = userRoutes({
+  chaski: () => exports.ChaskiEntrypoint,
   identify: (c) => c.req.header('x-fixture-user') ?? null,
-  allowedOrigins: ['https://frontend.host.test'],
+  allowedOrigins: ['https://frontend.app.test'],
 });
 
 // A second inbox for the same signed-in user, shared with their team: its own contact, so its own
 // feed, socket and count, and the feed alone, so a browser can't leave the user's own inbox for it.
-const teamNotifications = chaski.userRoutes({
+const teamNotifications = userRoutes({
+  chaski: () => exports.ChaskiEntrypoint,
   identify: (c) => {
     const user = c.req.header('x-fixture-user');
     return user ? `team:${user}` : null;
@@ -81,22 +65,21 @@ const teamNotifications = chaski.userRoutes({
 });
 
 const app = new Hono<{ Bindings: FixtureEnv }>()
-  .get('/', (c) => c.text('Host home'))
   // Fills the local database for `pnpm dev`, where wrangler keeps every email on disk; only in the
   // local environment, so nothing reaches a provider.
   .post('/dev/seed', async (c) => {
-    if (c.env.ENVIRONMENT !== 'local')
+    if (c.env.CHASKI_ENVIRONMENT !== 'local') {
       return c.json({ error: 'not_found', message: 'no such endpoint' }, 404);
-    return c.json(await seed(chaski));
+    }
+    return c.json(await seed(api));
   })
-  .route('/me/notifications', notifications)
-  .route('/me/team-notifications', teamNotifications)
-  .route('/chaski', dashboard)
-  .route('/admin', new Hono().route('/notifications', dashboard));
+  .route('/app/notifications', notifications)
+  .route('/app/team-notifications', teamNotifications);
 
 export default {
-  fetch: app.fetch,
-  queue: async (batch, env, ctx) => {
-    await chaski.queue(batch, env, ctx);
-  },
-} satisfies ExportedHandler<FixtureEnv>;
+  fetch: (request, env, ctx) =>
+    /^\/(app|dev)\//.test(new URL(request.url).pathname)
+      ? app.fetch(request, env, ctx)
+      : worker.fetch(request, env, ctx),
+  queue: worker.queue,
+} satisfies ExportedHandler<FixtureEnv, DeliveryMessage>;

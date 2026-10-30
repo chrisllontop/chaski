@@ -1,13 +1,14 @@
 import { env, exports } from 'cloudflare:workers';
 import { describe, expect, it, vi } from 'vitest';
-import type { AdminSocketEvent } from '../src';
+import type { AdminSocketEvent } from '../src/contract/admin-events';
+import { api as chaski } from '../src/server/api';
 import { publishAdminEvents } from '../src/server/lib/admin-events';
-import { chaski, fixtureConfig } from './fixture/worker';
-import { api, recipient, seedTemplate, useConfig } from './helpers';
+import { fixtureConfig } from './fixture/worker';
+import { api, CHASKI_URL, recipient, seedTemplate, signedIn, useConfig } from './helpers';
 
 const openEvents = async () => {
-  const response = await exports.default.fetch('https://host.test/chaski/api/events', {
-    headers: { upgrade: 'websocket', origin: 'https://host.test' },
+  const response = await exports.default.fetch(`${CHASKI_URL}/api/events`, {
+    headers: { upgrade: 'websocket', origin: CHASKI_URL, ...signedIn() },
   });
   const socket = response.webSocket;
   if (!socket) throw new Error(`no upgrade: ${response.status}`);

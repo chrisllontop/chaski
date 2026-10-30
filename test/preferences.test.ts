@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chaski } from './fixture/worker';
+import { api as chaski } from '../src/server/api';
 import { recipient, seedTemplate, seedTemplateType, useConfig } from './helpers';
 
 const send = (type = 'payment_received', extra = {}) =>

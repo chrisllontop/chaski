@@ -1,8 +1,8 @@
 import { env } from 'cloudflare:workers';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { api as chaski } from '../src/server/api';
 import { getClient } from '../src/server/db';
-import { chaski } from './fixture/worker';
-import { api, processDeliveries, recipient, seedTemplate, stubEmail } from './helpers';
+import { api, processDeliveries, recipient, seedTemplate, signedIn, stubEmail } from './helpers';
 
 type Json = Record<string, unknown> & {
   actor?: unknown;
@@ -24,10 +24,12 @@ afterEach(() => {
 });
 
 describe('GET /api/me', () => {
-  it('answers with the actor authorize let in', async () => {
-    const { body } = await json('/me', { headers: { 'x-fixture-actor': 'ana@example.com' } });
+  it('answers with the actor Access signed in', async () => {
+    const { body } = await json('/me', {
+      headers: signedIn({ email: 'ana@example.com', name: 'Ana' }),
+    });
 
-    expect(body).toEqual({ actor: { id: 'ana@example.com', name: 'Fixture admin' } });
+    expect(body).toEqual({ actor: { id: 'ana@example.com', name: 'Ana' } });
   });
 });
 

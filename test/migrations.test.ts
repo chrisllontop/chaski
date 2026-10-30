@@ -1,23 +1,32 @@
 import { env, exports } from 'cloudflare:workers';
-import { Hono } from 'hono';
 import { describe, expect, it } from 'vitest';
-import { createChaski } from '../src';
+import { api as chaski } from '../src/server/api';
 import { ensureMigrations, MIGRATIONS } from '../src/server/migrations';
 import { TemplateService } from '../src/server/services/template.service';
 import { fixtureConfig } from './fixture/worker';
-import { useConfig } from './helpers';
+import { api, useConfig } from './helpers';
+
+// A database where wrangler applied nothing yet.
+const fresh = {
+  prepare: () => ({ all: async () => ({ results: [] }) }),
+} as unknown as D1Database;
+
+const useFreshDatabase = () => {
+  const config = fixtureConfig(env);
+  useConfig({ bindings: { ...config.bindings, db: fresh } });
+};
 
 describe('migrations', () => {
   it('lists every file the package ships in migrations/', () => {
     expect(MIGRATIONS).toEqual(env.TEST_MIGRATIONS.map((migration) => migration.name));
   });
 
-  it('passes once the host applied every migration', async () => {
-    await expect(ensureMigrations(env.CHASKI_DB, 'd1_migrations')).resolves.toBeUndefined();
+  it('passes once every migration is applied', async () => {
+    await expect(ensureMigrations(env.CHASKI_DB)).resolves.toBeUndefined();
   });
 
   it('names the missing migrations and how to apply them', async () => {
-    await expect(ensureMigrations(env.CHASKI_DB, 'missing_migrations')).rejects.toMatchObject({
+    await expect(ensureMigrations(fresh)).rejects.toMatchObject({
       code: 'config',
       message: expect.stringContaining(
         'missing migrations 0000_init.sql, 0001_delivery_latency.sql, 0002_channel_pauses.sql, ' +
@@ -27,16 +36,9 @@ describe('migrations', () => {
   });
 
   it('answers the API with the config error before touching storage', async () => {
-    const chaski = createChaski(() => ({
-      ...fixtureConfig(env),
-      migrationsTable: 'missing_migrations',
-    }));
-    const app = new Hono().route(
-      '/chaski',
-      chaski.routes({ dashboard: { authorize: () => ({ id: 'admin@host.test' }) } }),
-    );
+    useFreshDatabase();
 
-    const response = await app.request('/chaski/api/templates');
+    const response = await api('/templates');
 
     expect(response.status).toBe(500);
     expect(await response.json()).toMatchObject({
@@ -46,11 +48,9 @@ describe('migrations', () => {
   });
 });
 
-// A host's health check asks Chaski whether it can run, without sending anything.
-describe('chaski.ready()', () => {
+// An app's health check asks Chaski whether it can run, without sending anything.
+describe('ready()', () => {
   it('reports the channels and the environment, in process and over RPC', async () => {
-    const chaski = useConfig();
-
     expect(await chaski.ready()).toEqual({
       channels: ['email', 'in_app'],
       paused: [],
@@ -67,7 +67,6 @@ describe('chaski.ready()', () => {
 
   // With no template every send is refused, as on a fresh database or after a forgotten import.
   it('counts the templates a send can name, leaving out the deleted ones', async () => {
-    const chaski = useConfig();
     await chaski.templates.import({
       format: 'chaski.templates',
       version: 1,
@@ -79,15 +78,15 @@ describe('chaski.ready()', () => {
   });
 
   it('throws the config error a send would', async () => {
-    await expect(
-      useConfig({ migrationsTable: 'missing_migrations' }).ready(),
-    ).rejects.toMatchObject({
+    useFreshDatabase();
+    await expect(chaski.ready()).rejects.toMatchObject({
       code: 'config',
       message: expect.stringContaining('missing migrations 0000_init.sql'),
     });
-    await expect(useConfig({ publicUrl: '/relative' }).ready()).rejects.toMatchObject({
+    useConfig({ publicUrl: '/relative' });
+    await expect(chaski.ready()).rejects.toMatchObject({
       code: 'config',
-      message: expect.stringContaining('publicUrl must be the absolute http(s) URL'),
+      message: expect.stringContaining('CHASKI_PUBLIC_URL must be the absolute http(s) URL'),
     });
   });
 
@@ -101,7 +100,7 @@ describe('chaski.ready()', () => {
       }),
     } as unknown as D1Database;
     const config = fixtureConfig(env);
-    const chaski = useConfig({ bindings: { ...config.bindings, db: broken } });
+    useConfig({ bindings: { ...config.bindings, db: broken } });
 
     await expect(chaski.ready()).rejects.toThrowError('Network connection lost');
   });

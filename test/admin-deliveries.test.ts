@@ -1,7 +1,8 @@
 import { env } from 'cloudflare:workers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { api as chaski } from '../src/server/api';
 import { getClient } from '../src/server/db';
-import { chaski, fixtureConfig } from './fixture/worker';
+import { fixtureConfig } from './fixture/worker';
 import {
   api,
   processDeliveries,
@@ -273,7 +274,6 @@ describe('GET /api/channels', () => {
     expect(JSON.parse(text)).toEqual({
       environment: null,
       realtime: true,
-      canPause: true,
       channels: [
         expect.objectContaining({
           channel: 'email',

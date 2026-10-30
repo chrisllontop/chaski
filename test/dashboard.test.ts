@@ -1,14 +1,10 @@
 import { exports } from 'cloudflare:workers';
 import { describe, expect, it } from 'vitest';
 import { assets } from '../src/generated/dashboard';
+import { CHASKI_URL, signedIn } from './helpers';
 
-type Verdict = 'allow' | 'deny' | 'redirect';
-
-const get = (path: string, verdict: Verdict = 'allow') =>
-  exports.default.fetch(`https://host.test${path}`, {
-    headers: { 'x-fixture-authorize': verdict },
-    redirect: 'manual',
-  });
+const get = (path: string) =>
+  exports.default.fetch(`${CHASKI_URL}${path}`, { headers: signedIn(), redirect: 'manual' });
 
 const baseHref = async (response: Response) =>
   (await response.text()).match(/<base href="([^"]*)">/)?.[1];
@@ -16,29 +12,24 @@ const baseHref = async (response: Response) =>
 const scriptAsset = Object.keys(assets).find((path) => path.endsWith('.js'));
 
 describe('dashboard shell', () => {
-  it.each([
-    ['/chaski', '/chaski/'],
-    ['/chaski/', '/chaski/'],
-    ['/admin/notifications', '/admin/notifications/'],
-    ['/admin/notifications/', '/admin/notifications/'],
-  ])('serves %s with the base path %s', async (path, expected) => {
-    const response = await get(path);
+  it('serves the root of the Worker with the base path /', async () => {
+    const response = await get('/');
 
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toContain('text/html');
-    expect(await baseHref(response)).toBe(expected);
+    expect(await baseHref(response)).toBe('/');
   });
 
   it('serves deep links so the dashboard can route them', async () => {
-    const response = await get('/chaski/templates/welcome');
+    const response = await get('/templates/welcome');
 
     expect(response.status).toBe(200);
-    expect(await baseHref(response)).toBe('/chaski/');
+    expect(await baseHref(response)).toBe('/');
   });
 
   it('allows runtime styles only with a nonce that changes on every load', async () => {
     const styleSource = async () =>
-      (await get('/chaski')).headers
+      (await get('/')).headers
         .get('content-security-policy')
         ?.split('; ')
         .find((directive) => directive.startsWith('style-src'));
@@ -51,7 +42,7 @@ describe('dashboard shell', () => {
   });
 
   it('is never cached and only loads same-origin resources', async () => {
-    const response = await get('/chaski');
+    const response = await get('/');
 
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(response.headers.get('content-security-policy')).toContain("default-src 'self'");
@@ -63,8 +54,8 @@ describe('dashboard assets', () => {
     expect(scriptAsset).toBeDefined();
   });
 
-  it.each(['/chaski', '/admin/notifications'])('serves hashed assets under %s', async (mount) => {
-    const response = await get(`${mount}/${scriptAsset}`);
+  it('serves hashed assets', async () => {
+    const response = await get(`/${scriptAsset}`);
 
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toBe('text/javascript; charset=utf-8');
@@ -75,63 +66,25 @@ describe('dashboard assets', () => {
     const favicon = Object.keys(assets).find((path) => /favicon-[\w-]+\.svg$/.test(path));
     expect(favicon).toBeDefined();
 
-    const response = await get(`/chaski/${favicon}`);
+    const response = await get(`/${favicon}`);
 
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toBe('image/svg+xml; charset=utf-8');
   });
 
   it('answers 404 for a missing asset instead of falling back to the shell', async () => {
-    const response = await get('/chaski/assets/missing-0000.js');
+    const response = await get('/assets/missing-0000.js');
 
     expect(response.status).toBe(404);
     expect(response.headers.get('content-type')).not.toContain('text/html');
-  });
-
-  it('serves assets without asking authorize', async () => {
-    const response = await get(`/chaski/${scriptAsset}`, 'deny');
-
-    expect(response.status).toBe(200);
-  });
-});
-
-describe('authorize', () => {
-  it('blocks the shell when it returns null', async () => {
-    const response = await get('/chaski/templates/welcome', 'deny');
-
-    expect(response.status).toBe(403);
-    expect(response.headers.get('content-type')).not.toContain('text/html');
-  });
-
-  it('blocks the API with a JSON error when it returns null', async () => {
-    const response = await get('/chaski/api/templates', 'deny');
-
-    expect(response.status).toBe(403);
-    expect(await response.json()).toEqual({ error: 'forbidden', message: 'not allowed' });
-  });
-
-  it('passes a returned response through untouched', async () => {
-    const response = await get('/chaski', 'redirect');
-
-    expect(response.status).toBe(302);
-    expect(response.headers.get('location')).toBe('/login');
   });
 });
 
 describe('API', () => {
-  it('answers 404 in JSON once authorize lets the request in', async () => {
-    const response = await get('/chaski/api/whatever');
+  it('answers 404 in JSON for an endpoint it does not have', async () => {
+    const response = await get('/api/whatever');
 
     expect(response.status).toBe(404);
     expect(await response.json()).toMatchObject({ error: 'not_found' });
-  });
-});
-
-describe('host', () => {
-  it('keeps serving its own routes', async () => {
-    const response = await get('/');
-
-    expect(response.status).toBe(200);
-    expect(await response.text()).toBe('Host home');
   });
 });

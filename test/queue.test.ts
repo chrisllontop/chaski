@@ -1,15 +1,12 @@
 import { createExecutionContext, createMessageBatch, getQueueResult } from 'cloudflare:test';
-import { env } from 'cloudflare:workers';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createChaski, type DeliveryMessage } from '../src';
 import { getClient } from '../src/server/db';
 import { DeliveryError } from '../src/server/lib/errors';
 import { CHANNEL_DEFS, type ChannelDefinition } from '../src/server/services/adapters/registry';
 import { DeliveryService } from '../src/server/services/delivery.service';
-import { chaski, fixtureConfig } from './fixture/worker';
+import worker, { type DeliveryMessage } from '../src/worker';
 
 const MESSAGE: DeliveryMessage = {
-  kind: 'chaski.delivery',
   deliveryId: 'd_queue',
   notificationId: 'n_queue',
   channel: 'email',
@@ -41,16 +38,16 @@ const useChannel = (deliver: ChannelDefinition['deliver']) => {
   CHANNEL_DEFS.email = { gate: null, deliver };
 };
 
-const consume = async (messages: { attempts: number; body: unknown }[]) => {
-  const batch = createMessageBatch(
+const consume = async (messages: { attempts: number; body: DeliveryMessage }[]) => {
+  const batch = createMessageBatch<DeliveryMessage>(
     'chaski-deliveries',
     messages.map((message, index) => ({ id: `m${index}`, timestamp: new Date(), ...message })),
   );
   // The local QueueResult does not carry retry delays, so the calls are observed directly.
   const retries = batch.messages.map((message) => vi.spyOn(message, 'retry'));
   const ctx = createExecutionContext();
-  const handled = await chaski.queue(batch, env, ctx);
-  return { handled, retries, result: await getQueueResult(batch, ctx) };
+  await worker.queue(batch);
+  return { retries, result: await getQueueResult(batch, ctx) };
 };
 
 afterEach(() => {
@@ -58,31 +55,13 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('chaski.queue', () => {
-  it('leaves a batch from another queue untouched', async () => {
-    const { handled, result } = await consume([{ attempts: 1, body: { invoiceId: 'inv_1' } }]);
-
-    expect(handled).toBe(false);
-    expect(result).toMatchObject({ explicitAcks: [], retryMessages: [], ackAll: false });
-  });
-
-  it('leaves a batch that mixes Chaski and foreign messages untouched', async () => {
-    const { handled, result } = await consume([
-      { attempts: 1, body: MESSAGE },
-      { attempts: 1, body: 'foreign' },
-    ]);
-
-    expect(handled).toBe(false);
-    expect(result.explicitAcks).toEqual([]);
-  });
-
+describe('the queue consumer', () => {
   it('acks a delivered message and records the provider id', async () => {
     await seedDelivery();
     useChannel(async () => ({ providerMessageId: 'provider_1' }));
 
-    const { handled, result } = await consume([{ attempts: 1, body: MESSAGE }]);
+    const { result } = await consume([{ attempts: 1, body: MESSAGE }]);
 
-    expect(handled).toBe(true);
     expect(result.explicitAcks).toEqual(['m0']);
     expect(await deliveryRow()).toMatchObject({ status: 'sent', providerMessageId: 'provider_1' });
   });
@@ -119,16 +98,16 @@ describe('chaski.queue', () => {
     expect((await deliveryRow())?.status).toBe('dead');
   });
 
-  it('counts attempts from the host maxRetries', async () => {
-    createChaski(() => ({ ...fixtureConfig(env), maxRetries: 1 }));
+  // The consumer in Chaski's wrangler.jsonc retries 5 times, so the sixth attempt is the last.
+  it('keeps the delivery pending before the last attempt', async () => {
     await seedDelivery();
     useChannel(async () => {
       throw new Error('provider timed out');
     });
 
-    await consume([{ attempts: 2, body: MESSAGE }]);
+    await consume([{ attempts: 5, body: MESSAGE }]);
 
-    expect((await deliveryRow())?.status).toBe('dead');
+    expect((await deliveryRow())?.status).toBe('pending');
   });
 
   it('fails a permanent error without retrying', async () => {
@@ -158,21 +137,19 @@ describe('chaski.queue', () => {
     });
   });
 
-  it('reports an unexpected failure to onError and retries in a minute', async () => {
-    const onError = vi.fn();
-    createChaski(() => ({ ...fixtureConfig(env), onError }));
-    const failure = new Error('database unavailable');
-    vi.spyOn(DeliveryService, 'process').mockRejectedValue(failure);
+  it('logs an unexpected failure and retries in a minute', async () => {
+    const error = vi.spyOn(console, 'error');
+    vi.spyOn(DeliveryService, 'process').mockRejectedValue(new Error('database unavailable'));
 
     const { result, retries } = await consume([{ attempts: 1, body: MESSAGE }]);
 
     expect(result.retryMessages).toEqual([{ msgId: 'm0' }]);
     expect(retries[0]).toHaveBeenCalledWith({ delaySeconds: 60 });
-    expect(onError).toHaveBeenCalledWith(failure, {
-      source: 'queue',
+    expect(error).toHaveBeenCalledWith('[chaski:consumer]', 'unexpected failure', {
       deliveryId: 'd_queue',
-      notificationId: 'n_queue',
       channel: 'email',
+      attempt: 1,
+      err: 'database unavailable',
     });
   });
 });

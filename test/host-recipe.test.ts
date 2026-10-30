@@ -1,12 +1,14 @@
-// The Vitest recipe in site/content/docs/local-development.mdx, kept runnable: it uses only what
-// a host has, the package's public API and cloudflare:test, so the page stays true.
+// The Vitest recipe in site/content/docs/local-development.mdx, kept runnable: it uses only the
+// package's public API, the service binding an app has and cloudflare:test, so the page stays true.
 import { createExecutionContext, createMessageBatch, getQueueResult } from 'cloudflare:test';
-import { env } from 'cloudflare:workers';
+import { env, exports } from 'cloudflare:workers';
 import { describe, expect, it, vi } from 'vitest';
-import type { DeliveryMessage, SendEmailBinding, TemplateFile } from '../src';
-import { chaski } from './fixture/worker';
+import type { TemplateFile } from '../src';
+import worker, { type DeliveryMessage, type SendEmailBinding } from '../src/worker';
 
-// Holds what Chaski puts on the queue, then hands it to chaski.queue() as the consumer would.
+const chaski = exports.ChaskiEntrypoint;
+
+// Holds what Chaski puts on the queue, then hands it to the Worker's queue handler.
 const captureDeliveries = () => {
   const queued: DeliveryMessage[] = [];
   vi.spyOn(env.CHASKI_QUEUE, 'sendBatch').mockImplementation(async (messages) => {
@@ -24,7 +26,7 @@ const captureDeliveries = () => {
       })),
     );
     const ctx = createExecutionContext();
-    await chaski.queue(batch, env, ctx);
+    await worker.queue(batch);
     return getQueueResult(batch, ctx);
   };
 };
@@ -43,9 +45,9 @@ const TEMPLATES: TemplateFile = {
   ],
 };
 
-describe('the host testing recipe', () => {
+describe('the testing recipe', () => {
   it('sends, drains the queue and checks the email and the feed', async () => {
-    await chaski.templates.import(TEMPLATES);
+    await chaski.templates().import(TEMPLATES);
     const drain = captureDeliveries();
     const emails: Array<Parameters<SendEmailBinding['send']>[0]> = [];
     vi.spyOn(env.CHASKI_EMAIL, 'send').mockImplementation(async (message) => {
@@ -61,6 +63,6 @@ describe('the host testing recipe', () => {
 
     expect(result.explicitAcks).toHaveLength(2);
     expect(emails).toEqual([expect.objectContaining({ subject: 'Welcome, Ana' })]);
-    expect(await chaski.feed.unreadCount('user_1')).toEqual({ unread: 1 });
+    expect(await chaski.feed().unreadCount('user_1')).toEqual({ unread: 1 });
   });
 });

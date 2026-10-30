@@ -1,14 +1,16 @@
 import { env } from 'cloudflare:workers';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { api as chaski } from '../src/server/api';
 import { getClient } from '../src/server/db';
 import { NotificationService } from '../src/server/services/notification.service';
-import { chaski, fixtureConfig } from './fixture/worker';
+import { fixtureConfig } from './fixture/worker';
 import {
   api,
   processDeliveries,
   queuedMessages,
   recipient,
   seedTemplate,
+  signedIn,
   stubEmail,
   useConfig,
 } from './helpers';
@@ -57,53 +59,19 @@ describe('pausing a channel', () => {
   });
 
   it('shows who paused it and when, and ready() lists it', async () => {
-    await pause('in_app', { 'x-fixture-actor': 'ops@host.test' });
-    await pause('in_app', { 'x-fixture-actor': 'someone-else@host.test' });
+    await pause('in_app', signedIn({ email: 'ops@chaski.test', name: 'Ops' }));
+    await pause('in_app', signedIn({ email: 'someone-else@chaski.test' }));
 
     const overview = (await (await api('/channels')).json()) as {
-      canPause: boolean;
       channels: Array<{ channel: string; paused: unknown }>;
     };
 
-    expect(overview.canPause).toBe(true);
     expect(overview.channels.find((c) => c.channel === 'in_app')?.paused).toEqual({
-      pausedBy: { id: 'ops@host.test', name: 'Fixture admin' },
+      pausedBy: { id: 'ops@chaski.test', name: 'Ops' },
       pausedAt: expect.any(String),
     });
     expect(overview.channels.find((c) => c.channel === 'email')?.paused).toBeNull();
     expect(await chaski.ready()).toMatchObject({ paused: ['in_app'] });
-  });
-
-  it('takes canPauseChannels, for pausing and for what a pause holds', async () => {
-    const denied = { 'x-fixture-can-pause': 'no' };
-
-    const responses = [
-      await pause('email', denied),
-      await post('/channels/email/resume', { send: true }, denied),
-      await post('/deliveries/held/send', { channel: 'email' }, denied),
-      await post('/deliveries/held/discard', { channel: 'email' }, denied),
-    ];
-
-    expect(responses.map((response) => response.status)).toEqual([403, 403, 403, 403]);
-    expect(await responses[0]?.json()).toMatchObject({ error: 'forbidden' });
-    expect(await (await api('/channels', { headers: denied })).json()).toMatchObject({
-      canPause: false,
-    });
-    expect(await chaski.ready()).toMatchObject({ paused: [] });
-  });
-
-  it('lets nobody pause when the host leaves canPauseChannels out', async () => {
-    const dashboard = chaski.routes({
-      dashboard: { authorize: () => ({ id: 'admin@host.test' }) },
-    });
-
-    const response = await dashboard.request(
-      '/api/channels/email/pause',
-      { method: 'POST', headers: { origin: 'http://localhost' } },
-      env,
-    );
-
-    expect(response.status).toBe(403);
   });
 
   it('refuses a channel the config leaves out', async () => {

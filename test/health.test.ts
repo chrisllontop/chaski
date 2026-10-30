@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { api as chaski } from '../src/server/api';
 import { getClient } from '../src/server/db';
 import { healthOf } from '../src/server/services/metrics.service';
-import { chaski } from './fixture/worker';
 import { api, processDeliveries, recipient, seedTemplate, stubEmail } from './helpers';
 
 describe('healthOf', () => {

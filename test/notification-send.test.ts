@@ -48,9 +48,7 @@ describe('NotificationService.send', () => {
       expect.objectContaining({ channel: 'email', status: 'pending' }),
       expect.objectContaining({ channel: 'in_app', status: 'skipped', reason: 'no_template' }),
     ]);
-    expect(queuedMessages()).toEqual([
-      expect.objectContaining({ kind: 'chaski.delivery', channel: 'email' }),
-    ]);
+    expect(queuedMessages()).toEqual([expect.objectContaining({ channel: 'email' })]);
     const stored = await getClient().notifications.findFirst({
       where: { id: result.notificationId },
     });

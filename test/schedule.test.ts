@@ -1,9 +1,10 @@
 import { introspectWorkflow } from 'cloudflare:test';
 import { env } from 'cloudflare:workers';
 import { describe, expect, it } from 'vitest';
+import { api as chaski } from '../src/server/api';
 import { getClient } from '../src/server/db';
 import { ScheduleService } from '../src/server/services/schedule.service';
-import { chaski, fixtureConfig } from './fixture/worker';
+import { fixtureConfig } from './fixture/worker';
 import { recipient, seedTemplate, useConfig } from './helpers';
 
 const inMinutes = (minutes: number) => new Date(Date.now() + minutes * 60_000).toISOString();
@@ -99,7 +100,7 @@ describe('chaski.schedule', () => {
 
     await expect(schedule()).rejects.toMatchObject({
       code: 'config',
-      message: expect.stringContaining('bindings.scheduler is missing'),
+      message: expect.stringContaining('the CHASKI_SCHEDULER binding is missing'),
     });
   });
 });
