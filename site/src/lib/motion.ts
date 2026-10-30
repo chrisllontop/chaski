@@ -53,15 +53,28 @@ export const useEntrances = (root: RefObject<HTMLElement | null>) => {
   }, [root]);
 };
 
-/** Mirrors whether the element is on screen into `data-in-view`, for CSS to pause on. */
-export const useInViewAttribute = (ref: RefObject<HTMLElement | null>) => {
+/**
+ * Mirrors whether `watched` (the element itself unless given) shows at least `threshold` of itself
+ * into the element's `data-in-view`, for CSS to pause on.
+ */
+export const useInViewAttribute = (
+  ref: RefObject<HTMLElement | null>,
+  watched: RefObject<HTMLElement | null> = ref,
+  threshold = 0,
+) => {
   useEffect(() => {
     const element = ref.current;
-    if (!element) return;
-    const observer = new IntersectionObserver(([entry]) => {
-      element.toggleAttribute('data-in-view', Boolean(entry?.isIntersecting));
-    });
-    observer.observe(element);
+    const target = watched.current;
+    if (!element || !target) return;
+    const observer = new IntersectionObserver(
+      // An entry intersects as soon as one pixel shows, whatever the threshold.
+      ([entry]) => {
+        const shown = entry?.isIntersecting && entry.intersectionRatio >= threshold;
+        element.toggleAttribute('data-in-view', Boolean(shown));
+      },
+      { threshold },
+    );
+    observer.observe(target);
     return () => observer.disconnect();
-  }, [ref]);
+  }, [ref, watched, threshold]);
 };

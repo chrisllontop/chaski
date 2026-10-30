@@ -4,8 +4,9 @@ export const sendSample = `await env.CHASKI.send({
   payload: { amount: '$15.00' },
 });`;
 
-// The commands' own output, as of chaskijs 0.1, trimmed to the panel's 27 lines: what npm and
-// Wrangler print is left out, and so are deploy's notes between its steps.
+// The commands' own output, as of chaskijs 0.1, trimmed to 26 lines so that with the shell's next
+// prompt they fill the panel's 27: what npm and Wrangler print is left out, and so are deploy's
+// notes between its steps. The terminal plays them back line by line (terminal.tsx).
 export const initSample = `$ npx chaskijs init
 ? Where should the Chaski project live?
   1. A folder of this repository
@@ -53,13 +54,12 @@ To deploy chaski, chaskijs will:
 
 Chaski is live at https://chaski.example.workers.dev
 
-Two steps are yours, in the Cloudflare dashboard:
-  1. Turn on Cloudflare Access. Open the Worker chaski, go to
-     Settings › Domains & Routes and select Enable Cloudflare Access on
-     its workers.dev URL. Use that switch, not the Worker's own Access
-     tab: that one refuses the WebSocket of the dashboard's live updates.
-  2. Set up the channels on the dashboard's Channels page:
-     https://chaski.example.workers.dev`;
+Two steps are yours:
+  1. Turn on Cloudflare Access. In the Cloudflare dashboard, open the
+     Worker chaski, go to Settings › Domains & Routes and select Enable
+     Cloudflare Access on its workers.dev URL. Use that switch, not the
+     Worker's own Access tab: it refuses the dashboard's live updates.
+  2. Set up the channels on the Channels page, at the URL above.`;
 
 export const appSample = `// Bound in wrangler.jsonc:
 // { "binding": "CHASKI", "service": "chaski",

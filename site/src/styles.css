@@ -235,6 +235,43 @@
   }
 }
 
+@keyframes tl-type {
+  from {
+    width: 0;
+  }
+}
+
+@keyframes tl-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes tl-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+@keyframes tl-gone {
+  to {
+    visibility: hidden;
+  }
+}
+
+@keyframes tl-dim {
+  from {
+    color: var(--color-muted-foreground);
+  }
+}
+
+@keyframes tl-glow {
+  from {
+    background-color: color-mix(in oklab, var(--color-success) 30%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-success) 30%, transparent);
+  }
+}
+
 @keyframes ring {
   from {
     opacity: 0.55;
@@ -249,6 +286,43 @@
 @layer components {
   .draw-path {
     stroke-dasharray: 1;
+  }
+
+  /* The How it works terminal (terminal.tsx). Its final frame is the whole transcript, with the
+     cursor at the shell's next prompt. */
+  .tl-line,
+  .tl-row {
+    display: block;
+    min-height: 22px;
+  }
+
+  .tl-cursor {
+    display: none;
+    width: 1ch;
+    height: 16px;
+    vertical-align: -3px;
+    background-color: var(--color-signal);
+  }
+
+  .tl-cursor-last {
+    display: inline-block;
+  }
+
+  .tl-spin {
+    display: none;
+  }
+
+  .tl-arrow {
+    position: relative;
+    display: inline-block;
+  }
+
+  .tl-glyph {
+    display: inline-block;
+  }
+
+  .tl-live {
+    border-radius: 3px;
   }
 
   @media (prefers-reduced-motion: no-preference) {
@@ -281,8 +355,72 @@
       animation: ring 1.8s linear infinite;
     }
 
-    .code-in {
-      animation: fade-in 350ms var(--ease-soft) both;
+    /* Each line shows at its --at; typing, spinners and cursors end at its --done. */
+    .tl-playing .tl-line {
+      animation: fade-in 160ms var(--ease-soft) var(--at) both;
+    }
+
+    .tl-playing .tl-row {
+      animation: slide-in 420ms var(--ease-soft) var(--at) both;
+    }
+
+    .tl-playing .tl-typed {
+      display: inline-block;
+      width: calc(var(--chars) * 1ch);
+      overflow: hidden;
+      vertical-align: top;
+      /* Backwards only: a finished steps() can stop a hair short of its last step and drop the last
+         character, so the final width is the element's own. */
+      animation: tl-type var(--typing) steps(var(--chars)) var(--type-at) backwards;
+    }
+
+    .tl-playing .tl-cursor {
+      display: inline-block;
+      animation:
+        tl-blink 1s steps(1) infinite,
+        tl-gone 0s var(--done) forwards;
+    }
+
+    .tl-playing .tl-cursor-last {
+      animation: tl-blink 1s steps(1) infinite;
+    }
+
+    .tl-playing .tl-spin {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      margin-left: 1ch;
+      vertical-align: -1px;
+      border: 1.5px solid var(--color-signal);
+      border-right-color: transparent;
+      border-radius: 9999px;
+      animation:
+        tl-spin 700ms linear infinite,
+        tl-gone 0s var(--done) forwards;
+    }
+
+    .tl-playing .tl-arrow .tl-spin {
+      position: absolute;
+      top: 6px;
+      left: 50%;
+      margin-left: -5px;
+    }
+
+    .tl-playing .tl-glyph {
+      animation: pop-in 360ms var(--ease-soft) var(--done) both;
+    }
+
+    .tl-playing .tl-pending {
+      animation: tl-dim 0s var(--done) backwards;
+    }
+
+    .tl-playing .tl-live {
+      animation: tl-glow 1.6s ease-out var(--at) both;
+    }
+
+    /* The playback waits, like the steps, while the panel is out of view. */
+    section:not([data-in-view]) .tl-playing * {
+      animation-play-state: paused;
     }
 
     [data-reveal="hidden"] {
