@@ -4,7 +4,6 @@ import { cn } from 'cn';
 import { FileText, MoreHorizontal, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { ConfirmDialog } from '~/components/app/confirm-dialog';
-import { TemplateDetailsDialog } from '~/components/app/template-details-dialog';
 import {
   DataBody,
   DataCell,
@@ -18,6 +17,7 @@ import {
 import { CHANNEL_ICONS, HealthBadge } from '~/components/app/delivery-bits';
 import { ErrorAlert, PageHeader } from '~/components/app/page';
 import { SiteHeader } from '~/components/app/site-header';
+import { TemplateDetailsDialog } from '~/components/app/template-details-dialog';
 import { Button } from '~/components/ui/button';
 import {
   Dialog,

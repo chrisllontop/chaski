@@ -71,9 +71,7 @@ export const TemplateDetailsDialog = ({
         >
           <DialogHeader>
             <DialogTitle>Template details</DialogTitle>
-            <DialogDescription>
-              Description and topic show on the templates list.
-            </DialogDescription>
+            <DialogDescription>Description and topic show on the templates list.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-2">
             <Label htmlFor={`${uid}-type`}>Type</Label>
