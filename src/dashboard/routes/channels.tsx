@@ -5,6 +5,7 @@ import {
   BellOff,
   CircleAlert,
   KeyRound,
+  Languages,
   Mail,
   Pause,
   Pencil,
@@ -22,6 +23,7 @@ import {
   WnsDialog,
 } from '~/components/app/channel-settings';
 import { ConfirmDialog } from '~/components/app/confirm-dialog';
+import { LanguageDialog } from '~/components/app/languages';
 import { ErrorAlert, PageHeader } from '~/components/app/page';
 import { Panel } from '~/components/app/panel';
 import { Pill } from '~/components/app/pill';
@@ -41,6 +43,14 @@ import { Skeleton } from '~/components/ui/skeleton';
 import { ApiError, api, query } from '~/lib/api';
 import { useChannelsOverview } from '~/lib/channels';
 import { CHANNEL_LABELS, formatDateTime, formatNumber, formatRelative } from '~/lib/format';
+import {
+  coverageNote,
+  IMPLICIT_DEFAULT,
+  languageChoices,
+  languageCoverage,
+  languageName,
+  useLocales,
+} from '~/lib/locales';
 import type {
   Actor,
   ApnsApp,
@@ -49,6 +59,7 @@ import type {
   ChannelsOverview,
   PushProvider,
   SavedMeta,
+  TemplateSummary,
 } from '~/lib/types';
 
 const Row = ({ label, children }: { label: string; children: ReactNode }) => (
@@ -348,6 +359,177 @@ const SecretHint = ({
   </div>
 );
 
+// ─── Languages ───
+
+const LanguageRow = ({
+  locale,
+  children,
+  action,
+}: {
+  locale: string;
+  children: ReactNode;
+  action?: ReactNode;
+}) => (
+  <div className="grid grid-cols-[8rem_1fr_auto] items-center gap-3 px-4 py-2.5 text-[13px]">
+    <dt className="text-muted-foreground">{languageName(locale)}</dt>
+    <dd className="flex min-h-6 min-w-0 flex-wrap items-center gap-2">
+      <code className="w-12 shrink-0 font-mono text-muted-foreground text-xs">{locale}</code>
+      {children}
+    </dd>
+    <dd>{action}</dd>
+  </div>
+);
+
+type LanguageDialogKind = 'add' | 'default';
+
+/**
+ * The Worker's languages, saved whole. Until they're saved the content counts as English, the
+ * default the server formats in; the default can change only while no translation exists.
+ */
+const LanguagesPanel = () => {
+  const client = useQueryClient();
+  const locales = useLocales();
+  const templates = useQuery({
+    queryKey: ['templates'],
+    queryFn: () => api.get<{ templates: TemplateSummary[] }>('templates'),
+  });
+  const [dialog, setDialog] = useState<LanguageDialogKind | null>(null);
+  // The language outlives the dialog's open state, so its words stay put while it closes.
+  const [removing, setRemoving] = useState<string | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+
+  if (locales.error) return <ErrorAlert error={locales.error} />;
+  if (!locales.data) return <Skeleton className="h-32" />;
+
+  const settings = locales.data;
+  const defaultLocale = settings.default ?? IMPLICIT_DEFAULT;
+  const defaultName = languageName(defaultLocale);
+  const list = templates.data?.templates ?? [];
+  const save = async (next: { default: string; supported: string[] }) => {
+    await api.put('settings/locales', next);
+    await client.invalidateQueries({ queryKey: ['locales'] });
+    await client.invalidateQueries({ queryKey: ['templates'] });
+  };
+  const removingName = languageName(removing ?? defaultLocale);
+  const kept = removing ? languageCoverage(list, removing).translated : 0;
+
+  return (
+    <>
+      <ChannelPanel
+        className="lg:col-span-2"
+        icon={Languages}
+        title="Languages"
+        description="The languages templates can add. A send falls back to the default when a template lacks the contact’s."
+        state={null}
+        actions={
+          <Button variant="outline" size="sm" onClick={() => setDialog('add')}>
+            <Plus /> Add language
+          </Button>
+        }
+      >
+        {settings.problem ? <Note>{settings.problem}</Note> : null}
+        <LanguageRow
+          locale={defaultLocale}
+          action={
+            settings.translations === 0 ? (
+              <Button variant="outline" size="xs" onClick={() => setDialog('default')}>
+                Change
+              </Button>
+            ) : (
+              <span className="whitespace-nowrap text-muted-foreground text-xs">
+                Fixed while templates have translations
+              </span>
+            )
+          }
+        >
+          <Pill tone="neutral">Default</Pill>
+          <span className="text-muted-foreground">Every template starts in this language.</span>
+        </LanguageRow>
+        {settings.supported.map((locale) => {
+          const coverage = languageCoverage(list, locale);
+          const note = coverageNote(coverage);
+          return (
+            <LanguageRow
+              key={locale}
+              locale={locale}
+              action={
+                <Button
+                  variant="outline"
+                  size="xs"
+                  onClick={() => {
+                    setRemoving(locale);
+                    setConfirmRemove(true);
+                  }}
+                >
+                  Remove
+                </Button>
+              }
+            >
+              {templates.data ? (
+                <span>
+                  {formatNumber(coverage.translated)} of {formatNumber(coverage.total)}{' '}
+                  {coverage.total === 1 ? 'template' : 'templates'}
+                </span>
+              ) : null}
+              {note ? <span className="text-muted-foreground">· {note}</span> : null}
+            </LanguageRow>
+          );
+        })}
+        {settings.updatedBy && settings.updatedAt ? (
+          <Row label="Saved by">
+            {actorName(settings.updatedBy)} · <When at={settings.updatedAt} />
+          </Row>
+        ) : null}
+      </ChannelPanel>
+
+      <LanguageDialog
+        open={dialog === 'add'}
+        onOpenChange={(open) => setDialog(open ? 'add' : null)}
+        title="Add a language"
+        description="Each template can then add it from its language menu."
+        choices={languageChoices([defaultLocale, ...settings.supported]).map((c) => c.locale)}
+        hint={
+          <>
+            <code className="font-mono">es</code> covers every Spanish region. Add a region, like{' '}
+            <code className="font-mono">es-MX</code>, only when its wording differs.
+          </>
+        }
+        action={(name) => (name ? `Add ${name}` : 'Add language')}
+        onSubmit={(locale) =>
+          save({ default: defaultLocale, supported: [...settings.supported, locale] })
+        }
+      />
+      <LanguageDialog
+        open={dialog === 'default'}
+        onOpenChange={(open) => setDialog(open ? 'default' : null)}
+        title="Change the default language"
+        description="Every template starts in this language, and sends fall back to it."
+        choices={languageChoices([defaultLocale]).map((c) => c.locale)}
+        hint="You can change it until a template has a translation."
+        action={(name) => (name ? `Make ${name} the default` : 'Change the default')}
+        onSubmit={(locale) => save({ default: locale, supported: settings.supported })}
+      />
+      <ConfirmDialog
+        open={confirmRemove}
+        onOpenChange={setConfirmRemove}
+        title={`Remove ${removingName}?`}
+        description={
+          kept > 0
+            ? `${removingName} contacts get the ${defaultName} content from the next send. The ${removingName} content of ${formatNumber(kept)} ${kept === 1 ? 'template' : 'templates'} stays saved: add ${removingName} again to use it.`
+            : `${removingName} contacts get the ${defaultName} content from the next send.`
+        }
+        action={`Remove ${removingName}`}
+        onConfirm={() =>
+          save({
+            default: defaultLocale,
+            supported: settings.supported.filter((locale) => locale !== removing),
+          })
+        }
+      />
+    </>
+  );
+};
+
 type Editing = 'email' | PushProvider | 'muted';
 
 export const ChannelsPage = () => {
@@ -617,6 +799,8 @@ export const ChannelsPage = () => {
                 </div>
               </Row>
             </ChannelPanel>
+
+            <LanguagesPanel />
           </div>
         )}
       </div>

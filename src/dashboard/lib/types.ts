@@ -8,6 +8,21 @@ export type Health = 'healthy' | 'at_risk' | 'blocked' | 'paused';
 
 export type Actor = { id: string; name?: string };
 
+/** How a translation stands against its channel's default content; `missing` when there is none. */
+export type TranslationStatus = 'complete' | 'outdated' | 'missing';
+
+/** The Worker's languages; `default` is null until they're saved. */
+export type LocalesSettings = {
+  default: string | null;
+  /** The other languages, the default excluded. */
+  supported: string[];
+  /** Stored translations, deleted templates included: while any exists the default stays. */
+  translations: number;
+  updatedBy: Actor | null;
+  updatedAt: string | null;
+  problem: string | null;
+};
+
 export type Delivery = {
   id: string;
   notificationId: string;
@@ -27,6 +42,9 @@ export type Delivery = {
   recipientId: string;
   address: string | null;
   payload: Record<string, unknown>;
+  requestedLocale: string | null;
+  requestedLocaleFrom: 'send' | 'contact' | null;
+  renderedLocale: string | null;
 };
 
 export type DeliveryPage = { deliveries: Delivery[]; total: number; page: number; limit: number };
@@ -60,6 +78,11 @@ export type Overview = Totals & {
   topErrorCodes: Array<{ errorCode: string; count: number }>;
   skipReasons: Array<{ skipReason: string; count: number }>;
   scheduledPending: number;
+  /** Sent deliveries that went out in another language than the one asked for. */
+  languageFallbacks: {
+    total: number;
+    rows: Array<{ type: string; channel: Channel; requestedLocale: string; count: number }>;
+  };
 };
 
 export type DayOutcome = {
@@ -93,7 +116,12 @@ export type TemplateSummary = {
   updatedAt: string;
   contentUpdatedAt: string;
   lastUsedAt: string | null;
-  channels: Array<{ channel: Channel; enabled: boolean }>;
+  channels: Array<{
+    channel: Channel;
+    enabled: boolean;
+    /** One key per supported language. */
+    translations: Record<string, TranslationStatus>;
+  }>;
 };
 
 export type DeletedTemplate = {
@@ -104,6 +132,19 @@ export type DeletedTemplate = {
   deletedAt: string;
 };
 
+export type Translation = {
+  channel: Channel;
+  locale: string;
+  subject: string | null;
+  body: string;
+  textBody: string | null;
+  status: Exclude<TranslationStatus, 'missing'>;
+  /** False once its language is taken off the Worker: kept, unused. */
+  supported: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type TemplateChannelContent = {
   id: string;
   channel: Channel;
@@ -111,6 +152,9 @@ export type TemplateChannelContent = {
   subject: string | null;
   body: string | null;
   textBody: string | null;
+  /** When its default content was last saved. */
+  updatedAt: string;
+  translations: Translation[];
 };
 
 export type TemplateDetail = {
