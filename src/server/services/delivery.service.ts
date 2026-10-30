@@ -49,17 +49,6 @@ export class DeliveryService extends BaseService {
       });
       return { status: 'held' };
     }
-    // Saved settings that stopped validating keep their channel on, so its deliveries fail here
-    // with the reason instead of skipping as unconfigured. Push fails per platform, in its adapter.
-    const channel = delivery.channel;
-    const problem =
-      channel === 'email' || channel === 'in_app'
-        ? DeliveryService.config.problems[channel]
-        : undefined;
-    if (problem) {
-      await DeliveryService.markFailed(delivery.id, 'config', problem);
-      return { status: 'failed' };
-    }
 
     const notification = await DeliveryService.client.notifications.findFirst({
       where: { id: delivery.notificationId },
@@ -80,6 +69,25 @@ export class DeliveryService extends BaseService {
         'channel_not_available',
         `no adapter for channel '${delivery.channel}'`,
       );
+      return { status: 'failed' };
+    }
+
+    // A channel turned off after the send stops what it still had queued. One whose saved settings
+    // stopped validating stays on, so its deliveries fail with the reason instead of skipping as
+    // unconfigured; push fails per platform, in its adapter.
+    const { enabledChannels, problems } = DeliveryService.config;
+    const channel = delivery.channel;
+    if (!(enabledChannels as string[]).includes(channel)) {
+      await DeliveryService.markFailed(
+        delivery.id,
+        'channel_not_configured',
+        `the ${channel} channel is not configured`,
+      );
+      return { status: 'failed' };
+    }
+    const problem = channel === 'email' || channel === 'in_app' ? problems[channel] : undefined;
+    if (problem) {
+      await DeliveryService.markFailed(delivery.id, 'config', problem);
       return { status: 'failed' };
     }
 
