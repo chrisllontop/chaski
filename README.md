@@ -359,7 +359,7 @@ delivering it. [Local development](https://chaski.sh/docs/local-development) has
 Paste this prompt into your coding agent, in the project that holds your app’s Worker:
 
 ```text
-Set up Chaski, notifications for Cloudflare Workers, in this project. Follow https://chaski.sh/skill/SKILL.md step by step, and ask me before anything that touches my Cloudflare account.
+Set up Chaski for this app: notifications that run as a Worker of their own, next to it. Follow https://chaski.sh/skill/SKILL.md step by step, and ask me before anything that touches my Cloudflare account.
 ```
 
 The agent reads Chaski’s [agent skill](skills/chaski/SKILL.md) from chaski.sh, creates the Chaski

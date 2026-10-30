@@ -47,7 +47,7 @@ export const Route = createFileRoute('/')({
     seo({
       title: 'Chaski · Notifications that run in a Worker of your own',
       description:
-        'Open-source notification infrastructure for Cloudflare Workers. Email, web push and in-app notifications with templates, scheduling, retries and a dashboard, on your own Cloudflare account.',
+        'Open-source notifications that run as a Worker of their own on your Cloudflare account: email, in-app and push for the web, iOS, macOS, Android and Windows, with templates, retries and a dashboard.',
       path: '/',
     }),
   component: Landing,
