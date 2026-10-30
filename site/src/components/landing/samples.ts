@@ -4,55 +4,57 @@ export const sendSample = `await env.CHASKI.send({
   payload: { amount: '$15.00' },
 });`;
 
-export const wranglerSample = `{
-  "name": "chaski",
-  "main": "src/index.ts",
-  "d1_databases": [
-    {
-      "binding": "CHASKI_DB",
-      "database_name": "chaski",
-      "database_id": "<printed by wrangler d1 create>",
-      // Chaski's tables come from the package.
-      "migrations_dir": "node_modules/chaskijs/migrations"
-    }
-  ],
-  "queues": {
-    "producers": [
-      { "binding": "CHASKI_QUEUE", "queue": "chaski-deliveries" }
-    ],
-    "consumers": [
-      {
-        "queue": "chaski-deliveries",
-        "max_retries": 5,
-        "dead_letter_queue": "chaski-deliveries-dlq"
-      }
-    ]
-  },
-  "send_email": [{ "name": "CHASKI_EMAIL" }]
-}`;
+export const initSample = `$ npx chaskijs init
 
-export const indexSample = `// The whole Chaski Worker: the dashboard, the queue
-// consumer and the API your app calls.
-export {
-  ChaskiEntrypoint,
-  ChaskiEvents,
-  ChaskiFeed,
-  ChaskiScheduler,
-  default,
-} from 'chaskijs/worker';`;
+? Where should Chaski live?
+› A folder of this repository
+  A new repository
 
-export const billingSample = `// Bound to Chaski in wrangler.jsonc:
+✓ Wrote chaski/package.json
+✓ Wrote chaski/wrangler.jsonc
+✓ Wrote chaski/src/index.ts
+✓ Applied the migrations locally
+
+Next: npx chaskijs deploy`;
+
+export const deploySample = `$ npx chaskijs deploy
+
+✓ Created the database
+✓ Created the queues
+✓ Applied the migrations
+✓ Deployed chaski
+
+Your dashboard is at
+https://chaski.acme.workers.dev
+Set up the channels there.`;
+
+export const appSample = `// Bound in wrangler.jsonc:
 // { "binding": "CHASKI", "service": "chaski",
 //   "entrypoint": "ChaskiEntrypoint" }
-export const sendReceipt = async (env: Env, user: User, payment: Payment) => {
-  await env.CHASKI.send({
+import { Hono } from 'hono';
+import { userRoutes } from 'chaskijs';
+
+const app = new Hono<{ Bindings: Env }>();
+
+// The signed-in user's feed, devices and preferences.
+app.route(
+  '/me/notifications',
+  userRoutes({
+    chaski: (c) => c.env.CHASKI,
+    identify: (c) => currentUserId(c),
+  }),
+);
+
+app.post('/payments', async (c) => {
+  const payment = await charge(c);
+  await c.env.CHASKI.send({
     type: 'payment_received',
-    recipient: { id: user.id, email: user.email, name: user.name },
+    recipient: { id: payment.userId },
     payload: { amount: payment.amount },
-    // A retried request with the same key sends only once.
     idempotencyKey: \`payment:\${payment.id}\`,
   });
-};`;
+  return c.json(payment);
+});`;
 
 export const rpcSample = `await env.CHASKI.send({
   type: 'order_shipped',
