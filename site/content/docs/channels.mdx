@@ -5,18 +5,21 @@ description: Email, in-app and push, web, iOS, macOS, Android and Windows. Each 
 
 Every channel starts off. It turns on when you save its settings on the **Channels** page of the
 dashboard, and each type’s template turns it on for that type. Removing a channel’s settings turns
-it off again, and its sends skip it as `channel_not_configured`. A pause is something else: it
-holds a channel’s deliveries until you resume it; see
-[Pause a channel](/docs/dashboard#pause-a-channel).
+it off again: its sends skip it as `channel_not_configured`, and the deliveries it still had queued
+fail with that reason. A pause is something else: it holds a channel’s deliveries until you resume
+it; see [Pause a channel](/docs/dashboard#pause-a-channel).
 
-Each environment’s Chaski keeps settings of its own, and the credentials among them are encrypted
-with `CHASKI_SECRET`. [Configuration](/docs/configuration#channel-settings) lists every field.
+Each environment’s Chaski keeps settings of its own, and the push credentials among them are
+encrypted with `CHASKI_SECRET`. A setting that stops working, such as credentials saved under
+another `CHASKI_SECRET`, shows its channel as **Failing** until you save it again.
+[Configuration](/docs/configuration#channel-settings) lists every field.
 
 ## Email
 
 Email goes out through Cloudflare Email Service, from a domain you onboarded to it, through the
 `CHASKI_EMAIL` binding. Set its sender address, and optionally a sender name and a reply-to
-address. The address must be one the binding allows.
+address. The address must be one the binding allows. The page says when the binding is
+missing.
 
 A send can override the sender name and the reply-to address, and attach up to 10 files when
 `CHASKI_ATTACHMENTS` holds an R2 bucket. The HTML of every email carries a pixel, served through
@@ -38,11 +41,12 @@ the unread items and marks them read.
 Push reaches browsers through web push, Apple devices through APNs, Android devices through FCM
 and Windows devices through WNS. Set up any of them; push is on once one is.
 
-- **Web push** takes a subject, a `mailto:` or `https:` contact the push services can reach you
-  at, and a key pair: **Generate keys** makes one, or paste the pair you already use.
+- **Web push** takes a contact, a `mailto:` or `https:` address the push services can reach you
+  at, and a key pair: **Generate keys** makes one, and **Use existing keys** takes the pair you
+  already send with.
 - **APNs** takes your team id, the key’s id and the `.p8` file, which send to every app of your
-  team. The iOS app and the macOS app each take their bundle id and the APNs environment of their
-  tokens, `sandbox` for development builds and `production` for the rest.
+  team. The iOS app and the macOS app each take their bundle ID and the APNs environment of their
+  tokens: Sandbox for development builds, Production for TestFlight and App Store builds.
 - **FCM** takes a service account’s JSON key file, from **Project settings → Service accounts** in
   the Firebase console. The project it names must be the one your Android app registers its tokens
   with.
@@ -109,6 +113,6 @@ A contact without a registered device skips the channel with `no_device_tokens`.
 
 <Callout title="Subscriptions belong to the key they were made with.">
   Keep your web push key pair once browsers subscribe: a subscription made with another public key
-  can never receive this Chaski’s pushes. The dashboard asks before it replaces the pair, and each
-  browser’s client subscribes again the next time it sees the new key.
+  can never receive this Chaski’s pushes. The dashboard asks before **Replace keys** swaps the pair,
+  and each browser’s client subscribes again the next time it sees the new key.
 </Callout>

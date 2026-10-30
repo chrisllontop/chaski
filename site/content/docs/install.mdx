@@ -125,15 +125,15 @@ The binding names are fixed: Chaski reads them by name. Leave out what you don�
 
 ## Set the secret [step]
 
-`CHASKI_SECRET` encrypts the channel credentials you save in the dashboard, such as your APNs key,
-so the database alone never holds them in the clear:
+`CHASKI_SECRET` encrypts the push keys and credentials you save in the dashboard, such as your
+APNs key, so the database alone never holds them in the clear. Push can’t be set up without it:
 
 ```bash
 openssl rand -base64 32 | npx wrangler secret put CHASKI_SECRET
 ```
 
-Keep it as it is. With another value, Chaski can’t read the credentials saved under this one, and
-the **Channels** page asks for them again.
+Keep it as it is. With another value, Chaski can’t open the credentials saved under this one: the
+**Channels** page shows each of those as **Failing** until you save it again.
 
 ## Create the tables [step]
 

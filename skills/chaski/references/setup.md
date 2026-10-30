@@ -289,7 +289,7 @@ Then check each of these, in order:
    - **Email**: a sender address. Any address works locally, since every email stays on disk;
      production needs one on the domain onboarded to Email Service.
    - **In-app**: turning it on is the setting.
-   - **Web push**: a subject (`mailto:` an address of the team) and a key pair: generate one there,
+   - **Web push**: a **Contact** (`mailto:` an address of the team) and a key pair: **Generate keys**,
      or paste the pair the app already sends with when browsers are subscribed to it
      ([plan.md](plan.md) brings them over).
    - **APNs, FCM, WNS**: credentials only the user holds (the `.p8` key, the service account
@@ -365,7 +365,7 @@ Then hand the user what is theirs to do:
    policy is the whole permission model.
 2. **Save the production channel settings** on the deployed dashboard’s **Channels** page: the
    email sender on the domain onboarded to Email Service (it needs the Workers Paid plan), the web
-   push key pair, the APNs, FCM and WNS credentials, and the default muted types.
+   push key pair, the APNs, FCM and WNS credentials, and the types muted by default.
 
 **Done when** the deploy printed the Worker’s URL, and the user confirms the dashboard opens for
 them through Access and its **Channels** page shows the channels they turned on.

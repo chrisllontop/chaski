@@ -195,7 +195,7 @@ const topics = await env.CHASKI.preferences().topics(); // types grouped by thei
 - A `mutedTypes` entry ending in `*` mutes every type starting with it; a `channel:` prefix limits
   it to that channel.
 - `mutedTypes` overwrites the stored list on every `set`: send the full list.
-- **Default muted types**, on the dashboard’s **Channels** page, mutes types for every contact
+- **Muted by default**, on the dashboard’s **Channels** page, mutes types for every contact
   until they save preferences of their own, for opt-in types such as a digest. `get()` for a
   contact who never saved returns those defaults, with every channel on.
 - Every send checks preferences channel by channel, except `transactional: true` sends.

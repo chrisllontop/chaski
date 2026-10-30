@@ -11,7 +11,7 @@ methods: `env.CHASKI.feed().list(query)` is still a single round trip.
 
 | Call | Returns | |
 | --- | --- | --- |
-| `ready()` | `{ channels, paused, environment, templates }` | Checks the setup and the applied migrations, lists the channels that are on and the [paused](/docs/dashboard#pause-a-channel) ones, names the environment from `CHASKI_ENVIRONMENT` (`null` without one) and counts the templates, changing nothing; throws the `config` error a send would. |
+| `ready()` | `{ channels, paused, problems, environment, templates }` | Checks the setup and the applied migrations, lists the channels that are on, the [paused](/docs/dashboard#pause-a-channel) ones and the saved settings that stopped working (`problems`: `{ channel, message }[]`), names the environment from `CHASKI_ENVIRONMENT` (`null` without one) and counts the templates, changing nothing; throws the `config` error a send would. |
 | `send(request)` | `SendResult` | Sends now; see [Sending](/docs/sending). |
 | `schedule(request)` | `ScheduleResult` | Sends at `scheduledAt`; see [Scheduling](/docs/scheduling). |
 | `schedules().list({ recipientId? })` | `ScheduledItem[]` | Pending schedules, soonest first. |
@@ -32,13 +32,15 @@ methods: `env.CHASKI.feed().list(query)` is still a single round trip.
 doesn’t answer fails it too. `templates` counts the templates outside the trash; at `0`, every send
 is refused as an unknown type, as on a fresh database or after a deploy that forgot to load them.
 `paused` names the channels someone [paused](/docs/dashboard#pause-a-channel) in the dashboard,
-whose deliveries wait as held.
+whose deliveries wait as held, and `problems` the channels whose deliveries fail until someone
+saves their settings again.
 
 ```ts
 app.get('/health', async (c) => {
   try {
     const status = await c.env.CHASKI.ready();
-    return c.json({ chaski: status }, status.templates > 0 ? 200 : 503);
+    const healthy = status.templates > 0 && status.problems.length === 0;
+    return c.json({ chaski: status }, healthy ? 200 : 503);
   } catch (error) {
     return c.json({ chaski: String(error) }, 503);
   }
