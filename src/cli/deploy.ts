@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { CliError, type Context, runOrFail } from './context';
@@ -21,6 +21,8 @@ import {
 export type DeployFlags = { env?: string; yes?: boolean };
 
 type Step = { title: string; act: () => Promise<void> };
+
+const newSecret = () => randomBytes(32).toString('base64');
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -86,6 +88,20 @@ export const deploy = async (context: Context, flags: DeployFlags) => {
   const wranglerOrFail = (args: string[], options: { capture?: boolean; input?: string } = {}) =>
     runOrFail(context, 'wrangler', [...args, ...envFlags], { cwd, env: account, ...options });
 
+  // Wrangler answers `secret list` for a Worker that was never deployed with an error that names
+  // it, which tells a first deploy apart from a Worker that runs without the secret.
+  const secretState = async (): Promise<'set' | 'missing' | 'no worker'> => {
+    const listed = await wrangler(['secret', 'list', '--format', 'json'], { capture: true });
+    if (listed.code === 0) {
+      const names = parseJson<{ name: string }[]>(listed.stdout, 'wrangler secret list');
+      return names.some((each) => each.name === 'CHASKI_SECRET') ? 'set' : 'missing';
+    }
+    if (/Worker "[^"]+"( \(env: [^)]+\))? not found/.test(listed.stderr + listed.stdout)) {
+      return 'no worker';
+    }
+    throw new CliError(`wrangler secret list failed\n${(listed.stderr || listed.stdout).trim()}`);
+  };
+
   const listDatabases = async () =>
     parseJson<{ uuid: string; name: string }[]>(
       (await wranglerOrFail(['d1', 'list', '--json'], { capture: true })).stdout,
@@ -98,7 +114,8 @@ export const deploy = async (context: Context, flags: DeployFlags) => {
     ? databases.find((each) => each.uuid === database.database_id)
     : undefined;
   const bucket = attachmentsBucket(env.scope);
-  const [missingQueues, bucketMissing] = await Promise.all([
+  const [secret, missingQueues, bucketMissing] = await Promise.all([
+    secretState(),
     Promise.all(
       declaredQueues(env.scope).map(async (queue) =>
         (await wrangler(['queues', 'info', queue], { capture: true })).code === 0 ? [] : [queue],
@@ -163,12 +180,24 @@ export const deploy = async (context: Context, flags: DeployFlags) => {
       },
     },
     {
-      title: `Deploy the Worker ${env.worker}`,
+      title:
+        secret === 'no worker'
+          ? `Deploy the Worker ${env.worker}, with a new CHASKI_SECRET`
+          : `Deploy the Worker ${env.worker}`,
       act: async () => {
-        const outputDir = mkdtempSync(join(tmpdir(), 'chaskijs-'));
-        const output = join(outputDir, 'wrangler-output.json');
+        const dir = mkdtempSync(join(tmpdir(), 'chaskijs-'));
+        const output = join(dir, 'wrangler-output.json');
+        const secretsFile = join(dir, 'secrets.json');
         try {
-          await runOrFail(context, 'wrangler', ['deploy', ...envFlags], {
+          // A first deploy uploads the secret with the Worker's first version, so it never runs
+          // without one. Only then: the file would replace the secret a running Worker holds.
+          if (secret === 'no worker') {
+            writeFileSync(secretsFile, JSON.stringify({ CHASKI_SECRET: newSecret() }), {
+              mode: 0o600,
+            });
+          }
+          const secrets = secret === 'no worker' ? ['--secrets-file', secretsFile] : [];
+          await runOrFail(context, 'wrangler', ['deploy', ...secrets, ...envFlags], {
             cwd,
             env: { ...account, WRANGLER_OUTPUT_FILE_PATH: output },
           });
@@ -178,29 +207,21 @@ export const deploy = async (context: Context, flags: DeployFlags) => {
             .map((line) => JSON.parse(line) as { type?: string; targets?: string[] })
             .find((entry) => entry.type === 'deploy')?.targets?.[0];
         } finally {
-          rmSync(outputDir, { recursive: true, force: true });
+          rmSync(dir, { recursive: true, force: true });
         }
-      },
-    },
-    {
-      // Only once the deploy above went through: on a Worker that doesn't exist yet, `secret put`
-      // creates an empty one under its name, which an app could bind to.
-      title: 'Set CHASKI_SECRET, if the Worker has none',
-      act: async () => {
-        const secrets = parseJson<{ name: string }[]>(
-          (await wranglerOrFail(['secret', 'list', '--format', 'json'], { capture: true })).stdout,
-          'wrangler secret list',
-        );
-        if (secrets.some((secret) => secret.name === 'CHASKI_SECRET')) {
-          context.print('The Worker has one, which stays as it is.');
-          return;
-        }
-        await wranglerOrFail(['secret', 'put', 'CHASKI_SECRET'], {
-          input: randomBytes(32).toString('base64'),
-        });
       },
     },
   );
+  if (secret === 'missing') {
+    steps.push({
+      // After the deploy above went through: on a Worker that doesn't exist, `secret put` creates
+      // an empty one under its name, which an app could bind to.
+      title: 'Set a new CHASKI_SECRET on the Worker',
+      act: async () => {
+        await wranglerOrFail(['secret', 'put', 'CHASKI_SECRET'], { input: newSecret() });
+      },
+    });
+  }
 
   context.print();
   context.print(`To deploy ${env.worker}${env.name ? ` (env.${env.name})` : ''}, chaskijs will:`);

@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { parse } from 'jsonc-parser';
@@ -103,6 +103,8 @@ export const fakeAccount = (
     databases?: { uuid: string; name: string }[];
     queues?: string[];
     buckets?: string[];
+    /** Whether the Worker was deployed before; it holds `secrets` only then. */
+    deployed?: boolean;
     secrets?: string[];
     accounts?: { id: string; name: string }[];
     signedIn?: boolean;
@@ -112,8 +114,12 @@ export const fakeAccount = (
     databases: [...(initial.databases ?? [])],
     queues: new Set(initial.queues ?? []),
     buckets: new Set(initial.buckets ?? []),
+    deployed: initial.deployed ?? false,
     secrets: new Set(initial.secrets ?? []),
+    /** Each secret value the Worker got, by `secret put` or a secrets file. */
     secretValues: [] as string[],
+    /** Each secrets file a deploy read: where it was and who could read it. */
+    secretFiles: [] as { path: string; mode: number }[],
   };
   const respond = ({ command, args, options }: Call): RunResult | undefined => {
     if (command !== 'wrangler') return undefined;
@@ -141,6 +147,18 @@ export const fakeAccount = (
     if (is('r2', 'bucket', 'info')) return exists(account.buckets.has(fourth));
     if (is('r2', 'bucket', 'create')) return ok(void account.buckets.add(fourth));
     if (first === 'deploy') {
+      const fileAt = args.indexOf('--secrets-file');
+      if (fileAt >= 0) {
+        const path = args[fileAt + 1] ?? '';
+        account.secretFiles.push({ path, mode: statSync(path).mode & 0o777 });
+        for (const [name, value] of Object.entries(
+          JSON.parse(readFileSync(path, 'utf8')) as Record<string, string>,
+        )) {
+          account.secrets.add(name);
+          account.secretValues.push(value);
+        }
+      }
+      account.deployed = true;
       const output = options.env?.WRANGLER_OUTPUT_FILE_PATH;
       if (output) {
         writeFileSync(
@@ -152,6 +170,16 @@ export const fakeAccount = (
       return ok();
     }
     if (is('secret', 'list')) {
+      if (!account.deployed) {
+        const env = args.includes('--env') ? ` (env: ${args[args.indexOf('--env') + 1]})` : '';
+        return {
+          code: 1,
+          stdout: '',
+          stderr:
+            `✘ [ERROR] Worker "chaski"${env} not found.\n\n` +
+            'If this is a new Worker, run `wrangler deploy` first to create it.\n',
+        };
+      }
       return ok(
         JSON.stringify([...account.secrets].map((name) => ({ name, type: 'secret_text' }))),
       );
@@ -174,4 +202,8 @@ export const actions = (calls: Call[]) =>
       const line = args.join(' ');
       return !/^(whoami|d1 list|queues info|r2 bucket info|secret list)\b/.test(line);
     })
-    .map(({ command, args }) => [command, ...args].join(' '));
+    .map(({ command, args }) =>
+      [command, ...args.map((arg, i) => (args[i - 1] === '--secrets-file' ? '<file>' : arg))].join(
+        ' ',
+      ),
+    );
