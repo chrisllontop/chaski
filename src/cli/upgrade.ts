@@ -50,11 +50,11 @@ export const upgrade = async (context: Context, tag = 'latest') => {
     : undefined;
   // A tag can point behind the installed version, as `latest` does while a release is in
   // pre-release, and an older chaskijs can't undo what a newer one changed.
-  const view = await context.run('npm', ['view', `chaskijs@${tag}`, 'version'], {
-    cwd,
-    capture: true,
-  });
-  const target = view.code === 0 ? view.stdout.trim().split('\n').at(-1)?.trim() : undefined;
+  // Without npm, or for a tag npm can't look up, the install goes ahead unchecked.
+  const view = await context
+    .run('npm', ['view', `chaskijs@${tag}`, 'version'], { cwd, capture: true })
+    .catch(() => undefined);
+  const target = view?.code === 0 ? view.stdout.trim().split('\n').at(-1)?.trim() : undefined;
   if (installed && target && compareVersions(target, installed) < 0) {
     throw new CliError(
       `chaskijs@${tag} is ${target}, older than the ${installed} installed here. ` +
