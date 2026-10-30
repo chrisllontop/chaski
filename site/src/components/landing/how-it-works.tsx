@@ -12,11 +12,11 @@ const FILES = [
 const STEPS = [
   {
     title: 'Create it',
-    text: 'One command writes the project, three files in a folder of your repository or in a new one, ready to run locally.',
+    text: 'One command writes the project in a folder of your repository or in a new one, and installs it, ready to run locally.',
   },
   {
     title: 'Deploy it',
-    text: 'It creates a database and a queue on your Cloudflare account, and deploys. Its dashboard opens for your team only, and the channels are set up there.',
+    text: 'It shows what it will create on your Cloudflare account, a database and its queues, and deploys once you say yes. Its dashboard opens for your team only, and the channels are set up there.',
   },
   {
     title: 'Connect your app',
