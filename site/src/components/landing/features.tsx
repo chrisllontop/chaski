@@ -365,7 +365,7 @@ export const Features = () => (
       <Cell
         title="Liquid templates"
         guide="templates"
-        text="One per channel, edited in the dashboard with a live preview. Export them as JSON and import them anywhere."
+        text="One per type, with content for each channel, edited in the dashboard with a live preview. Keep them in a file and load them into any environment."
         delay="[--reveal-delay:70ms]"
       >
         <TemplateDetail />

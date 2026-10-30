@@ -5,7 +5,7 @@ import { StatusPill } from './status';
 const ROLES = [
   {
     who: 'Your team',
-    text: 'Sets up the channels, writes the templates and follows every delivery, in a dashboard behind your company’s sign-in.',
+    text: 'Sets up the channels, writes the templates and follows every delivery, in a dashboard behind your team’s sign-in.',
   },
   {
     who: 'Your app',
