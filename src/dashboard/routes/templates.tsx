@@ -319,7 +319,10 @@ export const TemplatesPage = () => {
                         <DataCell className="min-w-0 max-w-md whitespace-normal">
                           <div className="font-medium font-mono text-xs">{template.type}</div>
                           {template.description ? (
-                            <div className="break-words whitespace-normal text-muted-foreground text-xs">
+                            <div
+                              className="line-clamp-2 break-words text-muted-foreground text-xs"
+                              title={template.description}
+                            >
                               {template.description}
                             </div>
                           ) : null}
