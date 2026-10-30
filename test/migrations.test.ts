@@ -30,7 +30,8 @@ describe('migrations', () => {
       code: 'config',
       message: expect.stringContaining(
         'missing migrations 0000_init.sql, 0001_delivery_latency.sql, 0002_channel_pauses.sql, ' +
-          '0003_push_silent.sql, 0004_notification_data.sql. Apply them with `wrangler d1',
+          '0003_push_silent.sql, 0004_notification_data.sql, 0005_channel_settings.sql. Apply them ' +
+          'with `wrangler d1',
       ),
     });
   });

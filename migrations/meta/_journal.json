@@ -36,6 +36,13 @@
       "when": 1793317255900,
       "tag": "0004_notification_data",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1793337685575,
+      "tag": "0005_channel_settings",
+      "breakpoints": true
     }
   ]
 }

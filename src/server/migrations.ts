@@ -10,6 +10,7 @@ export const MIGRATIONS: readonly string[] = [
   '0002_channel_pauses.sql',
   '0003_push_silent.sql',
   '0004_notification_data.sql',
+  '0005_channel_settings.sql',
 ];
 
 // Wrangler's own table: Chaski's wrangler.jsonc leaves migrations_table unset.
