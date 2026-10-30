@@ -4,7 +4,7 @@ import { setupPrompt } from '~/lib/site';
 import { CopyStatus, useCopy } from './copy';
 import { ArrowRightIcon, CheckIcon, CopyIcon } from './icons';
 
-const INSTALL = 'npm install chaskijs';
+const INSTALL = 'npx chaskijs init';
 
 const WAYS = ['npm', 'agent'] as const;
 type Way = (typeof WAYS)[number];
@@ -55,7 +55,7 @@ const CopyWay = ({ way }: { way: Way }) => {
   );
 };
 
-/** The two ways in: install the package, or copy the prompt that hands the setup to an agent. */
+/** The two ways in: create the project with one command, or hand the setup to an agent. */
 export const InstallChip = ({ initial }: { initial: Way }) => {
   const id = useId();
   const tabs = useRef<Array<HTMLButtonElement | null>>([]);

@@ -23,16 +23,16 @@ the next:
 1. Reads your project: the Worker and its Wrangler config, the Hono app, how the app knows who is
    signed in, and the frontend.
 2. Asks where the Chaski project goes, a folder of this repository or a repository of its own, and
-   creates it there: `chaskijs`, its `wrangler.jsonc` with the bindings for the features you pick,
-   and the one-line main module.
-3. Applies Chaski’s migrations to the local database.
+   which features you want, and creates it there with `chaskijs init`: its `wrangler.jsonc` with
+   the bindings for those features, the one-line main module, and the local database.
+3. Checks that the project builds, without deploying it.
 4. Binds your app to Chaski, and mounts the routes your frontend calls for the signed-in user.
 5. Runs both with `wrangler dev`, which keeps every email on disk, sets up the channels in the local
    dashboard, and sends a first notification you can open there.
 
-All of that happens on your machine. Creating resources in your Cloudflare account, applying the
-migrations with `--remote`, setting secrets and deploying act on production, so the agent asks you
-before each one, and deploys only when you tell it to. Turning on Cloudflare Access and saving the
+All of that happens on your machine. `chaskijs deploy` creates resources in your Cloudflare
+account, applies the migrations to the deployed database, sets the secret and deploys, so the agent
+shows you what it will do and runs it only when you say yes. Turning on Cloudflare Access and saving the
 production channel settings are yours, in the Cloudflare dashboard and in Chaski’s.
 
 ## Add the skill to your repository

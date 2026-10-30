@@ -1,28 +1,68 @@
-import { type KeyboardEvent, useEffect, useRef, useState } from 'react';
+import { type CSSProperties, type KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { useInViewAttribute, useMotionAllowed } from '~/lib/motion';
 import { highlight } from './code';
-import { billingSample, indexSample, wranglerSample } from './samples';
+import { appSample, deploySample, initSample } from './samples';
+import { playback, Terminal } from './terminal';
+
+// A source file's lines slide in one after another, this far apart.
+const CASCADE = 28;
+const CASCADE_END = CASCADE * appSample.split('\n').length + 420;
+
+// A step lasts while its file plays, then leaves time to read it: 6 s at least.
+const stepLength = (played: number) => Math.max(6000, played + 3000);
 
 const FILES = [
-  { id: 'wrangler', name: 'chaski/wrangler.jsonc', code: wranglerSample },
-  { id: 'index', name: 'chaski/src/index.ts', code: indexSample },
-  { id: 'billing', name: 'app/src/billing.ts', code: billingSample },
-];
+  { id: 'init', name: 'npx chaskijs init', code: initSample, terminal: true },
+  { id: 'deploy', name: 'npx chaskijs deploy', code: deploySample, terminal: true },
+  { id: 'app', name: 'app/src/index.ts', code: appSample, terminal: false },
+].map((file) => ({
+  ...file,
+  duration: stepLength(file.terminal ? playback(file.code).end : CASCADE_END),
+}));
 
 const STEPS = [
   {
-    title: 'Declare the bindings',
-    text: 'A database and a queue to start. Add the rest as you need it.',
+    title: 'Create it',
+    text: 'One command writes the project in a folder of your repository or in a new one, and installs it, ready to run locally.',
   },
   {
     title: 'Deploy it',
-    text: 'One line re-exports the Worker. Its dashboard opens for your team only, and the channels are set up there.',
+    text: 'It shows what it will create on your Cloudflare account, a database and its queues, and deploys once you say yes. Its dashboard opens for your team only, and the channels are set up there.',
   },
   {
-    title: 'Send from your app',
-    text: 'Bind your app to it, and one call fans out to email, push and the in-app feed, with retries.',
+    title: 'Connect your app',
+    text: 'Bind your app to it and mount the routes your frontend reads the feed through. Then one call fans out to email, push and the in-app feed, with retries.',
   },
 ];
+
+const SourceFile = ({ code, playing }: { code: string; playing: boolean }) => {
+  const rows = code.split('\n').map((text, index) => ({ text, number: index + 1 }));
+  const at = (number: number) =>
+    playing ? ({ '--at': `${(number - 1) * CASCADE}ms` } as CSSProperties) : undefined;
+  return (
+    <>
+      <pre
+        className={`code text-right text-muted-foreground/60 select-none ${playing ? 'tl-playing' : ''}`}
+        aria-hidden="true"
+      >
+        {rows.map((row) => (
+          <span key={row.number} className="tl-row" style={at(row.number)}>
+            {row.number}
+          </span>
+        ))}
+      </pre>
+      <pre className={`code ${playing ? 'tl-playing' : ''}`}>
+        <code>
+          {rows.map((row) => (
+            <span key={row.number} className="tl-row" style={at(row.number)}>
+              {highlight(row.text)}
+            </span>
+          ))}
+        </code>
+      </pre>
+    </>
+  );
+};
 
 const TAB_KEYS: Record<string, (index: number) => number> = {
   ArrowRight: (index) => (index + 1) % FILES.length,
@@ -33,17 +73,37 @@ const TAB_KEYS: Record<string, (index: number) => number> = {
 
 export const HowItWorks = () => {
   const section = useRef<HTMLElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
   const tabs = useRef<Array<HTMLButtonElement | null>>([]);
   const motion = useMotionAllowed();
   const [active, setActive] = useState(1);
   const [stopped, setStopped] = useState(false);
   const autoplay = motion && !stopped;
-  useInViewAttribute(section);
+  // The steps and the playback wait until most of the panel shows, so the command is typed in view.
+  useInViewAttribute(section, panel, 0.3);
 
   // Autoplay tells the story from the first step; the prerendered frame shows the second.
   useEffect(() => {
     if (motion) setActive(0);
   }, [motion]);
+
+  // On a phone the tab names overflow their bar. Scroll the bar alone, never the page, so the open
+  // tab reads whole while the steps above advance.
+  useEffect(() => {
+    const tab = tabs.current[active];
+    const bar = tab?.parentElement;
+    if (!tab || !bar) return;
+    const inset = Number.parseFloat(getComputedStyle(bar).paddingLeft);
+    const box = bar.getBoundingClientRect();
+    const { left, right } = tab.getBoundingClientRect();
+    const by =
+      left < box.left + inset
+        ? left - box.left - inset
+        : right > box.right - inset
+          ? right - box.right + inset
+          : 0;
+    if (by) bar.scrollBy({ left: by, behavior: motion ? 'smooth' : 'auto' });
+  }, [active, motion]);
 
   const choose = (index: number) => {
     setStopped(true);
@@ -72,7 +132,7 @@ export const HowItWorks = () => {
           Deploy it next to your app.
         </h2>
         <p className="lede">
-          Chaski is a Worker of its own, on your account. A project of three files deploys it, and
+          Chaski is a Worker of its own, on your account. Two commands create and deploy it, and
           your app sends to it from anywhere in its code.
         </p>
         <ol className="flex flex-col pt-5">
@@ -109,6 +169,9 @@ export const HowItWorks = () => {
                   <span
                     key={autoplay ? `fill-${index}` : 'still'}
                     className={`absolute top-0 -left-0.5 h-full w-0.5 origin-top bg-signal ${autoplay ? 'step-fill' : ''}`}
+                    style={
+                      autoplay ? { animationDuration: `${FILES[index]?.duration}ms` } : undefined
+                    }
                     onAnimationEnd={() => setActive((index + 1) % STEPS.length)}
                     aria-hidden="true"
                   />
@@ -119,7 +182,10 @@ export const HowItWorks = () => {
         </ol>
       </div>
 
-      <div className="min-w-0 overflow-hidden rounded-[14px] border border-border bg-card">
+      <div
+        ref={panel}
+        className="min-w-0 overflow-hidden rounded-[14px] border border-border bg-card"
+      >
         <div
           role="tablist"
           aria-label="Files"
@@ -157,20 +223,13 @@ export const HowItWorks = () => {
             >
               <div
                 key={index === active ? 'shown' : 'hidden'}
-                className={`flex w-max gap-5 px-5 pt-5 pb-6 ${index === active ? 'code-in' : ''}`}
+                className="flex w-max gap-5 px-5 pt-5 pb-6"
               >
-                <pre
-                  className="code text-right text-muted-foreground/60 select-none"
-                  aria-hidden="true"
-                >
-                  {file.code
-                    .split('\n')
-                    .map((_, line) => line + 1)
-                    .join('\n')}
-                </pre>
-                <pre className="code">
-                  <code>{highlight(file.code)}</code>
-                </pre>
+                {file.terminal ? (
+                  <Terminal transcript={file.code} playing={motion && index === active} />
+                ) : (
+                  <SourceFile code={file.code} playing={motion && index === active} />
+                )}
               </div>
             </div>
           ))}

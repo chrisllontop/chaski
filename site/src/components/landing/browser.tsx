@@ -18,6 +18,7 @@ const FEED = [
 ];
 
 const PACKAGES = [
+  { name: 'chaskijs', text: 'userRoutes(), the routes your app mounts' },
   { name: 'chaskijs/client', text: 'The feed, unread count, push and preferences' },
   { name: 'chaskijs/sw', text: 'Shows web push in your service worker' },
   { name: 'chaskijs/react', text: 'useFeed, useUnreadCount, usePush and usePreferences' },
@@ -115,11 +116,11 @@ export const Browser = () => (
     <div data-reveal="" className="flex flex-col gap-5 [--reveal-delay:70ms]">
       <p className="kicker">In the browser</p>
       <h2 id="browser-title" className="h2">
-        The bell comes with it.
+        Draw your bell. Chaski keeps it live.
       </h2>
       <p className="lede">
-        Your frontend talks to the routes your app mounts, as the signed-in user. The feed updates
-        over a WebSocket the moment a send lands.
+        Your frontend reads the signed-in user’s feed through the routes your app mounts, and the
+        hooks update the bell over a WebSocket the moment a send lands.
       </p>
       <dl className="mt-4 flex flex-col border-t border-border">
         {PACKAGES.map((entry) => (

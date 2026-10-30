@@ -42,115 +42,57 @@ resources, so your data stays in your account.
 
 ### 1. Create the project
 
-A Chaski project is three files. Keep it in a folder of your app’s repository, such as `chaski/`,
-or in a repository of its own.
+```sh
+npx chaskijs@next init
+```
+
+`@next` picks Chaski 0.1, in pre-release until it ships as `latest`. The command asks where the
+project lives (a folder of your app’s repository, such as `chaski/`, or a new repository), the
+Worker’s name, which names its resources, and whether to send email and attachments. Every answer
+has a flag (`--folder`, `--repo`, `--name`, `--no-email`, `--attachments`, `--public-url`), for
+scripts and agents.
+
+It writes the project, installs it and creates the local database. Besides `.dev.vars`, the
+local settings `wrangler dev` reads, and a `.gitignore`, the project holds three files:
+
+- `package.json`, with `chaskijs`, `hono` and `wrangler`.
+- `src/index.ts`, the only code the project holds:
+
+  ```ts
+  export { ChaskiEntrypoint, ChaskiEvents, ChaskiFeed, ChaskiScheduler, default } from 'chaskijs/worker';
+  ```
+
+- `wrangler.jsonc`, with the bindings Chaski reads by name. Only `CHASKI_DB` and `CHASKI_QUEUE`
+  are required; the rest turn on a feature each:
+
+  | Binding | Needed for |
+  | --- | --- |
+  | `CHASKI_FEED` | The in-app channel |
+  | `CHASKI_EVENTS` | Live updates in the dashboard |
+  | `CHASKI_SCHEDULER` | `schedule()` |
+  | `CHASKI_EMAIL` | The email channel |
+  | `CHASKI_ATTACHMENTS` | Email attachments |
+
+[Install](https://chaski.sh/docs/install#read-what-it-wrote) shows the whole `wrangler.jsonc`.
+
+### 2. Deploy
+
+In the project, signed in with `npx wrangler login`:
 
 ```sh
-npm install chaskijs hono
-npm install -D wrangler
+npx chaskijs deploy
 ```
 
-```ts
-// src/index.ts: the Worker, and the classes its bindings name.
-export { ChaskiEntrypoint, ChaskiEvents, ChaskiFeed, ChaskiScheduler, default } from 'chaskijs/worker';
-```
+It lists what the Worker is missing in your Cloudflare account and asks before it acts: it creates
+the database, the queues and, with attachments, the R2 bucket, applies Chaski’s migrations, and
+deploys. The first deploy uploads a random `CHASKI_SECRET` with the Worker
+(`wrangler deploy --secrets-file`), so it never runs without one; the secret encrypts the channel
+credentials you save in the dashboard. Set it by hand on a Worker that already runs, with
+`wrangler secret put CHASKI_SECRET` after a deploy: until the Worker exists, `secret put` creates
+an empty one under its name. Run `chaskijs deploy` again after every upgrade: it creates only
+what’s missing and migrates before it deploys.
 
-### 2. Create the resources
-
-```sh
-npx wrangler d1 create chaski
-npx wrangler queues create chaski-deliveries
-npx wrangler queues create chaski-deliveries-dlq
-npx wrangler r2 bucket create chaski-attachments   # only for email attachments
-```
-
-The Durable Objects and the Workflow are created when you deploy.
-
-### 3. Declare the bindings
-
-```jsonc
-// wrangler.jsonc
-{
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "chaski",
-  "main": "src/index.ts",
-  "compatibility_date": "2026-10-15",
-  "observability": { "enabled": true },
-  "vars": {
-    "CHASKI_ENVIRONMENT": "production",
-    // Where your app mounts userRoutes(); emails track opens through it.
-    "CHASKI_PUBLIC_URL": "https://app.example.com/me/notifications"
-  },
-  // wrangler dev signs this identity in, as Cloudflare Access does once deployed.
-  "access": {
-    "dev": { "aud": "chaski-local", "identity": { "email": "you@example.com", "name": "You" } }
-  },
-  "d1_databases": [
-    {
-      "binding": "CHASKI_DB",
-      "database_name": "chaski",
-      "database_id": "<id printed by wrangler d1 create>",
-      // Chaski's tables come from the package.
-      "migrations_dir": "node_modules/chaskijs/migrations"
-    }
-  ],
-  "queues": {
-    "producers": [{ "binding": "CHASKI_QUEUE", "queue": "chaski-deliveries" }],
-    "consumers": [
-      {
-        "queue": "chaski-deliveries",
-        "max_batch_size": 10,
-        "max_batch_timeout": 1,
-        // Chaski counts on five retries.
-        "max_retries": 5,
-        "dead_letter_queue": "chaski-deliveries-dlq"
-      }
-    ]
-  },
-  "durable_objects": {
-    "bindings": [
-      { "name": "CHASKI_FEED", "class_name": "ChaskiFeed" },
-      { "name": "CHASKI_EVENTS", "class_name": "ChaskiEvents" }
-    ]
-  },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ChaskiFeed", "ChaskiEvents"] }],
-  "workflows": [
-    { "name": "chaski-scheduler", "binding": "CHASKI_SCHEDULER", "class_name": "ChaskiScheduler" }
-  ],
-  "r2_buckets": [{ "binding": "CHASKI_ATTACHMENTS", "bucket_name": "chaski-attachments" }],
-  "send_email": [{ "name": "CHASKI_EMAIL" }]
-}
-```
-
-The binding names are fixed. Only `CHASKI_DB` and `CHASKI_QUEUE` are required; leave out what you
-don’t use:
-
-| Binding | Needed for |
-| --- | --- |
-| `CHASKI_FEED` | The in-app channel |
-| `CHASKI_EVENTS` | Live updates in the dashboard |
-| `CHASKI_SCHEDULER` | `schedule()` |
-| `CHASKI_EMAIL` | The email channel |
-| `CHASKI_ATTACHMENTS` | Email attachments |
-
-### 4. Set the secret and create the tables
-
-`CHASKI_SECRET` encrypts the channel credentials you save in the dashboard. Keep it: with another
-value, Chaski can’t read what was saved under this one.
-
-```sh
-openssl rand -base64 32 | npx wrangler secret put CHASKI_SECRET
-npx wrangler d1 migrations apply CHASKI_DB --remote
-```
-
-Apply the migrations again after every Chaski upgrade, before you deploy. Chaski refuses to run
-until every migration it ships is applied, and names the missing ones.
-
-### 5. Deploy and turn on Cloudflare Access
-
-```sh
-npx wrangler deploy
-```
+### 3. Turn on Cloudflare Access
 
 The Worker’s URL serves the dashboard, and opens only for people Cloudflare Access signs in. In the
 Cloudflare dashboard, open the `chaski` Worker, go to **Settings** › **Domains & Routes** and
@@ -158,11 +100,15 @@ select **Enable Cloudflare Access** on its workers.dev URL, then choose who gets
 application it creates. Protect the hostname this way rather than from the Worker’s own **Access**
 tab, which refuses the WebSocket the dashboard’s live updates use.
 
-### 6. Set up the channels
+### 4. Set up the channels
 
 Open the dashboard and go to **Channels**. Every channel starts off and turns on once you save its
 settings there: the sender address for email, the in-app feed, and a key pair for web push or the
 credentials of APNs, FCM and WNS.
+
+New versions come through the package: `npx chaskijs upgrade` installs the latest and updates the
+project to it, then `npx chaskijs deploy` ships it. `npx chaskijs env add staging` adds an
+environment with resources of its own; see [Environments](https://chaski.sh/docs/environments).
 
 ## Connect your app
 
@@ -340,12 +286,10 @@ from the types each topic groups.
 
 ## Develop locally
 
-`wrangler dev` runs everything on your machine. In the Chaski project, apply the migrations to the
-local database, give it a local secret in `.dev.vars`, and start it:
+`wrangler dev` runs everything on your machine, and `chaskijs init` already created the local
+database and wrote a local secret into `.dev.vars`. In the Chaski project:
 
 ```sh
-npx wrangler d1 migrations apply CHASKI_DB --local
-echo 'CHASKI_SECRET=any-local-value-of-32-characters-or-more' >> .dev.vars
 npx wrangler dev
 ```
 
@@ -359,7 +303,7 @@ delivering it. [Local development](https://chaski.sh/docs/local-development) has
 Paste this prompt into your coding agent, in the project that holds your app’s Worker:
 
 ```text
-Set up Chaski, notifications for Cloudflare Workers, in this project. Follow https://chaski.sh/skill/SKILL.md step by step, and ask me before anything that touches my Cloudflare account.
+Set up Chaski for this app: notifications that run as a Worker of their own, next to it. Follow https://chaski.sh/skill/SKILL.md step by step, and ask me before anything that touches my Cloudflare account.
 ```
 
 The agent reads Chaski’s [agent skill](skills/chaski/SKILL.md) from chaski.sh, creates the Chaski
