@@ -39,8 +39,11 @@ node "${TMPDIR:-/tmp}/chaski-skill/scripts/find-sends.mjs" <project root> \
 ```
 
 It prints counts, then each hit as `file:line: code`, under these headings: packages,
-credentials, other settings, template files, email, push, notification services, other sends, sms
-and chat, templates, jobs and schedules, preferences and devices, in-app feed. From `.env` and
+credentials, other settings, template files, message catalogs, translated sends, email, push,
+notification services, other sends, sms and chat, templates, jobs and schedules, i18n, preferences
+and devices, in-app feed. Message catalogs are the app’s translation files and the templates kept
+per language; translated sends are translation calls (`t('…')`, `formatMessage`, `gettext`) within
+a few lines of a send, the text a send carries already translated. From `.env` and
 `.dev.vars` files it reads only the names of the settings, never their values. It matches
 patterns: it flags lines that send nothing, and it misses sends it has no pattern for. A provider
 missing from its lists shows up only as candidates: a package marked `unknown`, whose name sounds
@@ -63,6 +66,11 @@ past it:
   steps the code only names by id. Automations configured in a provider’s dashboard, such as an
   email sequence, send with no call site at all. List each id you find, and ask the user about
   what lives only in a dashboard.
+- **Languages.** An i18n package, message catalogs or templates per language mean the app sends
+  in more than one language. Find how it picks one (a user setting, a request’s
+  `Accept-Language`, a team’s or an account’s language), which languages it ships, and which it
+  falls back to. Each translated send is a flow whose text moves into its template’s
+  translations ([plan.md](plan.md)).
 - **Chaski itself**, when step 1 found it. The Chaski project’s folder, its `CHASKI_*` settings and
   the `chaskijs` package are Chaski’s own: dismiss their hits. The flows already on Chaski are the
   calls through the binding, which the finder has no pattern for: search for `CHASKI.send(` and
@@ -84,7 +92,8 @@ weekly digest. Trace each one from its send back to its trigger, and record:
 | Channels | Email, web push, iOS push, macOS push, Android push, Windows push, in-app, SMS, chat. |
 | Provider | The SDK or service, with the `file:line` of the send. |
 | Template | Where the content lives: a file (React Email, MJML, Handlebars, inline HTML), a provider-hosted template id, or a string in code. |
-| Data | The values the content uses. |
+| Data | The values the content uses, and which ones the app formats (money, dates) before sending. |
+| Languages | The languages it sends in, where each one’s text lives (catalog keys, a template per language) and what picks the language; or one language. |
 | Timing | Immediate; delayed, and by what (a queue’s `delaySeconds`, a provider’s `send_at`, a timer); or recurring, with the schedule. |
 | Dedupe | What stops a double send today: an idempotency key, a “sent” column, nothing. |
 | Preferences | What’s checked before sending: an opt-out column, an unsubscribe list, nothing. Mark the flows that must reach the reader whatever they chose: receipts, password resets, security alerts. |

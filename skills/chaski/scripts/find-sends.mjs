@@ -107,6 +107,27 @@ const PACKAGES = {
     '@slack/webhook',
     'discord.js',
   ],
+  i18n: [
+    'i18next',
+    'react-i18next',
+    'next-i18next',
+    'i18next-fs-backend',
+    'next-intl',
+    'react-intl',
+    '@formatjs/',
+    '@lingui/',
+    'vue-i18n',
+    '@nuxtjs/i18n',
+    'svelte-i18n',
+    '@inlang/',
+    'typesafe-i18n',
+    'i18n-js',
+    'node-polyglot',
+    'rosetta',
+    'i18n',
+    'gettext-parser',
+    'node-gettext',
+  ],
   'jobs and schedules': [
     'node-cron',
     'cron',
@@ -171,6 +192,12 @@ const PATTERNS = {
     // A "sent" marker is how a flow avoids sending twice.
     /\w*sent_?at\b|\bis_?sent\b|\bsent_?flag\b/i,
   ],
+  i18n: [
+    // t('key') and $t('key'), alone or on i18n, i18next, a request or a context.
+    /(?:^|[^\w$])\$?t\(\s*['"`][\w.:-]+['"`]/,
+    /\b(?:formatMessage|getTranslations?|useTranslations?|getFixedT|changeLanguage)\(/,
+    /\b__?\(\s*['"]|\b[ndp]?gettext\(/,
+  ],
   'preferences and devices': [
     /(?:notification|notif|email|push|sms)_?(?:pref|setting|opt)\w*/i,
     /unsubscrib\w*|\bopt_?out\w*|\bopted_?out\b|marketing_?(?:emails?|opt\w*)/i,
@@ -218,7 +245,30 @@ const SETTINGS_FILE =
 // Env files hold secrets: only the names of their settings are read, never the values.
 const ENV_FILE = /^\.(?:env|dev\.vars)(?:\..+)?$/;
 
+// The sends a translation call next to them most likely feeds: the categories above, and Chaski's
+// own calls, where a payload of translated strings is what templates' translations replace.
+const SENDS = ['email', 'push', 'notification services', 'other sends'];
+const CHASKI_SEND = /\bCHASKI\.(?:send|schedule)\(/;
+// How many lines after a send's first line its arguments, the payload among them, may run.
+const SEND_SPAN = 12;
+
+// Message catalogs and templates kept per language: a folder or a file named after a language.
+const LANGUAGES = new Set(
+  'ar bg bn ca cs da de el en es et eu fa fi fr gl he hi hr hu id it ja ko lt lv ms nb nl no pl pt ro ru sk sl sr sv th tl tr uk vi zh'.split(
+    ' ',
+  ),
+);
+const CATALOG_DIRS = /^(?:locales?|i18n|l10n|lang|langs|languages|translations|messages|intl)$/i;
+const CATALOG_FILE = /\.(?:json|ya?ml|po|pot|ftl|properties|xliff|xlf|arb|strings)$/i;
+// `es`, `pt-BR` or `pt_BR`, as a folder or a file name without its extension.
+const isLanguage = (segment) => {
+  const [language, region, ...rest] = segment.replace(/\.[^.]+$/, '').split(/[-_]/);
+  return LANGUAGES.has(language ?? '') && rest.length === 0 && (!region || region.length === 2);
+};
+
 const hits = new Map(Object.keys(PATTERNS).map((category) => [category, []]));
+const translatedSends = [];
+const catalogs = [];
 const packages = [];
 const dependencies = new Map();
 const templateFiles = [];
@@ -284,9 +334,15 @@ const isEmailPath = (path) =>
 const scanFile = (path) => {
   const rel = relative(root, path);
   const ext = extname(path).toLowerCase();
-  if (TEMPLATE_FILES.has(ext) || (isEmailPath(rel) && /\.(?:html|tsx|jsx)$/.test(ext))) {
-    templateFiles.push(rel);
-  }
+  const isTemplate =
+    TEMPLATE_FILES.has(ext) || (isEmailPath(rel) && /\.(?:html|tsx|jsx)$/.test(ext));
+  if (isTemplate) templateFiles.push(rel);
+  const parts = rel.split(sep);
+  const inCatalogDir = parts.slice(0, -1).some((part) => CATALOG_DIRS.test(part));
+  // welcome.es.html, receipt_pt-BR.mjml
+  const suffix = /[._-]([a-z]{2})(?:[-_][A-Z]{2})?\.[^.]+$/.exec(basename(path))?.[1];
+  const perLanguage = parts.some(isLanguage) || LANGUAGES.has(suffix ?? '');
+  if ((inCatalogDir && CATALOG_FILE.test(path)) || (isTemplate && perLanguage)) catalogs.push(rel);
   if (ENV_FILE.test(basename(path))) {
     readFileSync(path, 'utf8')
       .split('\n')
@@ -299,12 +355,21 @@ const scanFile = (path) => {
   const text = readFileSync(path, 'utf8');
   if (basename(path) === 'package.json') scanPackageJson(rel, text);
   const isSettingsFile = SETTINGS_FILE.test(basename(path));
+  let lastSend = Number.NEGATIVE_INFINITY;
   text.split('\n').forEach((line, index) => {
     recordCredentials(line, `${rel}:${index + 1}`, isSettingsFile);
-    for (const [category, patterns] of Object.entries(PATTERNS)) {
-      if (patterns.some((pattern) => pattern.test(line))) {
-        record(category, `${rel}:${index + 1}: ${line.trim().slice(0, 160)}`);
-      }
+    const matched = Object.entries(PATTERNS).filter(([, patterns]) =>
+      patterns.some((pattern) => pattern.test(line)),
+    );
+    for (const [category] of matched) {
+      record(category, `${rel}:${index + 1}: ${line.trim().slice(0, 160)}`);
+    }
+    const categories = matched.map(([category]) => category);
+    if (CHASKI_SEND.test(line) || categories.some((category) => SENDS.includes(category))) {
+      lastSend = index;
+    }
+    if (categories.includes('i18n') && index - lastSend <= SEND_SPAN) {
+      translatedSends.push(`${rel}:${index + 1}: ${line.trim().slice(0, 160)}`);
     }
   });
 };
@@ -349,6 +414,8 @@ const sections = [
     ),
   ],
   ['template files', templateFiles],
+  ['message catalogs', catalogs],
+  ['translated sends', translatedSends],
   ...hits.entries(),
 ];
 const distinct = new Set(

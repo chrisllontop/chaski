@@ -57,12 +57,20 @@ Write these down per flow:
   whose handler calls `env.CHASKI.send()` per contact.
 - **Recipient.** `recipient.id` is required, and is the same user id `identify` returns in the
   user routes, so the feed, devices and preferences line up; `email` and `name` come from the
-  user record. A flow that sends to an address with no user behind it (a password reset typed in,
-  a list) looks the user up; when there’s none, the user decides whether it sends at all.
-- **Payload.** The template’s values, formatted in the app (money, dates), since Liquid prints
-  them as given. Chaski stores the payload with the notification and shows it in the dashboard’s
-  delivery detail, so a secret in it, such as a password reset token or a sign-in link, is
-  readable there. Point that out, and let the user decide.
+  user record, and so does `locale` when the app keeps the user’s language. A flow that sends to
+  an address with no user behind it (a password reset typed in, a list) looks the user up; when
+  there’s none, the user decides whether it sends at all.
+- **Language.** For a flow that sends in more than one language, the language each send asks
+  for: `recipient.locale` from the user record, or the send’s own `locale` when it isn’t the
+  user’s (the language of a checkout, of a team, of a request’s `Accept-Language`). The text the
+  app translates today becomes the template’s translations (below), and the send passes the
+  language instead of the text.
+- **Payload.** The template’s values, raw: numbers, amounts and dates go as they are, and the
+  template formats them for the reader with `number`, `currency` and `format_date`
+  ([sending.md](sending.md), Liquid). Text the app builds or translates (a sentence, a label) goes
+  into the template, not the payload. Chaski stores the payload with the notification and shows
+  it in the dashboard’s delivery detail, so a secret in it, such as a password reset token or a
+  sign-in link, is readable there. Point that out, and let the user decide.
 - **`transactional: true`** for the flows step 3 of the audit marked as must-reach.
 - **Idempotency key.** From the event, never the time: `payment_received:<payment id>`, a digest’s
   `weekly_digest:<user id>:<week>`, a reminder’s `trial_ending:<trial id>`. A “sent” column the
@@ -104,10 +112,43 @@ value that holds HTML on purpose goes through `raw` instead.
   keep the output.
 - **Provider-hosted templates**: ask the user to export them from the provider’s dashboard, then
   convert as above.
+- **Formatted values.** A price or a date the code formats before sending (`toLocaleString`,
+  `Intl.NumberFormat`, a `formatCurrency` helper, a date library) becomes the raw value in the
+  payload and a filter in the template: `{{ amount | currency: 'EUR' }}`,
+  `{{ paidAt | format_date: 'long', 'short' }}`. The filter formats in the language the content
+  renders in. A value whose currency differs per send keeps its code in the payload too:
+  `{{ amount | currency: currency }}`.
 - **Entities in plain text.** Content written for HTML, or exported from a provider, often carries
   `&middot;`, `&#8217;` or `&amp;` into subjects and push text, where Chaski shows them as typed.
   Write the characters themselves in every field but the email body; loading the file prints a
   warning for each one left.
+
+### Converting translations
+
+When the audit found the app’s own translations (a catalog, an i18n library, a template per
+language), each flow’s content in each language comes over as the template’s `translations`
+([sending.md](sending.md), Languages):
+
+- **The languages.** The app’s default language, the one its fallback serves, becomes the file’s
+  `defaultLocale` and the content of each channel; every other language the flow sends in becomes
+  a key of `translations` on each channel it has, as a BCP 47 tag (`pt_BR` is `pt-BR`). List them
+  for the user, who saves them under **Languages** on **Channels**, with the same default, before
+  the file loads.
+- **Catalogs** (i18next, next-intl, react-intl and FormatJS, Lingui, vue-i18n, gettext `.po`,
+  Rails or Laravel YAML and PHP): resolve every key the flow’s content uses in each language and
+  write the result into that language’s fields. A catalog’s placeholders become Liquid tags:
+  i18next’s `{{name}}`, ICU’s `{name}` and gettext’s `%(name)s` become `{{ name }}`. A plural
+  becomes a condition on the number, `{% if count == 1 %}…{% else %}…{% endif %}`, and an ICU
+  `{amount, number, currency}` becomes the `currency` filter.
+- **A template per language** (`welcome.es.html`, `emails/pt-BR/receipt.mjml`, a provider
+  template per language): convert each one as above, into the translation of its language. The
+  one the app falls back to is the default content.
+- **Every field is the translation’s own.** A translation leaves no field to the default: when a
+  language lacks a string the app falls back for, write the default’s text into that field, and
+  list it in the plan as untranslated.
+- **What decides the language** stays the app’s, moved into the send: the user’s setting becomes
+  `recipient.locale`, a choice per message becomes `locale`. The translated strings the finder
+  listed under translated sends leave the payload.
 
 Write every converted template into the template file ([sending.md](sending.md)), with
 `sampleData` that fills every tag it uses, and note in the plan where each one came from.
@@ -157,17 +198,19 @@ opt-in flag) reads it until the column goes; afterwards it sends to everyone it 
 lets preferences skip the rest, each skipped send recorded as `suppressed`.
 
 **Done when** every flow that moves has its type, channels, call, idempotency key,
-`transactional` choice, template source and bindings; the template file holds a template for every
-type, with `sampleData` that fills every tag it uses; and every piece of stored state has its way
-over or a reason it stays.
+`transactional` choice, template source, languages and bindings; the template file holds a
+template for every type, with `sampleData` that fills every tag it uses and a translation for each
+language the flow sends in; and every piece of stored state has its way over or a reason it stays.
 
 ## 3. Stage it
 
 Write the stages into the plan in this order:
 
 1. **Chaski, locally.** Set it up on a branch ([setup.md](setup.md)) with the bindings the
-   moving flows need. Load the template file into the local database ([sending.md](sending.md)),
-   and the user checks each template in the dashboard’s preview. Before the first email type, the
+   moving flows need. When the flows send in several languages, the user saves them under
+   **Languages** on the local dashboard’s **Channels** first. Load the template file into the
+   local database ([sending.md](sending.md)), and the user checks each template in the
+   dashboard’s preview, in each language. Before the first email type, the
    user onboards the sending domain to Email Service, a DNS change on their side.
 2. **Backfills**, before the types that depend on them: preferences before any type that respects
    them, devices before any push type, with the double writes above from the same deploy.

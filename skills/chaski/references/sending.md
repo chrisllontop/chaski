@@ -23,7 +23,8 @@ A template holds, per channel, three fields under the same three names:
 A channel goes out only when the template has it `enabled` and the channel is on (its settings
 saved on the dashboard’s **Channels** page). A template can also carry a `description`, a `topic`
 that groups it on the user’s preferences screen, and `sampleData`, a string of JSON the dashboard
-previews it with.
+previews it with. Each channel can carry the same three fields in other languages, its
+**translations** (below).
 
 ### The template file
 
@@ -35,25 +36,33 @@ dashboard, whose preview renders it with its `sampleData`.
 ```json title="chaski-templates.json"
 {
   "format": "chaski.templates",
-  "version": 1,
+  "version": 2,
+  "defaultLocale": "en",
   "templates": [
     {
       "type": "payment_received",
       "topic": "billing",
-      "sampleData": "{\"amount\": \"$15.00\", \"recipient\": {\"name\": \"Ana\"}}",
+      "sampleData": "{\"amount\": 15, \"recipient\": {\"name\": \"Ana\"}}",
       "channels": [
         {
           "channel": "email",
           "enabled": true,
-          "subject": "We received {{ amount }}",
-          "body": "<p>Thanks, {{ recipient.name }}. We received {{ amount }}.</p>",
-          "textBody": "Thanks, {{ recipient.name }}. We received {{ amount }}."
+          "subject": "We received {{ amount | currency: 'USD' }}",
+          "body": "<p>Thanks, {{ recipient.name }}. We received {{ amount | currency: 'USD' }}.</p>",
+          "textBody": "Thanks, {{ recipient.name }}. We received {{ amount | currency: 'USD' }}.",
+          "translations": {
+            "es": {
+              "subject": "Recibimos {{ amount | currency: 'USD' }}",
+              "body": "<p>Gracias, {{ recipient.name }}. Recibimos {{ amount | currency: 'USD' }}.</p>",
+              "textBody": "Gracias, {{ recipient.name }}. Recibimos {{ amount | currency: 'USD' }}."
+            }
+          }
         },
         {
           "channel": "in_app",
           "enabled": true,
           "subject": "Payment received",
-          "body": "We received {{ amount }}.",
+          "body": "We received {{ amount | currency: 'USD' }}.",
           "textBody": "/payments"
         }
       ]
@@ -61,6 +70,10 @@ dashboard, whose preview renders it with its `sampleData`.
   ]
 }
 ```
+
+A file that sends in one language leaves out `defaultLocale` and `translations`. A file of
+`"version": 1`, the format before translations, still loads, and one that carries `translations`
+is refused rather than loaded without them.
 
 Load it into the local database from the Chaski project, after Chaski’s migrations:
 
@@ -82,11 +95,50 @@ npx wrangler d1 execute CHASKI_DB --local --file .wrangler/chaski-templates.sql
   They write to the user’s database: ask first.
 - **From the app’s code**, `env.CHASKI.templates().import(file)` applies the same file (a seed
   route, a deploy job), and `{ preview: true }` reports what it would change without writing.
+- **Translations need the Worker’s languages.** A file with `translations` loads only into a
+  Chaski whose languages are saved on **Channels**, **Languages**, with the file’s
+  `defaultLocale` as the default: the user saves them there first, in each environment. Without
+  them, or with another default, nothing loads: the SQL stops at `this file has its default
+  content in en`, and `import()` names both languages.
+
+### Languages
+
+A Chaski sends in a **default language**, the one every template’s content is written in, and in
+the other languages saved under **Languages** on **Channels**. With none saved, every send renders
+the default content.
+
+- **The content per language.** A channel’s `translations` hold its `subject`, `body` and
+  `textBody` in each other language, keyed by BCP 47 tag (`es`, `pt-BR`). Every field is the
+  translation’s own: one it leaves out is empty, never the default’s. It needs a `body`, and it
+  can’t be in the default language.
+- **The language a send asks for** is its own `locale`, for that send alone, or else
+  `recipient.locale`. Chaski reads either as Intl does (`es-pe` and `es_PE` are `es-PE`); a value
+  that isn’t a language tag counts as absent, so the send goes out in the default language.
+- **Each channel picks on its own**: the translation in that locale, else in its language (`es`
+  for `es-PE`), else the default content, among the Worker’s languages only. So a send can email
+  in Spanish while its in-app item falls back to English, when only the email is translated.
+- **Outdated.** A translation remembers the default content it was written from. Once that
+  content changes, the dashboard marks the translation outdated until someone saves it again or
+  marks it current; it still goes out meanwhile. An exported file writes `"outdated": true` on it,
+  and the import keeps it so.
+- **Every delivery records** the language it went out in, which the dashboard’s **Deliveries**
+  shows next to the one the send asked for, and the **Overview** counts the deliveries that went
+  out in another language than asked for.
 
 ### Liquid
 
 Templates are [Liquid](https://liquidjs.com). They see the send’s `payload` at the top level, plus
-`recipient` (`id`, and `email`, `name`, `phone`, `timezone`, `locale` when the send gave them).
+`recipient` (`id`, and `email`, `name`, `phone`, `timezone`, `locale` when the send gave them) and,
+once the Worker has languages, `locale`: the language the channel renders in.
+
+- Three filters format for the reader, in the language the content renders in, with the region the
+  send asked for when it is that language (`es-PE` over Spanish content):
+  `{{ count | number }}` (`{{ ratio | number: 2 }}` for two decimals),
+  `{{ amount | currency: 'USD' }}`, and `{{ paidAt | format_date }}`, a date in the long style,
+  with `format_date: 'medium', 'short'` for the date and the time, or `'none', 'short'` for the
+  time alone. Dates are in `recipient.timezone`, or UTC without one; a number or a string of
+  digits counts seconds, as Liquid’s `date` does. A value they can’t read prints as it came. With
+  no languages saved, they format in English.
 
 - A missing key renders empty instead of failing the delivery.
 - An email `body` escapes every value for HTML on its own. A value that holds HTML on purpose
@@ -120,6 +172,7 @@ const result = await env.CHASKI.send({
 | `transactional` | `true` sends whatever the contact’s preferences say: receipts, password resets, security alerts. |
 | `email` | `fromName`, `replyTo`, and up to 10 `attachments` (`filename`, `contentType`, and base64 `content` or a `url`); attachments need `CHASKI_ATTACHMENTS`. Chaski deletes them once the email goes out or its schedule is cancelled; a failed or dead delivery keeps them for a replay, so suggest an R2 lifecycle rule on `att/` that outlasts the farthest schedule with attachments. |
 | `push` | `silent: true` shows the push’s alert without a sound on Apple devices, on Windows and in browsers; on Android the app’s notification channel decides the sound. `collapseId` (up to 64 printable ASCII characters) replaces a push already shown with the same id, and becomes the push’s `tag`. |
+| `locale` | The language of this send alone, ahead of `recipient.locale`, and never saved to the contact: a receipt in the language of the checkout, say. |
 | `data` | Up to 20 string values for the app’s clients, such as its own event id: the feed item (`data`) and every push carry them as they came. Keys are letters, digits and `_`; `aps`, `href`, `tag`, `from`, `message_type`, `collapse_key` and keys starting with `google` or `gcm` are refused. |
 | `idempotencyKey` | The same key returns the first send’s result (`replayed: true`) instead of sending again. |
 | `inline` | `true` delivers the email before `send()` returns, for someone waiting on it; needs `transactional: true` and `channels: ['email']`. |
@@ -174,7 +227,8 @@ const pending = await env.CHASKI.schedules().list({ recipientId: user.id });
   what happened: `created`, `updated`, `completed` (it already went out, and nothing changed) or
   `cancelled` (the new time had passed). Something that arms again after it fired needs a new key
   each time.
-- Preferences and the template are read when the send fires, not when it’s scheduled.
+- Preferences and the template, its translations included, are read when the send fires, not
+  when it’s scheduled; the language it asks for is the one at scheduling.
 - A schedule is one send at one time. Something that repeats, such as a weekly digest, stays a
   Cron Trigger in the app whose handler calls `env.CHASKI.send()`.
 - It needs `CHASKI_SCHEDULER` bound in the Chaski Worker.

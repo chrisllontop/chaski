@@ -54,7 +54,8 @@ resolve on chaski.sh too. Only the audit’s finder has to be on disk to run:
   - The secret `CHASKI_SECRET`: encrypts the channel credentials saved in the dashboard. Set it once
     per environment and keep it: another value leaves those credentials unreadable.
   - The dashboard’s **Channels** page, per environment: each channel’s settings (sender address, push
-    keys and credentials) and the types **Muted by default**. A channel is on once its settings are saved
+    keys and credentials), the types **Muted by default** and the **Languages** templates can be
+    written in. A channel is on once its settings are saved
     and off when they’re removed; a pause, also there, holds its deliveries instead.
   - The app’s Wrangler config: only the `CHASKI` service binding.
 - **Bindings decide features.** Only `CHASKI_DB` (D1) and `CHASKI_QUEUE` (producer and consumer,
@@ -66,8 +67,9 @@ resolve on chaski.sh too. Only the audit’s finder has to be on disk to run:
   `env.CHASKI.feed().unreadCount(id)`, `env.CHASKI.schedules().cancel(query)`, and likewise
   `push()`, `preferences()` and `templates()`.
 - **Words.** A **notification** has a **type** (`payment_received`), and each type has a
-  **template** with content per **channel** (`email`, `in_app`, `push`). One notification going out
-  on one channel is a **delivery**. The person receiving it is the **contact** (`recipient` in
+  **template** with content per **channel** (`email`, `in_app`, `push`), in the default language
+  and, as its **translations**, in the Worker’s other languages. One notification going out on one
+  channel is a **delivery**. The person receiving it is the **contact** (`recipient` in
   code), their choices are **preferences**, and the in-app list is their **feed**.
 - **The types are the truth.** Once `chaskijs` is installed, its declarations answer any question
   about a field: `node_modules/chaskijs/dist/contract/contract.d.ts` (requests and results),
