@@ -3,11 +3,11 @@ import type { ReactNode } from 'react';
 const KEYWORDS = new Set(['import', 'from', 'export', 'const', 'await', 'async', 'default']);
 
 const TOKEN =
-  /(\/\/[^\n]*)|('(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\]|\\.)*`)|\b([a-z]+)\b/g;
+  /((?<!:)\/\/[^\n]*)|('(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\]|\\.)*`)|\b([a-z]+)\b/g;
 
 /**
- * Colors the landing's TypeScript and JSONC samples with the classes the docs' Shiki theme emits,
- * without shipping Shiki to the page: comments, strings and a handful of keywords are enough.
+ * Colors the landing's TypeScript, JSONC and terminal samples with the classes the docs' Shiki theme
+ * emits, without shipping Shiki: comments, strings and a few keywords are enough. `://` is a URL.
  */
 export const highlight = (code: string): ReactNode[] => {
   const nodes: ReactNode[] = [];

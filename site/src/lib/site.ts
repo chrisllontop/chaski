@@ -16,4 +16,4 @@ export const editUrl = (path: string) => `${repo}/blob/main/site/content/docs/${
 export const skillUrl = `${site.url}/skill/SKILL.md`;
 
 /** What every "copy the prompt" button copies, and what the landing shows pasted. */
-export const setupPrompt = `Set up Chaski, notifications for Cloudflare Workers, in this project. Follow ${skillUrl} step by step, and ask me before anything that touches my Cloudflare account.`;
+export const setupPrompt = `Set up Chaski for this app: notifications that run as a Worker of their own, next to it. Follow ${skillUrl} step by step, and ask me before anything that touches my Cloudflare account.`;

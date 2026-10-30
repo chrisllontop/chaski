@@ -19,7 +19,7 @@ export const SiteFooter = () => (
         <div className="flex flex-col gap-3.5">
           <Logo className="h-7 w-max" />
           <p className="text-sm leading-5 text-muted-foreground">
-            Notification infrastructure for Cloudflare Workers.
+            Notifications that run as a Worker of their own, next to your app.
           </p>
         </div>
         <nav className="flex gap-10 sm:gap-20" aria-label="Footer">

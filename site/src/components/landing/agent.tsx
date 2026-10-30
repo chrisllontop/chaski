@@ -9,6 +9,7 @@ const STEPS = [
   { text: 'Created the Chaski Worker next to it', meta: 'chaski/' },
   { text: 'Bound the app and mounted the user routes', meta: '/me/notifications' },
   { text: 'Created the tables locally', meta: '--local' },
+  { text: 'Set up the channels in the local dashboard', meta: 'Channels' },
   { text: 'Sent a welcome email locally', meta: 'delivered', metaClass: 'text-success' },
 ];
 
@@ -23,6 +24,7 @@ const ROW_DELAYS = [
   '[animation-delay:1400ms]',
   '[animation-delay:1700ms]',
   '[animation-delay:2000ms]',
+  '[animation-delay:2300ms]',
 ];
 const MARK_DELAYS = [
   '[animation-delay:350ms]',
@@ -32,6 +34,7 @@ const MARK_DELAYS = [
   '[animation-delay:1550ms]',
   '[animation-delay:1850ms]',
   '[animation-delay:2150ms]',
+  '[animation-delay:2450ms]',
 ];
 
 const ALSO_TRY = [

@@ -1,26 +1,26 @@
 import { type KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { useInViewAttribute, useMotionAllowed } from '~/lib/motion';
 import { highlight } from './code';
-import { billingSample, indexSample, wranglerSample } from './samples';
+import { appSample, deploySample, initSample } from './samples';
 
 const FILES = [
-  { id: 'wrangler', name: 'chaski/wrangler.jsonc', code: wranglerSample },
-  { id: 'index', name: 'chaski/src/index.ts', code: indexSample },
-  { id: 'billing', name: 'app/src/billing.ts', code: billingSample },
+  { id: 'init', name: 'npx chaskijs init', code: initSample },
+  { id: 'deploy', name: 'npx chaskijs deploy', code: deploySample },
+  { id: 'app', name: 'app/src/index.ts', code: appSample },
 ];
 
 const STEPS = [
   {
-    title: 'Declare the bindings',
-    text: 'A database and a queue to start. Add the rest as you need it.',
+    title: 'Create it',
+    text: 'One command writes the project, three files in a folder of your repository or in a new one, ready to run locally.',
   },
   {
     title: 'Deploy it',
-    text: 'One line re-exports the Worker. Its dashboard opens for your team only, and the channels are set up there.',
+    text: 'It creates a database and a queue on your Cloudflare account, and deploys. Its dashboard opens for your team only, and the channels are set up there.',
   },
   {
-    title: 'Send from your app',
-    text: 'Bind your app to it, and one call fans out to email, push and the in-app feed, with retries.',
+    title: 'Connect your app',
+    text: 'Bind your app to it and mount the routes your frontend reads the feed through. Then one call fans out to email, push and the in-app feed, with retries.',
   },
 ];
 
@@ -44,6 +44,24 @@ export const HowItWorks = () => {
   useEffect(() => {
     if (motion) setActive(0);
   }, [motion]);
+
+  // On a phone the tab names overflow their bar. Scroll the bar alone, never the page, so the open
+  // tab reads whole while the steps above advance.
+  useEffect(() => {
+    const tab = tabs.current[active];
+    const bar = tab?.parentElement;
+    if (!tab || !bar) return;
+    const inset = Number.parseFloat(getComputedStyle(bar).paddingLeft);
+    const box = bar.getBoundingClientRect();
+    const { left, right } = tab.getBoundingClientRect();
+    const by =
+      left < box.left + inset
+        ? left - box.left - inset
+        : right > box.right - inset
+          ? right - box.right + inset
+          : 0;
+    if (by) bar.scrollBy({ left: by, behavior: motion ? 'smooth' : 'auto' });
+  }, [active, motion]);
 
   const choose = (index: number) => {
     setStopped(true);
@@ -72,7 +90,7 @@ export const HowItWorks = () => {
           Deploy it next to your app.
         </h2>
         <p className="lede">
-          Chaski is a Worker of its own, on your account. A project of three files deploys it, and
+          Chaski is a Worker of its own, on your account. Two commands create and deploy it, and
           your app sends to it from anywhere in its code.
         </p>
         <ol className="flex flex-col pt-5">

@@ -75,6 +75,13 @@ export const PhoneIcon = icon(
   </>,
 );
 
+export const MonitorIcon = icon(
+  <>
+    <rect x="2" y="3" width="20" height="14" rx="2" />
+    <path d="M8 21h8M12 17v4" />
+  </>,
+);
+
 export const GlobeIcon = icon(
   <>
     <circle cx="12" cy="12" r="10" />
