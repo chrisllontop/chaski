@@ -1,5 +1,7 @@
 import { env, exports } from 'cloudflare:workers';
+import { Hono } from 'hono';
 import { describe, expect, it, vi } from 'vitest';
+import { userRoutes } from '../src/app/user-routes';
 import { getClient } from '../src/server/db';
 import { injectOpenPixel, openPixelUrl } from '../src/server/lib/email-open';
 import { DeliveryService } from '../src/server/services/delivery.service';
@@ -88,6 +90,26 @@ describe('GET /t/o/:deliveryId', () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toBe('image/gif');
+  });
+
+  // An app that gates its routes behind a session mounts the pixel alone ahead of the gate.
+  it('serves the pixel from a mount with no groups, ahead of the app gates', async () => {
+    const deliveryId = await createEmailDelivery('sent');
+    const app = new Hono();
+    const chaski = () => exports.ChaskiEntrypoint;
+    app.route('/n', userRoutes({ chaski, identify: () => null, groups: [] }));
+    app.use('*', (c) => c.json({ error: 'unauthorized' }, 401));
+    app.route('/n', userRoutes({ chaski, identify: () => 'user_1' }));
+
+    const pixel = await app.request(`https://app.test/n/t/o/${deliveryId}`, {
+      headers: { 'sec-fetch-site': 'cross-site' },
+    });
+    const feed = await app.request('https://app.test/n/feed');
+
+    expect(pixel.status).toBe(200);
+    expect(pixel.headers.get('content-type')).toBe('image/gif');
+    expect(feed.status).toBe(401);
+    await vi.waitFor(async () => expect(await openedAt(deliveryId)).toBeTruthy());
   });
 });
 
