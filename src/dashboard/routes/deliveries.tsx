@@ -14,6 +14,7 @@ import {
   rowActionClass,
 } from '~/components/app/data-table';
 import { ChannelLabel, STATUS_LABELS, StatusBadge } from '~/components/app/delivery-bits';
+import { LanguageLabel } from '~/components/app/languages';
 import { ErrorAlert, PageHeader } from '~/components/app/page';
 import { Pager } from '~/components/app/pager';
 import { Pill } from '~/components/app/pill';
@@ -53,6 +54,7 @@ import {
   formatNumber,
   formatRelative,
 } from '~/lib/format';
+import { isFallback, languageNote, languagesOf, useLocales } from '~/lib/locales';
 import type { Channel, Delivery, DeliveryPage, DeliveryStatus, TemplateSummary } from '~/lib/types';
 
 type HeldSelection = { ids?: string[]; channel?: Channel; type?: string };
@@ -203,6 +205,7 @@ const DeliverySheet = ({
     enabled: deliveryId !== null,
   });
   const delivery = data?.delivery;
+  const languages = languagesOf(useLocales().data);
   return (
     <Sheet open={deliveryId !== null} onOpenChange={(open) => !open && onClose()}>
       <SheetContent className="w-full gap-0 overflow-y-auto sm:max-w-lg">
@@ -235,6 +238,16 @@ const DeliverySheet = ({
                       <div className="text-muted-foreground">{delivery.address}</div>
                     ) : null}
                   </Field>
+                  {languages && (delivery.requestedLocale || delivery.renderedLocale) ? (
+                    <Field label="Language">
+                      {delivery.renderedLocale ? (
+                        <div>
+                          <LanguageLabel locale={delivery.renderedLocale} />
+                        </div>
+                      ) : null}
+                      <div className="text-muted-foreground">{languageNote(delivery)}</div>
+                    </Field>
+                  ) : null}
                   <Field label="Attempts">
                     <span className="tabular-nums">{delivery.attempts}</span>
                   </Field>
@@ -326,6 +339,8 @@ export const DeliveriesPage = () => {
   const [discarding, setDiscarding] = useState<Delivery | null>(null);
   const [bulk, setBulk] = useState<'send' | 'discard' | null>(null);
   const channels = useChannelsOverview();
+  const languages = languagesOf(useLocales().data);
+  const columns = languages ? 8 : 7;
   const recipientId = useDebounced(contact.trim(), 300);
 
   const filters = {
@@ -531,6 +546,7 @@ export const DeliveriesPage = () => {
               <DataHead>Contact</DataHead>
               <DataHead>Type</DataHead>
               <DataHead>Channel</DataHead>
+              {languages ? <DataHead>Language</DataHead> : null}
               <DataHead>Status</DataHead>
               <DataHead numeric>Attempts</DataHead>
               <DataHead numeric>Updated</DataHead>
@@ -542,13 +558,13 @@ export const DeliveriesPage = () => {
               Array.from({ length: 8 }, (_, row) => (
                 // biome-ignore lint/suspicious/noArrayIndexKey: placeholder rows have no identity
                 <DataRow key={row}>
-                  <DataCell colSpan={7}>
+                  <DataCell colSpan={columns}>
                     <Skeleton className="h-4 w-full" />
                   </DataCell>
                 </DataRow>
               ))
             ) : list.data.deliveries.length === 0 ? (
-              <DataEmpty colSpan={7}>No deliveries match these filters.</DataEmpty>
+              <DataEmpty colSpan={columns}>No deliveries match these filters.</DataEmpty>
             ) : (
               list.data.deliveries.map((delivery) => (
                 <DataRow
@@ -566,6 +582,20 @@ export const DeliveriesPage = () => {
                   <DataCell>
                     <ChannelLabel channel={delivery.channel} />
                   </DataCell>
+                  {languages ? (
+                    <DataCell>
+                      {delivery.renderedLocale ? (
+                        <span className="whitespace-nowrap">
+                          <code className="font-mono text-xs">{delivery.renderedLocale}</code>
+                          {isFallback(delivery.requestedLocale, delivery.renderedLocale) ? (
+                            <span className="text-muted-foreground text-xs"> · fallback</span>
+                          ) : null}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">–</span>
+                      )}
+                    </DataCell>
+                  ) : null}
                   <DataCell>
                     <div className="flex items-center gap-1.5">
                       <StatusBadge status={delivery.status} />
