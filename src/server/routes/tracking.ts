@@ -2,12 +2,11 @@ import { Hono } from 'hono';
 import { publishAdminEvents } from '../lib/admin-events';
 import { TRANSPARENT_GIF } from '../lib/email-open';
 import { logger } from '../lib/log';
-import { reportError } from '../lib/report-error';
 import { DeliveryService } from '../services/delivery.service';
 
-// Public, unauthenticated: mail clients and proxies (e.g. Gmail's image cache)
-// fetch the pixel with no credentials. The response is always the GIF — the DB
-// write runs in waitUntil and any failure must never surface to the client.
+// The app forwards the pixel without identifying anyone: mail clients and proxies (Gmail's image
+// cache, say) fetch it with no credentials. The response is always the GIF; the write runs in
+// waitUntil and its failure never reaches the client.
 export const tracking = new Hono();
 
 tracking.get('/o/:deliveryId', (c) => {
@@ -16,7 +15,6 @@ tracking.get('/o/:deliveryId', (c) => {
     DeliveryService.markOpened(deliveryId)
       .then((opened) => (opened ? publishAdminEvents(['deliveries', 'metrics']) : undefined))
       .catch((error: unknown) => {
-        reportError(error, { source: 'tracking', deliveryId });
         logger('tracking').error('open mark failed', error, { deliveryId });
       }),
   );

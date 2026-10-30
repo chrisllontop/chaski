@@ -50,7 +50,7 @@ export type PushHandlerOptions = {
 export const PUSH_MESSAGE_TYPE = 'chaski:push';
 
 /**
- * Shows Chaski's pushes and handles their clicks; call it from the host's
+ * Shows Chaski's pushes and handles their clicks; call it from the app's
  * service worker: `handlePushEvents(self)`. A click takes an open window to
  * the push's link and focuses it, or opens the link in a new one.
  */

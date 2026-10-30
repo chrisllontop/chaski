@@ -1,4 +1,5 @@
 import { RpcTarget, WorkerEntrypoint } from 'cloudflare:workers';
+import { Hono } from 'hono';
 import type {
   ChaskiApi,
   ChaskiFeedApi,
@@ -18,6 +19,8 @@ import type {
   UnregisterPushSubscriptionQuery,
 } from '../contract/contract';
 import { api } from './api';
+import { tracking } from './routes/tracking';
+import { userRoutes } from './routes/user';
 
 class Schedules extends RpcTarget implements ChaskiSchedulesApi {
   list(query?: { recipientId?: string }) {
@@ -73,15 +76,22 @@ class Templates extends RpcTarget implements ChaskiTemplatesApi {
   }
 }
 
+// The open pixel first: mail clients load it with no session, so it names no recipient.
+const routes = new Hono().route('/t', tracking).route('/', userRoutes);
+
 /**
- * The in-process API over RPC, for the host's other Workers; only Workers in the
- * host's account can bind to it. A service binding sees methods, never getters,
- * so each group is a method: env.CHASKI.feed().list(query), still one round trip.
+ * Chaski's API over RPC, plus the routes the app's userRoutes() forwards; only Workers in the same
+ * account can bind to it. A service binding sees methods, never getters, so each group is a
+ * method: env.CHASKI.feed().list(query), still one round trip.
  */
 export class ChaskiEntrypoint
   extends WorkerEntrypoint
   implements Pick<ChaskiApi, 'ready' | 'send' | 'schedule'>
 {
+  override fetch(request: Request) {
+    return routes.fetch(request, this.env, this.ctx);
+  }
+
   ready() {
     return api.ready();
   }
