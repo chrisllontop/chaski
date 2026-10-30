@@ -230,9 +230,11 @@ export class SettingsService extends BaseService {
       full = { ...fields, [field]: plaintext };
     }
 
+    // The muted types are stored as { mutedTypes }, and the config takes the list itself.
+    const value = section === 'default_muted_types' ? full.mutedTypes : full;
     let resolved: unknown;
     try {
-      resolved = resolveSection(section, full as StoredSections[S], bindings);
+      resolved = resolveSection(section, value as StoredSections[S], bindings);
     } catch (error) {
       // The binding passed above, so what's left is a field the person saving can fix.
       if (isChaskiError(error) && error.code === 'config') {

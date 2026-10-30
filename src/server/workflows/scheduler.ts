@@ -27,11 +27,9 @@ export class ChaskiScheduler extends WorkflowEntrypoint<unknown, ScheduleParams>
     const { scheduledId } = event.payload;
 
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-      // Each step loads the channel settings first, as every other entry point does.
-      const target = await step.do(`resolve ${attempt}`, async () => {
-        await ready();
-        return ScheduleService.workflowTarget(scheduledId);
-      });
+      const target = await step.do(`resolve ${attempt}`, () =>
+        ScheduleService.workflowTarget(scheduledId),
+      );
       // Cancelled, sent or gone: nothing left to do.
       if (!target) return;
       if (!target.due) {
@@ -39,6 +37,7 @@ export class ChaskiScheduler extends WorkflowEntrypoint<unknown, ScheduleParams>
         continue;
       }
       try {
+        // The send reads the channels, so it loads their settings first, as every entry point does.
         await step.do(`send ${attempt}`, SEND_STEP, async () => {
           await ready();
           await ScheduleService.fire(scheduledId);
