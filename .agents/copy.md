@@ -1,8 +1,3 @@
----
-description: Product copy, UX writing, terminology, voice, and tone
-globs: src/dashboard/**/*.{ts,tsx}
----
-
 # Product copy
 
 Write for the person using the product, not for the implementation. Copy should make the current

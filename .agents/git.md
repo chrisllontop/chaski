@@ -1,7 +1,3 @@
----
-description: Git commit and pull request conventions
----
-
 ## Git commits
 
 - Use imperative mood and sentence case (e.g. `Add user billing flags`, `Fix sidebar layout on mobile`).

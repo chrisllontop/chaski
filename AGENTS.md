@@ -13,6 +13,24 @@ the endpoints the host's frontend calls for the signed-in user, which `chaskijs/
 `chaskijs/sw` and `chaskijs/react` wrap for the page, the service worker and React.
 `ChaskiEntrypoint` serves the same in-process API over RPC to the host's other Workers.
 
+## Guides
+
+The guides in `.agents/` hold the conventions of each area and are its source of truth. Read a
+guide before the work it names and follow it; when a change alters a convention, update its guide
+in the same change.
+
+- `.agents/api.md`: the admin API under `/api/*`: route layout, request validation, error and
+  success responses, resource IDs.
+- `.agents/services.md`: business logic and persistence under `src/server/services/`:
+  `BaseService`, the bindings, better-drizzle on D1.
+- `.agents/database.md`: a table, column or migration in `src/server/db/schema/` or `migrations/`.
+- `.agents/errors.md`: what a failure throws and where it shows: `ChaskiError`, `DeliveryError`,
+  HTTP answers, background work.
+- `.agents/types.md`: `null` versus `undefined` in zod inputs, service updates and response DTOs.
+- `.agents/copy.md`: any user-facing text in the dashboard: labels, errors, empty states,
+  confirmations.
+- `.agents/git.md`: a commit message or a pull request.
+
 ## Run it
 
 - `pnpm i` installs the dependencies (Node 24 and pnpm 12). `devEngines` holds contributors to
@@ -35,7 +53,7 @@ the endpoints the host's frontend calls for the signed-in user, which `chaskijs/
   that build as production does. Workers Builds publishes it (see CI); `pnpm deploy:site` is the
   manual fallback, and only the owner runs it.
 - `pnpm drizzle-kit generate --name <name>` writes a migration into `migrations/` after a schema
-  change; `.cursor/rules/database.mdc` says what else a migration needs.
+  change; `.agents/database.md` says what else a migration needs.
 - `pnpm check` builds the dashboard, then runs typecheck, lint and test, and builds the site: the
   same gate CI runs before the build.
 
@@ -80,7 +98,7 @@ the endpoints the host's frontend calls for the signed-in user, which `chaskijs/
     `feed()`, `push()`, `preferences()`, `schedules()`, `templates()`.
   - `routes/` holds the Hono sub-apps: the dashboard shell and assets, the admin API under `/api`,
     the open-tracking pixel and the user routes.
-  - `services/` holds the business logic (`.cursor/rules/services.mdc`), with one adapter per
+  - `services/` holds the business logic (`.agents/services.md`), with one adapter per
     channel in `services/adapters`.
   - `db/` holds the Drizzle schema and the better-drizzle client; `migrations.ts` refuses to run
     until the host applied every migration.
@@ -127,18 +145,31 @@ the endpoints the host's frontend calls for the signed-in user, which `chaskijs/
 
 ## Code conventions
 
-The rules live in `.cursor/rules/`: `git.mdc` (commit and pull request conventions), `style.mdc`
-(code style), `types.mdc` (null vs undefined across layers), `copy.mdc` (voice, terminology and
-punctuation for user-facing text), `api.mdc` (routes and responses), `services.mdc` (services and
-persistence), `database.mdc` (schema and migrations) and `errors.mdc` (errors and their codes).
-Read the ones that apply before committing, writing code or writing copy. Rules for the UI arrive
-with the code they govern.
+Biome formats and lints: 2 spaces, single quotes, always semicolons, 100 columns. Run `pnpm lint`;
+generated files (such as `routeTree.gen.ts`) are excluded in `biome.json`.
 
-- Biome: 2 spaces, single quotes, semicolons, 100 columns. Run `pnpm lint`.
-- Arrow functions, not function declarations. Inferred types over annotations; no `any`.
-- Comments say **why** (a constraint, an invariant, a quirk), never what the next line does.
+- Arrow functions (`const fn = () => {}`), not function declarations, in application code. The
+  registry-managed shadcn files (`src/dashboard/components/ui/**`) keep their upstream
+  declarations, so registry updates stay reviewable.
+- Inferred types over annotations; no `any`.
+- Use `~/` when a dashboard import crosses feature boundaries (`import { Button } from
+  '~/components/ui/button'`). Relative imports are fine within one module tree, in
+  registry-managed files and from root build or Worker entrypoints.
 - Chaski runs inside the host's Worker and only on the bindings the host declares. Do not assume
   binding names or reach for resources the host did not hand over.
+
+### Comments
+
+Comments say **why**: a non-obvious reason, an invariant, a workaround, a gotcha, a contract
+another module relies on. A comment that repeats the name or the next lines goes.
+
+- Leave a function, block or export that explains itself uncommented; prefer a clear name.
+- Describe behavior in words, not by product screen or task numbers (`#10`, `#11`).
+- Keep JSDoc (`/** */`) to about 3 lines. A longer block is for a non-obvious cross-module
+  contract, invariant or workaround that would be unsafe to lose; reusable policy goes in a guide
+  in `.agents/`.
+- Section dividers (`// ─── … ───`) group unrelated blocks in large route or service files only.
+
 - Each runtime has its own types: `tsconfig.json` (the Worker side of `src`, Workers types),
   `tsconfig.browser.json` (the browser entries and the contract, DOM types),
   `src/dashboard/tsconfig.json` (DOM and JSX), `test/tsconfig.json` (Workers plus the Vitest
@@ -174,9 +205,9 @@ with the code they govern.
 
 ## Working agreements
 
-- Commit small and often on your branch, following `.cursor/rules/git.mdc` (imperative, sentence
+- Commit small and often on your branch, following `.agents/git.md` (imperative, sentence
   case, no Conventional Commits prefixes). Run `pnpm check` and `pnpm build` before every push.
-- Stay inside the files your task owns. If you need a change in a shared file (root config, rules,
+- Stay inside the files your task owns. If you need a change in a shared file (root config, guides,
   CI), make the smallest additive edit, or report it back.
 - npm releases go through the Release workflow. Do not run `npm publish` yourself.
 - This repository is public. Keep secrets, private project names and internal links out of code,

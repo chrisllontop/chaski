@@ -566,7 +566,7 @@ Before you open a pull request:
 - Write commits in the imperative and sentence case, without prefixes: `Add a digest channel`.
 - Describe the pull request with a Summary, the Evidence that it works, and its Merge Danger.
 
-[`AGENTS.md`](AGENTS.md) maps the code, and [`.cursor/rules`](.cursor/rules) holds the conventions
+[`AGENTS.md`](AGENTS.md) maps the code, and the guides in [`.agents`](.agents) hold the conventions
 for code, copy, the API and the database.
 
 ## Logo

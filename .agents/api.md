@@ -1,7 +1,3 @@
----
-description: JSON API conventions for the admin API under /api/*
----
-
 ## Route layout
 
 - The admin API lives in `src/server/routes/`, mounted at `/api/*` under the path where the host mounts `chaski.routes()`. One router per concern; `src/server/routes/index.ts` composes them.
@@ -24,7 +20,7 @@ Every JSON error is `{ error: code, message }`, where `code` is a `ChaskiErrorCo
 - Paginated lists return `{ rows, total, page, limit }` with offset pagination (`page` is zero-based).
 - Deletions return the stub `{ id, deleted: true }` instead of an empty body.
 - Mutations that only trigger work return what happened: `{ requeued: true }`, `{ requeued: 12 }`.
-- Instants are RFC 3339 UTC strings (see `services.mdc`).
+- Instants are RFC 3339 UTC strings (see `services.md`).
 
 ## Resource IDs
 
