@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
-import { ArrowRightIcon, BellIcon, GlobeIcon, MailIcon, PhoneIcon } from '../icons';
+import { ArrowRightIcon, BellIcon, GlobeIcon, MailIcon, MonitorIcon, PhoneIcon } from '../icons';
 import { Code, Liquid } from './code';
 import { rpcSample } from './samples';
 import { StatusPill } from './status';
@@ -80,6 +80,20 @@ const CHANNELS = [
     time: '410 ms',
   },
   {
+    icon: <PhoneIcon size={20} strokeWidth={1.5} />,
+    name: 'FCM',
+    via: 'Android',
+    status: 'Sent',
+    time: '450 ms',
+  },
+  {
+    icon: <MonitorIcon size={20} strokeWidth={1.5} />,
+    name: 'WNS',
+    via: 'Windows',
+    status: 'Sent',
+    time: '520 ms',
+  },
+  {
     icon: <BellIcon size={20} strokeWidth={1.5} />,
     name: 'In-app',
     via: 'A live feed per user',
@@ -88,9 +102,25 @@ const CHANNELS = [
   },
 ];
 
+// Rules between the tiles: two columns on phones, three from `sm` up.
+const PHONE_RULES = ['pr-5', 'border-l pl-5'];
+const WIDE_RULES = [
+  'sm:border-l-0 sm:pl-0 sm:pr-5',
+  'sm:border-l sm:pl-5 sm:pr-5',
+  'sm:border-l sm:pl-5 sm:pr-0',
+];
+const LIFT_DELAYS = [
+  '',
+  'delay-[40ms]',
+  'delay-[80ms]',
+  'delay-[120ms]',
+  'delay-[160ms]',
+  'delay-[200ms]',
+];
+
 const ChannelsDetail = () => (
   <ul
-    className="-mt-2 grid grid-cols-2 border-b border-border sm:grid-cols-4"
+    className="-mt-2 grid grid-cols-2 border-b border-border sm:grid-cols-3"
     aria-label="Channels"
   >
     {CHANNELS.map((channel, index) => (
@@ -98,14 +128,14 @@ const ChannelsDetail = () => (
         key={channel.name}
         className={[
           'flex flex-col gap-3.5 border-border py-6',
-          index % 2 === 1 ? 'border-l pl-5' : 'pr-5',
+          PHONE_RULES[index % 2],
+          WIDE_RULES[index % 3],
           index >= 2 ? 'max-sm:border-t' : '',
-          index === 2 ? 'sm:border-l sm:pl-5' : '',
-          index === 1 || index === 2 ? 'sm:pr-5' : '',
+          index >= 3 ? 'sm:border-t' : '',
         ].join(' ')}
       >
         <span
-          className={`w-max motion-safe:transition-transform motion-safe:duration-300 motion-safe:group-hover:-translate-y-0.5 ${['', 'delay-[40ms]', 'delay-[80ms]', 'delay-[120ms]'][index]}`}
+          className={`w-max motion-safe:transition-transform motion-safe:duration-300 motion-safe:group-hover:-translate-y-0.5 ${LIFT_DELAYS[index]}`}
         >
           {channel.icon}
         </span>
@@ -319,7 +349,7 @@ export const Features = () => (
 
     <div className="grid gap-px overflow-hidden rounded-2xl border border-border bg-border md:grid-cols-2 lg:grid-cols-3">
       <Cell
-        title="Four channels, one call"
+        title="Six channels, one call"
         guide="channels"
         text="Each type picks its channels. Chaski renders every one, queues it and records what happened, per recipient."
         className="md:col-span-2"
