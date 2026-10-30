@@ -16,6 +16,7 @@ import {
 } from '~/components/app/data-table';
 import { CHANNEL_ICONS, HealthBadge } from '~/components/app/delivery-bits';
 import { ErrorAlert, PageHeader } from '~/components/app/page';
+import { Pill } from '~/components/app/pill';
 import { SiteHeader } from '~/components/app/site-header';
 import { Button } from '~/components/ui/button';
 import {
@@ -47,6 +48,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs';
 import { ApiError, api } from '~/lib/api';
 import { CHANNEL_LABELS, formatDateTime, formatNumber, formatRelative } from '~/lib/format';
 import { healthByType } from '~/lib/health';
+import { languagesOf, templateLanguages, useLocales } from '~/lib/locales';
 import type { Channel, DeletedTemplate, Health, TemplateSummary, TypeOutcome } from '~/lib/types';
 
 const CHANNELS: Channel[] = ['email', 'in_app', 'push'];
@@ -82,6 +84,50 @@ const Tag = ({ children }: { children: string }) => (
 );
 
 const Dash = () => <span className="text-muted-foreground">–</span>;
+
+/** A pill that opens the template in the first language it names. */
+const LanguagePill = ({
+  templateId,
+  locales,
+  tone,
+  label,
+}: {
+  templateId: string;
+  locales: string[];
+  tone: 'warning' | 'info';
+  label: string;
+}) =>
+  locales.length > 0 ? (
+    <Link
+      to="/templates/$templateId"
+      params={{ templateId }}
+      search={{ locale: locales[0] }}
+      onClick={(event) => event.stopPropagation()}
+    >
+      <Pill tone={tone}>
+        {label} {locales.join(', ')}
+      </Pill>
+    </Link>
+  ) : null;
+
+const TemplateLanguages = ({
+  template,
+  languages,
+}: {
+  template: TemplateSummary;
+  languages: { default: string; supported: string[] };
+}) => {
+  const { complete, missing, outdated } = templateLanguages(template.channels, languages.supported);
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="font-mono text-muted-foreground text-xs">
+        {[languages.default, ...complete].join(' ')}
+      </span>
+      <LanguagePill templateId={template.id} locales={missing} tone="warning" label="Missing" />
+      <LanguagePill templateId={template.id} locales={outdated} tone="info" label="Outdated" />
+    </div>
+  );
+};
 
 const When = ({ at }: { at: string | null }) =>
   at ? (
@@ -221,6 +267,8 @@ export const TemplatesPage = () => {
     queryFn: () => api.get<{ types: TypeOutcome[] }>('metrics/types?period=30d'),
   });
   const health = healthByType(outcomes.data?.types ?? []);
+  const languages = languagesOf(useLocales().data);
+  const columns = languages ? 8 : 7;
   const refresh = () => client.invalidateQueries({ queryKey: ['templates'] });
   const deleteTemplate = useMutation({
     mutationFn: (id: string) => api.delete(`templates/${id}`),
@@ -291,6 +339,7 @@ export const TemplatesPage = () => {
                     <DataHead>Type</DataHead>
                     <DataHead>Topic</DataHead>
                     <DataHead>Channels</DataHead>
+                    {languages ? <DataHead>Languages</DataHead> : null}
                     <DataHead>Health · 30 days</DataHead>
                     <DataHead numeric>Updated</DataHead>
                     <DataHead numeric>Last used</DataHead>
@@ -299,11 +348,11 @@ export const TemplatesPage = () => {
                 </DataHeader>
                 <DataBody>
                   {!live.data ? (
-                    <DataEmpty colSpan={7}>
+                    <DataEmpty colSpan={columns}>
                       <Skeleton className="mx-auto h-4 w-48" />
                     </DataEmpty>
                   ) : templates.length === 0 ? (
-                    <DataEmpty colSpan={7}>Every template is deleted.</DataEmpty>
+                    <DataEmpty colSpan={columns}>Every template is deleted.</DataEmpty>
                   ) : (
                     templates.map((template) => (
                       <DataRow
@@ -330,6 +379,11 @@ export const TemplatesPage = () => {
                         <DataCell>
                           <ChannelIcons channels={template.channels} />
                         </DataCell>
+                        {languages ? (
+                          <DataCell>
+                            <TemplateLanguages template={template} languages={languages} />
+                          </DataCell>
+                        ) : null}
                         <DataCell>
                           <TypeHealth health={health.get(template.type)} />
                         </DataCell>
