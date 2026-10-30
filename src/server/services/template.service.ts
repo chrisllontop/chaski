@@ -475,7 +475,9 @@ export class TemplateService extends BaseService {
     templateId: string,
     input: { to: string; data?: Record<string, unknown> },
   ): Promise<{ messageId?: string }> => {
-    const email = TemplateService.config.channels.email;
+    const { channels, problems } = TemplateService.config;
+    const email = channels.email;
+    if (problems.email) throw new ChaskiError('config', problems.email);
     if (!email) throw new ChaskiError('validation', 'the email channel is not configured');
 
     const rendered = await TemplateService.preview(templateId, 'email', input.data);

@@ -8,6 +8,8 @@ import {
   configFromEnv,
   setConfigure,
 } from '../../src/server/config';
+import { ready } from '../../src/server/migrations';
+import { SettingsService } from '../../src/server/services/settings.service';
 import type {
   ChaskiEvents,
   ChaskiFeed,
@@ -30,15 +32,21 @@ export type FixtureEnv = {
   CHASKI_SCHEDULER: Workflow<ScheduleParams>;
   CHASKI_ENVIRONMENT?: string;
   CHASKI_PUBLIC_URL?: string;
+  CHASKI_SECRET?: string;
 };
 
-export const fixtureConfig = (env: ChaskiEnv): ChaskiConfig => ({
-  ...configFromEnv(env),
-  channels: {
-    email: { from: 'notifications@host.test', fromName: 'Fixture host' },
-    in_app: {},
-  },
-});
+// The tests turn email and in-app on from code. `pnpm dev` runs as a deployed Chaski does, with
+// the channels saved on the Channels page; /dev/seed saves email and in-app there.
+export const fixtureConfig = (env: ChaskiEnv): ChaskiConfig =>
+  env.CHASKI_ENVIRONMENT === 'local'
+    ? configFromEnv(env)
+    : {
+        ...configFromEnv(env),
+        channels: {
+          email: { from: 'notifications@host.test', fromName: 'Fixture host' },
+          in_app: {},
+        },
+      };
 
 setConfigure(fixtureConfig);
 
@@ -71,6 +79,14 @@ const app = new Hono<{ Bindings: FixtureEnv }>()
     if (c.env.CHASKI_ENVIRONMENT !== 'local') {
       return c.json({ error: 'not_found', message: 'no such endpoint' }, 404);
     }
+    // Saved the way the Channels page saves them, under the identity wrangler dev signs in.
+    await ready();
+    const actor = { id: 'admin@chaski.test', name: 'Fixture admin' };
+    await SettingsService.saveEmail(
+      { from: 'notifications@host.test', fromName: 'Chaski dev' },
+      actor,
+    );
+    await SettingsService.saveInApp(actor);
     return c.json(await seed(api));
   })
   .route('/app/notifications', notifications)

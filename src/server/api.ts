@@ -1,5 +1,5 @@
 import type { ChaskiApi } from '../contract/api';
-import { resolveConfig } from './config';
+import { channelProblems } from './config';
 import { ready } from './migrations';
 import { ChannelService } from './services/channel.service';
 import { FeedService } from './services/feed.service';
@@ -27,6 +27,7 @@ export const api: ChaskiApi = {
     return {
       channels: config.enabledChannels,
       paused: config.enabledChannels.filter((channel) => pauses.has(channel)),
+      problems: channelProblems(config),
       environment: config.environment,
       templates,
     };
@@ -41,7 +42,7 @@ export const api: ChaskiApi = {
     register: run((request) => PushSubscriptionService.register(request)),
     unregister: run((query) => PushSubscriptionService.unregister(query)),
     vapidPublicKey: async () => ({
-      publicKey: resolveConfig().channels.push?.vapid?.publicKey ?? null,
+      publicKey: (await ready()).channels.push?.vapid?.publicKey ?? null,
     }),
   },
   preferences: {

@@ -1,4 +1,5 @@
 import type { PushPayload } from '../../../contract/contract';
+import { ChaskiError, isChaskiError } from '../../../contract/errors';
 import type { ResolvedPush } from '../../config';
 import { feedStub } from '../../durable/feed';
 import {
@@ -318,8 +319,11 @@ export class PushAdapter extends BaseService {
         : null;
     // Like FCM's, the WNS access token takes a request, so a failed exchange fails only Windows.
     const wnsToken = windows ? getWnsAccessToken(wns) : null;
+    const broken = PushSubscriptionService.brokenPlatforms();
     const results = await Promise.allSettled(
       devices.map((device) => {
+        const problem = broken[device.platform];
+        if (problem) return Promise.reject(new ChaskiError('config', problem));
         if (device.platform === 'web' && vapid) return sendWebPush(vapid, device, webPayload);
         if (isApnsDevice(device)) {
           const app = apns?.[device.platform];
@@ -364,7 +368,12 @@ export class PushAdapter extends BaseService {
         { permanent: true },
       );
     }
-    const rejection = results.find((r): r is PromiseRejectedResult => r.status === 'rejected');
+    const rejections = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+    // Credentials someone has to fix fail the same way on every attempt, so nothing retries them.
+    const misconfigured = (r: PromiseRejectedResult) =>
+      isChaskiError(r.reason) && r.reason.code === 'config';
+    const rejection = rejections[0];
+    if (rejection && rejections.every(misconfigured)) throw rejection.reason;
     const reason =
       rejection?.reason instanceof Error ? rejection.reason.message : String(rejection?.reason);
     throw new DeliveryError('provider_error', reason, { permanent: false });

@@ -49,6 +49,17 @@ export class DeliveryService extends BaseService {
       });
       return { status: 'held' };
     }
+    // Saved settings that stopped validating keep their channel on, so its deliveries fail here
+    // with the reason instead of skipping as unconfigured. Push fails per platform, in its adapter.
+    const channel = delivery.channel;
+    const problem =
+      channel === 'email' || channel === 'in_app'
+        ? DeliveryService.config.problems[channel]
+        : undefined;
+    if (problem) {
+      await DeliveryService.markFailed(delivery.id, 'config', problem);
+      return { status: 'failed' };
+    }
 
     const notification = await DeliveryService.client.notifications.findFirst({
       where: { id: delivery.notificationId },

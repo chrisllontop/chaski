@@ -1,11 +1,11 @@
 import { DurableObject } from 'cloudflare:workers';
 import type { FeedSocketEvent } from '../../contract/contract';
 import { ChaskiError } from '../../contract/errors';
-import { resolveConfig } from '../config';
+import { resolveBindings } from '../config';
 
 // One instance per recipient, named by the recipient id.
 export const feedStub = (recipientId: string) => {
-  const namespace = resolveConfig().bindings.feed;
+  const namespace = resolveBindings().feed;
   if (!namespace)
     throw new ChaskiError('config', 'Chaski config: the CHASKI_FEED binding is missing');
   return namespace.get(namespace.idFromName(recipientId));

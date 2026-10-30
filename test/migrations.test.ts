@@ -55,12 +55,14 @@ describe('ready()', () => {
     expect(await chaski.ready()).toEqual({
       channels: ['email', 'in_app'],
       paused: [],
+      problems: [],
       environment: null,
       templates: 0,
     });
     expect(await exports.ChaskiEntrypoint.ready()).toEqual({
       channels: ['email', 'in_app'],
       paused: [],
+      problems: [],
       environment: null,
       templates: 0,
     });

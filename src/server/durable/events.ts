@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import type { AdminEventTopic, AdminSocketEvent } from '../../contract/admin-events';
-import { resolveConfig } from '../config';
+import { resolveBindings } from '../config';
 
 // A burst of deliveries must not turn into a storm of dashboard refetches,
 // each running aggregate SQL on D1: invalidations inside this window merge.
@@ -8,7 +8,7 @@ const FLUSH_WINDOW_MS = 2_000;
 
 // One instance serves every dashboard session; null without the CHASKI_EVENTS binding.
 export const eventsStub = () => {
-  const namespace = resolveConfig().bindings.events;
+  const namespace = resolveBindings().events;
   return namespace ? namespace.get(namespace.idFromName('chaski')) : null;
 };
 

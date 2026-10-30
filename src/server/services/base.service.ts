@@ -1,4 +1,9 @@
-import { type ChaskiBindings, type ResolvedConfig, resolveConfig } from '../config';
+import {
+  type ChaskiBindings,
+  type ResolvedConfig,
+  resolveBindings,
+  resolveConfig,
+} from '../config';
 import { type Client, type Database, getClient, getDb } from '../db';
 import { getLogger, type Logger } from '../lib/log';
 
@@ -19,7 +24,7 @@ export abstract class BaseService {
   }
 
   protected static get bindings(): ChaskiBindings {
-    return resolveConfig().bindings;
+    return resolveBindings();
   }
 
   protected static get log(): Logger {

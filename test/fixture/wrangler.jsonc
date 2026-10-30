@@ -4,7 +4,9 @@
   "main": "worker.ts",
   "compatibility_date": "2026-10-15",
   "vars": {
-    "CHASKI_PUBLIC_URL": "http://localhost:8787/app/notifications"
+    "CHASKI_PUBLIC_URL": "http://localhost:8787/app/notifications",
+    // Test-only, and public: a deployed Chaski takes its own from `wrangler secret put`.
+    "CHASKI_SECRET": "test-only-not-a-secret-chaski-fixture-key"
   },
   // wrangler dev signs this identity in, as Cloudflare Access would; the tests send their own.
   "access": {
