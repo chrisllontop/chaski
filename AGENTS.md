@@ -157,19 +157,6 @@ generated files (such as `routeTree.gen.ts`) are excluded in `biome.json`.
   registry-managed files and from root build or Worker entrypoints.
 - Chaski runs inside the host's Worker and only on the bindings the host declares. Do not assume
   binding names or reach for resources the host did not hand over.
-
-### Comments
-
-Comments say **why**: a non-obvious reason, an invariant, a workaround, a gotcha, a contract
-another module relies on. A comment that repeats the name or the next lines goes.
-
-- Leave a function, block or export that explains itself uncommented; prefer a clear name.
-- Describe behavior in words, not by product screen or task numbers (`#10`, `#11`).
-- Keep JSDoc (`/** */`) to about 3 lines. A longer block is for a non-obvious cross-module
-  contract, invariant or workaround that would be unsafe to lose; reusable policy goes in a guide
-  in `.agents/`.
-- Section dividers (`// ─── … ───`) group unrelated blocks in large route or service files only.
-
 - Each runtime has its own types: `tsconfig.json` (the Worker side of `src`, Workers types),
   `tsconfig.browser.json` (the browser entries and the contract, DOM types),
   `src/dashboard/tsconfig.json` (DOM and JSX), `test/tsconfig.json` (Workers plus the Vitest
@@ -182,6 +169,18 @@ another module relies on. A comment that repeats the name or the next lines goes
   (`pnpm build:types`), so exported Drizzle tables and zod schemas keep their inferred types.
   `scripts/fix-declaration-imports.ts` then gives their relative imports the file extensions that
   Node16 and NodeNext resolution require.
+
+### Comments
+
+Comments say **why**: a non-obvious reason, an invariant, a workaround, a gotcha, a contract
+another module relies on. A comment that repeats the name or the next lines goes.
+
+- Leave a function, block or export that explains itself uncommented; prefer a clear name.
+- Describe behavior in words, not by product screen or task numbers (`#10`, `#11`).
+- Keep JSDoc (`/** */`) to about 3 lines. A longer block is for a non-obvious cross-module
+  contract, invariant or workaround that would be unsafe to lose; reusable policy goes in a guide
+  in `.agents/`.
+- Section dividers (`// ─── … ───`) group unrelated blocks in large route or service files only.
 
 ## Tests
 
