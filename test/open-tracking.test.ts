@@ -98,7 +98,7 @@ describe('GET /t/o/:deliveryId', () => {
     const app = new Hono();
     const chaski = () => exports.ChaskiEntrypoint;
     app.route('/n', userRoutes({ chaski, identify: () => null, groups: [] }));
-    app.use('*', (c) => c.json({ error: 'unauthorized' }, 401));
+    app.use('*', async (c) => c.json({ error: 'unauthorized' }, 401));
     app.route('/n', userRoutes({ chaski, identify: () => 'user_1' }));
 
     const pixel = await app.request(`https://app.test/n/t/o/${deliveryId}`, {
