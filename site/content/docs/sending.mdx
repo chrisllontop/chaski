@@ -60,8 +60,9 @@ own preferences skipped every channel, and `undeliverable` means the channel set
 contact’s data did, such as an email delivery for a recipient without an address.
 
 A channel is skipped, with its reason, when it isn’t configured (`channel_not_configured`), the
-contact muted it (`muted_by_preferences`), the recipient has no address or device for it
-(`missing_email`, `no_device_tokens`) or the template has no content for it (`no_template`).
+template has no content for it (`no_template`), the contact muted it (`muted_by_preferences`) or
+the recipient has no address or device for it (`missing_email`, `no_device_tokens`). The first
+that applies, in that order, is the one recorded.
 
 ## Deliver while someone waits [#inline]
 

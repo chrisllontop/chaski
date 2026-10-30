@@ -9,8 +9,10 @@ it off again: its sends skip it as `channel_not_configured`, and the deliveries 
 fail with that reason. A pause is something else: it holds a channel’s deliveries until you resume
 it; see [Pause a channel](/docs/dashboard#pause-a-channel).
 
-Each environment’s Chaski keeps settings of its own, and the push credentials among them are
-encrypted with `CHASKI_SECRET`. A setting that stops working, such as credentials saved under
+Settings are saved only through the dashboard, so a new environment sends nothing, not even in-app,
+until Cloudflare Access covers its URL and someone saves its channels; under `wrangler dev`, the
+identity under `access.dev` signs you in. Each environment’s Chaski keeps settings of its own, and
+the push credentials among them are encrypted with `CHASKI_SECRET`. A setting that stops working, such as credentials saved under
 another `CHASKI_SECRET`, shows its channel as **Failing** until you save it again.
 [Configuration](/docs/configuration#channel-settings) lists every field.
 
