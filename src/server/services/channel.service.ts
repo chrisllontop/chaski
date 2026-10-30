@@ -2,51 +2,52 @@ import { eq } from 'drizzle-orm';
 import type { Channel } from '../../contract/contract';
 import { ChaskiError } from '../../contract/errors';
 import type { Actor } from '../auth';
+import { baseConfig } from '../config';
 import { channelPauses } from '../db/schema';
 import { publishAdminEvents } from '../lib/admin-events';
+import { secretStatus } from '../lib/sealed';
 import { BaseService } from './base.service';
 import { DeliveryAdminService } from './delivery-admin.service';
+import { SettingsService } from './settings.service';
 
 export type ChannelPause = { pausedBy: Actor; pausedAt: string };
 
 export class ChannelService extends BaseService {
   protected static override name = 'channels';
 
-  /** The channels the config turns on, without a single secret, and which of them are paused. */
+  /**
+   * Which channels are on and paused, and the settings saved for each, without a single secret:
+   * a secret only reports that it is set.
+   */
   static overview = async () => {
-    const { channels, environment, bindings } = ChannelService.config;
-    const { email, push } = channels;
-    const pauses = await ChannelService.pauses();
-    const pauseOf = (channel: Channel) => pauses.get(channel) ?? null;
+    const { enabledChannels, environment, bindings } = ChannelService.config;
+    const [pauses, saved] = await Promise.all([
+      ChannelService.pauses(),
+      SettingsService.sections(),
+    ]);
+    // A pause outlives the settings, so it holds again if the channel is set up again; while the
+    // channel is off it holds nothing, as ready() reports it.
+    const state = (channel: Channel) => {
+      const enabled = enabledChannels.includes(channel);
+      return { channel, enabled, paused: (enabled && pauses.get(channel)) || null };
+    };
     return {
       environment,
       // Without the ChaskiEvents binding the dashboard refreshes on its own instead of live.
       realtime: Boolean(bindings.events),
+      // Push credentials are sealed with CHASKI_SECRET, so they can't be saved without it.
+      secret: secretStatus(baseConfig().secret),
+      // Email and in-app can't be turned on without these, whatever is saved.
+      bindings: { email: Boolean(bindings.email), feed: Boolean(bindings.feed) },
       channels: [
+        { ...state('email'), settings: saved.email },
+        { ...state('in_app'), settings: saved.in_app },
         {
-          channel: 'email' as const,
-          enabled: Boolean(email),
-          paused: pauseOf('email'),
-          from: email?.from ?? null,
-          fromName: email?.fromName ?? null,
-          replyTo: email?.replyTo ?? null,
-        },
-        {
-          channel: 'in_app' as const,
-          enabled: Boolean(channels.in_app),
-          paused: pauseOf('in_app'),
-        },
-        {
-          channel: 'push' as const,
-          enabled: Boolean(push),
-          paused: pauseOf('push'),
-          web: push?.vapid ? { vapidPublicKey: push.vapid.publicKey } : null,
-          ios: push?.apns?.ios ?? null,
-          macos: push?.apns?.macos ?? null,
-          android: push?.fcm ? { projectId: push.fcm.projectId } : null,
-          windows: push?.wns ? { clientId: push.wns.clientId } : null,
+          ...state('push'),
+          providers: { vapid: saved.vapid, apns: saved.apns, fcm: saved.fcm, wns: saved.wns },
         },
       ],
+      defaultMutedTypes: saved.defaultMutedTypes,
     };
   };
 

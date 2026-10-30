@@ -1,7 +1,7 @@
 import { better } from 'better-drizzle';
 import { softDelete } from 'better-drizzle/soft-delete';
 import { drizzle } from 'drizzle-orm/d1';
-import { resolveConfig } from '../config';
+import { resolveBindings } from '../config';
 import { softDeleteGuards } from './plugins/soft-delete-guards';
 import { timestamps } from './plugins/timestamps';
 import * as schema from './schema';
@@ -23,7 +23,7 @@ export type Client = ReturnType<typeof createClient>;
 let memo: { d1: D1Database; db: Database; client: Client } | undefined;
 
 const resolve = () => {
-  const d1 = resolveConfig().bindings.db;
+  const d1 = resolveBindings().db;
   if (!memo || memo.d1 !== d1) {
     const db = createDb(d1);
     memo = { d1, db, client: createClient(db) };

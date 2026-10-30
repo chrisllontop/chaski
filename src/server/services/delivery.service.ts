@@ -72,6 +72,25 @@ export class DeliveryService extends BaseService {
       return { status: 'failed' };
     }
 
+    // A channel turned off after the send stops what it still had queued. One whose saved settings
+    // stopped validating stays on, so its deliveries fail with the reason instead of skipping as
+    // unconfigured; push fails per platform, in its adapter.
+    const { enabledChannels, problems } = DeliveryService.config;
+    const channel = delivery.channel;
+    if (!(enabledChannels as string[]).includes(channel)) {
+      await DeliveryService.markFailed(
+        delivery.id,
+        'channel_not_configured',
+        `the ${channel} channel is not configured`,
+      );
+      return { status: 'failed' };
+    }
+    const problem = channel === 'email' || channel === 'in_app' ? problems[channel] : undefined;
+    if (problem) {
+      await DeliveryService.markFailed(delivery.id, 'config', problem);
+      return { status: 'failed' };
+    }
+
     // Every call to the channel is an attempt, whatever it ends in; the
     // failures above never reached one.
     const attempts = delivery.attempts + 1;

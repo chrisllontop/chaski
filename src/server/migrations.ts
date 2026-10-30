@@ -1,5 +1,6 @@
 import { ChaskiError } from '../contract/errors';
-import { type ResolvedConfig, resolveConfig } from './config';
+import { baseConfig, type ResolvedConfig, resolveConfig, validateConfig } from './config';
+import { SettingsService } from './services/settings.service';
 
 // The files the package ships in migrations/; a test keeps this list in sync.
 // They go in with `wrangler d1 migrations apply`, and Chaski refuses to run
@@ -10,6 +11,7 @@ export const MIGRATIONS: readonly string[] = [
   '0002_channel_pauses.sql',
   '0003_push_silent.sql',
   '0004_notification_data.sql',
+  '0005_channel_settings.sql',
 ];
 
 // Wrangler's own table: Chaski's wrangler.jsonc leaves migrations_table unset.
@@ -36,16 +38,19 @@ export const ensureMigrations = async (db: D1Database, { fresh = false } = {}): 
     throw new ChaskiError(
       'config',
       `Chaski: the database is missing migrations ${missing.join(', ')}. Apply them with ` +
-        '`wrangler d1 migrations apply CHASKI_DB --remote`.',
+        '`wrangler d1 migrations apply CHASKI_DB --remote`, or `--local` under `wrangler dev`.',
     );
   }
   verified.add(db);
 };
 
 // Every entry point runs this before touching storage, so a misconfigured Worker
-// fails on its first request with the reason instead of deep inside a service.
+// fails on its first request with the reason instead of deep inside a service. It
+// loads the channel settings too: the config reads them, and a change on the Channels
+// page has to apply from the next request on, whichever isolate serves it.
 export const ready = async (options: { fresh?: boolean } = {}): Promise<ResolvedConfig> => {
-  const config = resolveConfig();
+  const config = validateConfig(baseConfig());
   await ensureMigrations(config.bindings.db, options);
-  return config;
+  await SettingsService.load();
+  return resolveConfig();
 };

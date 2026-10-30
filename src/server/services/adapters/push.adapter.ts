@@ -1,4 +1,5 @@
 import type { PushPayload } from '../../../contract/contract';
+import { ChaskiError, isChaskiError } from '../../../contract/errors';
 import type { ResolvedPush } from '../../config';
 import { feedStub } from '../../durable/feed';
 import {
@@ -48,6 +49,9 @@ type PushOutcome = 'delivered' | 'expired' | { refused: string };
 // What Apple's 400 reasons for a token that will never work again say about the cause. A token
 // of another environment or another app reads the same as a broken one, so each names the
 // setting to check before the device registers again.
+// As the Channels page names them.
+const APNS_APP_NAMES = { ios: 'iOS app', macos: 'macOS app' } as const;
+
 const APNS_REFUSALS: Record<string, (device: ApnsPushDevice, app: ApnsApp) => string> = {
   BadDeviceToken: (device, app) =>
     `APNs refused the ${device.platform} device ${device.id} in ` +
@@ -55,8 +59,8 @@ const APNS_REFUSALS: Record<string, (device: ApnsPushDevice, app: ApnsApp) => st
     "only works in sandbox, so register it with environment: 'sandbox'",
   DeviceTokenNotForTopic: (device, app) =>
     `APNs refused the ${device.platform} device ${device.id} for ${app.bundleId} ` +
-    `(DeviceTokenNotForTopic): the token belongs to another app; check ` +
-    `channels.push.apns.${device.platform}.bundleId and the platform the app registers with`,
+    `(DeviceTokenNotForTopic): the token belongs to another app; check the bundle ID of the ` +
+    `${APNS_APP_NAMES[device.platform]} in the APNs settings, and the platform the app registers with`,
 };
 
 // What a failed FCM send means for the device and for the access token:
@@ -318,8 +322,11 @@ export class PushAdapter extends BaseService {
         : null;
     // Like FCM's, the WNS access token takes a request, so a failed exchange fails only Windows.
     const wnsToken = windows ? getWnsAccessToken(wns) : null;
+    const broken = PushSubscriptionService.brokenPlatforms();
     const results = await Promise.allSettled(
       devices.map((device) => {
+        const problem = broken[device.platform];
+        if (problem) return Promise.reject(new ChaskiError('config', problem));
         if (device.platform === 'web' && vapid) return sendWebPush(vapid, device, webPayload);
         if (isApnsDevice(device)) {
           const app = apns?.[device.platform];
@@ -364,7 +371,12 @@ export class PushAdapter extends BaseService {
         { permanent: true },
       );
     }
-    const rejection = results.find((r): r is PromiseRejectedResult => r.status === 'rejected');
+    const rejections = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+    // Credentials someone has to fix fail the same way on every attempt, so nothing retries them.
+    const misconfigured = (r: PromiseRejectedResult) =>
+      isChaskiError(r.reason) && r.reason.code === 'config';
+    const rejection = rejections[0];
+    if (rejection && rejections.every(misconfigured)) throw rejection.reason;
     const reason =
       rejection?.reason instanceof Error ? rejection.reason.message : String(rejection?.reason);
     throw new DeliveryError('provider_error', reason, { permanent: false });

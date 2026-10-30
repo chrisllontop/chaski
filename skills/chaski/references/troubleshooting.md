@@ -9,10 +9,11 @@ https://chaski.sh/docs/errors.
 
 `env.CHASKI.ready()` checks the setup and the applied migrations and changes nothing: call it from
 the app’s health route, or from a temporary route locally ([setup.md](setup.md), step 6). It throws
-the `config` error a send would, and answers `{ channels, paused, environment, templates }`:
-`channels` lists the channels whose settings are saved, `paused` the paused ones, `environment` the
-`CHASKI_ENVIRONMENT` of the Worker that answered, and `templates` at `0` means every send will be
-refused as an unknown type: load the template file ([sending.md](sending.md)).
+the `config` error a send would, and answers `{ channels, paused, problems, environment,
+templates }`: `channels` lists the channels whose settings are saved, `paused` the paused ones,
+`problems` the saved settings that stopped working (`{ channel, message }`, see below),
+`environment` the `CHASKI_ENVIRONMENT` of the Worker that answered, and `templates` at `0` means
+every send will be refused as an unknown type: load the template file ([sending.md](sending.md)).
 
 ## Config errors
 
@@ -36,24 +37,42 @@ A message that names `channels.<channel>.<field>` points at a setting saved on t
 | --- | --- |
 | `channels.email.from must be an email address` | Email’s sender address. |
 | `channels.push needs vapid (web push), apns (iOS, macOS), fcm (Android), wns (Windows) or several of them` | Push, with none of its four set up. |
-| `channels.push.vapid.subject must be a mailto: or https: URL` | Web push’s subject. |
-| `channels.push.vapid.publicKey must be a base64url uncompressed P-256 key (65 bytes)`, `channels.push.vapid.privateKey must be a base64url P-256 private key (32 bytes)` | Web push’s key pair: generate one there, or paste the raw base64url pair web-push tools print, not PEM. |
-| `channels.push.apns.teamId is required`, `channels.push.apns.keyId is required`, `channels.push.apns.privateKey must be the contents of the .p8 file` | APNs’ team id, key id and key: the whole `.p8` text, `-----BEGIN PRIVATE KEY-----` included. |
+| `channels.push.vapid.subject must be a mailto: or https: URL` | Web push’s **Contact**. |
+| `channels.push.vapid.publicKey must be a base64url uncompressed P-256 key (65 bytes)`, `channels.push.vapid.privateKey must be a base64url P-256 private key (32 bytes)` | Web push’s key pair: **Generate keys** there, or paste the raw base64url pair web-push tools print, not PEM. |
+| `channels.push.vapid.privateKey is not the private key of channels.push.vapid.publicKey` | The pasted pair doesn’t belong together: paste both halves of the same pair. |
+| `channels.push.apns.teamId is required`, `channels.push.apns.keyId is required`, `channels.push.apns.privateKey must be the contents of the .p8 file` | APNs’ **Team ID**, **Key ID** and **Private key (.p8)**: the whole `.p8` file, `-----BEGIN PRIVATE KEY-----` included. |
 | `channels.push.apns needs ios, macos or both: the bundle id and environment of each app`, `channels.push.apns.<ios or macos>.bundleId is required`, `channels.push.apns.<ios or macos>.environment must be 'sandbox' or 'production'` | APNs’ iOS and macOS apps. |
 | `channels.push.fcm.serviceAccount must be the contents of the service account JSON file`, `channels.push.fcm.serviceAccount has no <field>: use the JSON key file as downloaded`, `channels.push.fcm.serviceAccount has a private_key that is not a PEM key` | FCM’s service account: the whole JSON key file, as the Firebase console downloads it. |
-| `channels.push.wns.<field> is required` | WNS’s tenant id, client id and client secret, from the Entra app registration the Windows app creates its channel with. |
+| `channels.push.wns.<field> is required` | WNS’s **Directory (tenant) ID**, **Application (client) ID** and **Client secret**, from the Entra app registration the Windows app creates its channel with. |
 
-**The Channels page asks again for credentials it had saved.** `CHASKI_SECRET` changed, or this
-environment has another one: put the earlier value back, or save the credentials again under the
-new one.
+Push keys and credentials are encrypted with `CHASKI_SECRET`, so saving them needs it:
+
+| Message | Fix |
+| --- | --- |
+| `Chaski config: CHASKI_SECRET is missing, and <setting> is stored encrypted with it: run …` | Set it for this environment (`--env <name>`; locally in `.dev.vars`), then save again. The **Channels** page shows the same command. |
+| `Chaski config: CHASKI_SECRET must be at least 32 characters: …` | Replace it with `openssl rand -base64 32`. |
+
+**A channel shows as Failing.** A setting saved earlier no longer works, and the page shows why;
+`ready()` lists it under `problems`, and that channel’s deliveries fail with a `config` error that
+says the same, while the dashboard and the other channels carry on:
+
+- `Chaski config: <setting> doesn't decrypt with this CHASKI_SECRET: set the CHASKI_SECRET it was
+  saved with, or save <section> again`, or `<setting> is stored encrypted, but CHASKI_SECRET is
+  missing`: `CHASKI_SECRET` changed, or this environment has another one. Put the earlier value
+  back, or save the credentials again under the new one.
+- `Chaski config: channels.email is configured but the CHASKI_EMAIL binding is missing`, or the
+  in-app one with `CHASKI_FEED`: a binding left `wrangler.jsonc` after the channel was set up.
+  Declare it again and deploy, or remove the channel’s settings.
+- `Chaski config: the saved <setting> can't be read: save it again`: save it again on
+  **Channels**.
 
 ## Migrations
 
-`` Chaski: the database is missing migrations <files>. Apply them with `wrangler d1 migrations apply CHASKI_DB --remote`. ``
+`` Chaski: the database is missing migrations <files>. Apply them with `wrangler d1 migrations apply CHASKI_DB --remote`, or `--local` under `wrangler dev`. ``
 
-- Run the command from the Chaski project. The message always names `--remote`; under
-  `wrangler dev` the local database is the one missing them, so apply with `--local`. Another
-  environment adds `--env <name>`. `--remote` acts on the user’s account: ask first.
+- Run the command from the Chaski project: `--local` when `wrangler dev` answered, `--remote` for a
+  deployed environment, plus `--env <name>` for one other than production. `--remote` acts on the
+  user’s account: ask first.
 - A new `database_id` means a new, empty local database; apply again.
 - After a Chaski upgrade, new files arrive in `node_modules/chaskijs/migrations`; apply again
   before deploying.
@@ -154,7 +173,7 @@ A delivery skipped at send time carries its reason:
 
 | `reason` | Means |
 | --- | --- |
-| `channel_not_configured` | The channel has no settings on **Channels**, such as a scheduled send firing after they were removed. |
+| `channel_not_configured` | The channel has no settings on **Channels**, such as a scheduled send firing after they were removed. A delivery already queued when they were removed fails with the same reason. |
 | `muted_by_preferences` | The contact turned the channel off or muted the type. `transactional: true` sends anyway, for the flows that must arrive. |
 | `missing_email` | The send’s `recipient` has no `email`. |
 | `no_device_tokens` | The contact has no registered browser or device: push was never enabled for that `recipient.id`. |

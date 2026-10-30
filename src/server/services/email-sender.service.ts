@@ -35,7 +35,7 @@ export class EmailSenderService extends BaseService {
   static send = async (
     message: Parameters<SendEmailBinding['send']>[0],
   ): Promise<{ messageId?: string }> => {
-    const email = EmailSenderService.config.bindings.email;
+    const email = EmailSenderService.bindings.email;
     if (!email) {
       throw new DeliveryError('email_not_configured', 'the email channel is not configured', {
         permanent: true,

@@ -56,14 +56,20 @@ export interface ChaskiFeedApi {
   markRead(input: MarkFeedReadInput): Promise<{ marked: number }>;
 }
 
+/** A channel whose saved settings stopped validating, and why, in the config error's words. */
+export type ChannelProblem = { channel: Channel; message: string };
+
 /**
- * What `ready()` found: the channels the config turns on and which of them are paused, the
+ * What `ready()` found: the channels that are on and which of them are paused or failing, the
  * environment the config names, and how many templates there are; with none, every send is
- * refused as an unknown type.
+ * refused as an unknown type. A failing channel stays on and its deliveries fail with the
+ * problem's message, until someone fixes its settings on the Channels page; one push provider
+ * failing leaves the others sending.
  */
 export type ChaskiReadiness = {
   channels: Channel[];
   paused: Channel[];
+  problems: ChannelProblem[];
   environment: string | null;
   templates: number;
 };
@@ -72,7 +78,8 @@ export type ChaskiReadiness = {
 export interface ChaskiApi {
   /**
    * Checks the config, asks the database for the applied migrations and counts the templates,
-   * changing nothing; throws the `config` error a send would, for a health check.
+   * changing nothing; throws the `config` error a send would, for a health check. Saved channel
+   * settings that stopped validating don't stop a send, so they come back in `problems` instead.
    */
   ready(): Promise<ChaskiReadiness>;
   send(request: SendRequest): Promise<SendResult>;

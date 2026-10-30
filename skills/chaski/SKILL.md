@@ -54,7 +54,7 @@ resolve on chaski.sh too. Only the audit’s finder has to be on disk to run:
   - The secret `CHASKI_SECRET`: encrypts the channel credentials saved in the dashboard. Set it once
     per environment and keep it: another value leaves those credentials unreadable.
   - The dashboard’s **Channels** page, per environment: each channel’s settings (sender address, push
-    keys and credentials) and the default muted types. A channel is on once its settings are saved
+    keys and credentials) and the types **Muted by default**. A channel is on once its settings are saved
     and off when they’re removed; a pause, also there, holds its deliveries instead.
   - The app’s Wrangler config: only the `CHASKI` service binding.
 - **Bindings decide features.** Only `CHASKI_DB` (D1) and `CHASKI_QUEUE` (producer and consumer,

@@ -13,6 +13,14 @@ import { parseInput } from '../lib/validate';
 import { BaseService } from './base.service';
 import { ContactService } from './contact.service';
 
+// A broken APNs section can't say which of its apps it named, so it covers both.
+const PROVIDER_PLATFORMS = {
+  vapid: ['web'],
+  apns: APNS_PLATFORMS,
+  fcm: ['android'],
+  wns: ['windows'],
+} as const satisfies Record<string, readonly DevicePlatform[]>;
+
 const isApnsPlatform = (platform: string): platform is ApnsPlatform =>
   (APNS_PLATFORMS as readonly string[]).includes(platform);
 
@@ -165,7 +173,10 @@ export class PushSubscriptionService extends BaseService {
     });
   };
 
-  /** The platforms the config holds push credentials for. */
+  /**
+   * The platforms the config holds push credentials for, and those whose saved credentials stopped
+   * validating: their devices count as reachable, so a push to them fails with the reason.
+   */
   static configuredPlatforms = (): DevicePlatform[] => {
     const push = PushSubscriptionService.config.channels.push;
     const platforms: DevicePlatform[] = [];
@@ -173,7 +184,19 @@ export class PushSubscriptionService extends BaseService {
     for (const platform of APNS_PLATFORMS) if (push?.apns?.[platform]) platforms.push(platform);
     if (push?.fcm) platforms.push('android');
     if (push?.wns) platforms.push('windows');
-    return platforms;
+    const broken = Object.keys(PushSubscriptionService.brokenPlatforms()) as DevicePlatform[];
+    return [...new Set([...platforms, ...broken])];
+  };
+
+  /** Why push can't reach each platform whose saved credentials stopped validating. */
+  static brokenPlatforms = (): Partial<Record<DevicePlatform, string>> => {
+    const { problems } = PushSubscriptionService.config;
+    const broken: Partial<Record<DevicePlatform, string>> = {};
+    for (const [provider, platforms] of Object.entries(PROVIDER_PLATFORMS)) {
+      const problem = problems[provider as keyof typeof PROVIDER_PLATFORMS];
+      if (problem) for (const platform of platforms) broken[platform] = problem;
+    }
+    return broken;
   };
 
   // A device whose platform has no credentials, such as a Mac when APNs only names the iOS

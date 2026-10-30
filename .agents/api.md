@@ -25,3 +25,5 @@ Every JSON error is `{ error: code, message }`, where `code` is a `ChaskiErrorCo
 ## Resource IDs
 
 Persisted resources use prefixed random ids from `newId(prefix)` (`src/server/lib/ids.ts`): `n_` notifications, `d_` deliveries, `f_` feed items, `s_` schedules, `tpl_` templates, `tc_` template channels, `dt_` device tokens. The prefix makes an id's kind obvious in logs and support threads; the random part (16 characters of CSPRNG output) is the capability, so never shorten it.
+
+Settings are not resources with ids: each section is addressed by its name (`/channels/email`, `/channels/push/vapid`, `/preferences/defaults`), and its deletion stub carries that name as `id`.

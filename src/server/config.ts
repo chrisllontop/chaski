@@ -1,6 +1,8 @@
 import { env } from 'cloudflare:workers';
+import type { ChannelProblem } from '../contract/api';
 import { CHANNELS, type Channel } from '../contract/contract';
-import { ChaskiError } from '../contract/errors';
+import { ChaskiError, isChaskiError } from '../contract/errors';
+import type { SettingsSection } from './db/schema/channels';
 import type { ChaskiEvents } from './durable/events';
 import type { ChaskiFeed } from './durable/feed';
 import { APNS_PLATFORMS, type ApnsApp, type ApnsCredentials, type ApnsPlatform } from './lib/apns';
@@ -22,6 +24,8 @@ export type ChaskiEnv = {
   CHASKI_ENVIRONMENT?: string;
   /** Where the app mounts userRoutes(); emails track opens through it, and without it they don't. */
   CHASKI_PUBLIC_URL?: string;
+  /** Seals the secrets saved on the Channels page; a Wrangler secret of 32 characters or more. */
+  CHASKI_SECRET?: string;
 };
 
 export type ChaskiBindings = {
@@ -125,7 +129,12 @@ export type ChaskiConfig = {
   /** Absolute URL where the app mounts userRoutes(), e.g. `https://app.example.com/notifications`. */
   publicUrl?: string;
   bindings: ChaskiBindings;
-  /** A channel is active when it has a config entry. */
+  /** CHASKI_SECRET, which seals the secrets saved on the Channels page. */
+  secret?: string;
+  /**
+   * Channels on from code, under the settings saved on the Channels page; only the test fixture
+   * sets them. A channel is active when it has an entry.
+   */
   channels?: {
     email?: EmailConfig;
     in_app?: InAppConfig;
@@ -145,9 +154,15 @@ export type ResolvedConfig = {
     in_app?: InAppConfig;
     push?: ResolvedPush;
   };
+  /** The channels that are on: configured, or saved with settings that stopped validating. */
   enabledChannels: Channel[];
   defaultMutedTypes: string[];
   environment: string | null;
+  /**
+   * Why each saved section that stopped validating can't be used, in validateConfig's words. Its
+   * channel stays on, so its deliveries fail with this instead of skipping as unconfigured.
+   */
+  problems: Partial<Record<SettingsSection, string>>;
 };
 
 const fail = (message: string): never => {
@@ -250,7 +265,90 @@ const resolveWns = (wns: WnsConfig): WnsCredentials => {
   return { tenantId: wns.tenantId, clientId: wns.clientId, clientSecret: wns.clientSecret };
 };
 
-export const validateConfig = (config: ChaskiConfig): ResolvedConfig => {
+const resolveEmail = (email: EmailConfig): EmailConfig => {
+  if (!email.from?.includes('@')) fail('channels.email.from must be an email address');
+  return email;
+};
+
+/** The binding a channel's section can't work without, refused as validateConfig refuses it. */
+export const requireBinding = (section: SettingsSection, bindings: ChaskiBindings): void => {
+  if (section === 'email' && !bindings.email) {
+    fail(`channels.email is configured but the ${bindingName('email')} binding is missing`);
+  }
+  if (section === 'in_app' && !bindings.feed) {
+    fail(`channels.in_app is configured but the ${bindingName('feed')} binding is missing`);
+  }
+};
+
+export type StoredSections = {
+  email: EmailConfig;
+  in_app: InAppConfig;
+  vapid: VapidConfig;
+  apns: ApnsConfig;
+  fcm: FcmConfig;
+  wns: WnsConfig;
+  default_muted_types: string[];
+};
+
+/** A saved section as loaded from the settings table: its fields, or why they can't be read. */
+export type StoredSection<T> = { value: T } | { error: string };
+
+export type StoredSettings = {
+  [S in SettingsSection]?: StoredSection<StoredSections[S]>;
+};
+
+const RESOLVERS = {
+  email: resolveEmail,
+  in_app: (): InAppConfig => ({}),
+  vapid: resolveVapid,
+  apns: resolveApns,
+  fcm: resolveFcm,
+  wns: resolveWns,
+  default_muted_types: (types: string[]) => types,
+} satisfies { [S in SettingsSection]: (value: StoredSections[S]) => unknown };
+
+type Resolved<S extends SettingsSection> = ReturnType<(typeof RESOLVERS)[S]>;
+
+/** Checks a section as validateConfig does, its binding first, and throws its `config` error. */
+export const resolveSection = <S extends SettingsSection>(
+  section: S,
+  value: StoredSections[S],
+  bindings: ChaskiBindings,
+): Resolved<S> => {
+  requireBinding(section, bindings);
+  const resolve = RESOLVERS[section] as unknown as (value: StoredSections[S]) => Resolved<S>;
+  return resolve(value);
+};
+
+/** The channel a section turns on; default_muted_types belongs to none. */
+export const SECTION_CHANNEL = {
+  email: 'email',
+  in_app: 'in_app',
+  vapid: 'push',
+  apns: 'push',
+  fcm: 'push',
+  wns: 'push',
+  default_muted_types: null,
+} as const satisfies Record<SettingsSection, Channel | null>;
+
+/** Each saved section that stopped validating, under the channel it fails. */
+export const channelProblems = (config: ResolvedConfig): ChannelProblem[] =>
+  Object.entries(config.problems).flatMap(([section, message]) => {
+    const channel = SECTION_CHANNEL[section as SettingsSection];
+    return channel && message ? [{ channel, message }] : [];
+  });
+
+const checkBindings = (bindings: ChaskiBindings): ChaskiBindings => {
+  for (const name of ['db', 'queue'] as const) {
+    if (!bindings[name]) fail(`the ${bindingName(name)} binding is missing`);
+  }
+  return bindings;
+};
+
+export const validateConfig = (
+  config: ChaskiConfig,
+  stored: StoredSettings = {},
+): ResolvedConfig => {
   let publicUrl: URL | null = null;
   if (config.publicUrl) {
     try {
@@ -263,49 +361,79 @@ export const validateConfig = (config: ChaskiConfig): ResolvedConfig => {
     }
   }
 
-  const bindings = config.bindings;
-  for (const name of ['db', 'queue'] as const) {
-    if (!bindings[name]) fail(`the ${bindingName(name)} binding is missing`);
-  }
+  const bindings = checkBindings(config.bindings);
 
   const channels = config.channels ?? {};
+  if (channels.push && !Object.values(channels.push).some(Boolean)) {
+    fail(
+      'channels.push needs vapid (web push), apns (iOS, macOS), fcm (Android), wns (Windows) ' +
+        'or several of them',
+    );
+  }
+  const fromCode: { [S in SettingsSection]: StoredSections[S] | undefined } = {
+    email: channels.email,
+    in_app: channels.in_app,
+    vapid: channels.push?.vapid,
+    apns: channels.push?.apns,
+    fcm: channels.push?.fcm,
+    wns: channels.push?.wns,
+    default_muted_types: config.defaultMutedTypes,
+  };
+
+  // A saved section replaces the code's. The code's throws, as a bad config always has; a saved one
+  // that stops validating only stops its channel, so the dashboard stays up to fix it.
+  const problems: ResolvedConfig['problems'] = {};
+  const section = <S extends SettingsSection>(name: S): Resolved<S> | undefined => {
+    const saved = stored[name] as StoredSection<StoredSections[S]> | undefined;
+    if (!saved) {
+      const value = fromCode[name];
+      return value === undefined ? undefined : resolveSection(name, value, bindings);
+    }
+    if ('error' in saved) {
+      problems[name] = saved.error;
+      return undefined;
+    }
+    try {
+      return resolveSection(name, saved.value, bindings);
+    } catch (error) {
+      if (!isChaskiError(error)) throw error;
+      problems[name] = error.message;
+      return undefined;
+    }
+  };
+
+  const email = section('email');
+  const inApp = section('in_app');
+  const push = {
+    vapid: section('vapid'),
+    apns: section('apns'),
+    fcm: section('fcm'),
+    wns: section('wns'),
+  };
+  const defaultMutedTypes = section('default_muted_types') ?? [];
+  const configured: Record<Channel, boolean> = {
+    email: Boolean(email),
+    in_app: Boolean(inApp),
+    push: Object.values(push).some(Boolean),
+  };
+  const failing = (channel: Channel) =>
+    Object.keys(problems).some((name) => SECTION_CHANNEL[name as SettingsSection] === channel);
+  const enabledChannels = CHANNELS.filter((channel) => configured[channel] || failing(channel));
+
   const resolved: ResolvedConfig['channels'] = {};
-  if (channels.email) {
-    if (!bindings.email) {
-      fail(`channels.email is configured but the ${bindingName('email')} binding is missing`);
-    }
-    if (!channels.email.from?.includes('@')) fail('channels.email.from must be an email address');
-    resolved.email = channels.email;
-  }
-  if (channels.in_app) {
-    if (!bindings.feed) {
-      fail(`channels.in_app is configured but the ${bindingName('feed')} binding is missing`);
-    }
-    resolved.in_app = {};
-  }
-  if (channels.push) {
-    const { vapid, apns, fcm, wns } = channels.push;
-    if (!vapid && !apns && !fcm && !wns) {
-      fail(
-        'channels.push needs vapid (web push), apns (iOS, macOS), fcm (Android), wns (Windows) ' +
-          'or several of them',
-      );
-    }
-    resolved.push = {
-      vapid: vapid ? resolveVapid(vapid) : undefined,
-      apns: apns ? resolveApns(apns) : undefined,
-      fcm: fcm ? resolveFcm(fcm) : undefined,
-      wns: wns ? resolveWns(wns) : undefined,
-    };
-  }
+  if (email) resolved.email = email;
+  if (inApp) resolved.in_app = inApp;
+  // On with any provider: a broken one fails its own platforms, and the others still send.
+  if (enabledChannels.includes('push')) resolved.push = push;
 
   return {
     publicUrl: publicUrl ? publicUrl.href.replace(/\/+$/, '') : null,
     bindings,
     channels: resolved,
-    enabledChannels: CHANNELS.filter((channel) => resolved[channel]),
-    defaultMutedTypes: config.defaultMutedTypes ?? [],
+    enabledChannels,
+    defaultMutedTypes,
     environment: config.environment?.trim() || null,
+    problems,
   };
 };
 
@@ -321,6 +449,7 @@ export const configFromEnv = (env: ChaskiEnv): ChaskiConfig => ({
     feed: env.CHASKI_FEED,
     attachments: env.CHASKI_ATTACHMENTS,
   },
+  secret: env.CHASKI_SECRET,
 });
 
 let configure: (env: ChaskiEnv) => ChaskiConfig = configFromEnv;
@@ -330,6 +459,28 @@ export const setConfigure = (fn: (env: ChaskiEnv) => ChaskiConfig): void => {
   configure = fn;
 };
 
-// Evaluated on every call, so nothing here outlives a vitest binding swap or a secret rotation.
-export const resolveConfig = (): ResolvedConfig =>
-  validateConfig(configure(env as unknown as ChaskiEnv));
+/** The config from the env alone, before the settings saved on the Channels page and unchecked. */
+export const baseConfig = (): ChaskiConfig => configure(env as unknown as ChaskiEnv);
+
+/** The bindings alone, which never wait on the settings: storage and the pixel need only these. */
+export const resolveBindings = (): ChaskiBindings => checkBindings(baseConfig().bindings);
+
+let stored: StoredSettings | undefined;
+
+/** What the last load of the settings table found; ready() loads it on every request. */
+export const setStoredSettings = (settings: StoredSettings | undefined): void => {
+  stored = settings;
+};
+
+// Evaluated on every call, so nothing here outlives a vitest binding swap or a secret rotation. The
+// settings come from the last load in this isolate: ready() loads them before anything reads the
+// config, so a change on the Channels page applies from the next request on, in every isolate.
+export const resolveConfig = (): ResolvedConfig => {
+  if (!stored) {
+    throw new ChaskiError(
+      'internal',
+      'Chaski read its config before loading the channel settings: await ready() first',
+    );
+  }
+  return validateConfig(baseConfig(), stored);
+};

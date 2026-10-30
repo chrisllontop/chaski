@@ -6,6 +6,7 @@ export {
   userRoutes,
 } from './app/user-routes';
 export type {
+  ChannelProblem,
   ChaskiApi,
   ChaskiFeedApi,
   ChaskiPreferencesApi,

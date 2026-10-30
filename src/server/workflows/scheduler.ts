@@ -1,5 +1,6 @@
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from 'cloudflare:workers';
 import { logger } from '../lib/log';
+import { ready } from '../migrations';
 import { ScheduleService } from '../services/schedule.service';
 import type { ScheduleParams } from '../types';
 
@@ -36,7 +37,11 @@ export class ChaskiScheduler extends WorkflowEntrypoint<unknown, ScheduleParams>
         continue;
       }
       try {
-        await step.do(`send ${attempt}`, SEND_STEP, () => ScheduleService.fire(scheduledId));
+        // The send reads the channels, so it loads their settings first, as every entry point does.
+        await step.do(`send ${attempt}`, SEND_STEP, async () => {
+          await ready();
+          await ScheduleService.fire(scheduledId);
+        });
         return;
       } catch (error) {
         log.error('scheduled send failed', error, { scheduledId, attempt });

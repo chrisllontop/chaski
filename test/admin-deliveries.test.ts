@@ -248,7 +248,8 @@ describe('metrics', () => {
 });
 
 describe('GET /api/channels', () => {
-  it('shows what the host configured and none of its secrets', async () => {
+  // Channels on from code have no saved settings to show: only the fixture turns them on that way.
+  it('shows which channels are on and none of their secrets', async () => {
     const config = fixtureConfig(env);
     const pair = (await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, [
       'sign',
@@ -274,25 +275,19 @@ describe('GET /api/channels', () => {
     expect(JSON.parse(text)).toEqual({
       environment: null,
       realtime: true,
+      secret: 'set',
+      bindings: { email: true, feed: true },
       channels: [
-        expect.objectContaining({
-          channel: 'email',
-          enabled: true,
-          paused: null,
-          from: 'notifications@host.test',
-        }),
-        { channel: 'in_app', enabled: true, paused: null },
+        { channel: 'email', enabled: true, paused: null, settings: null },
+        { channel: 'in_app', enabled: true, paused: null, settings: null },
         {
           channel: 'push',
           enabled: true,
           paused: null,
-          web: { vapidPublicKey: publicKey },
-          ios: null,
-          macos: null,
-          android: null,
-          windows: null,
+          providers: { vapid: null, apns: null, fcm: null, wns: null },
         },
       ],
+      defaultMutedTypes: { mutedTypes: [], updatedBy: null, updatedAt: null, problem: null },
     });
     expect(text).not.toContain(jwk.d);
   });

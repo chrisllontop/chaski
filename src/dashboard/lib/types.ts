@@ -147,31 +147,81 @@ export type ChannelPause = { pausedBy: Actor; pausedAt: string };
 /** An Apple app push reaches: its bundle id and the APNs environment of its tokens. */
 export type ApnsApp = { bundleId: string; environment: 'sandbox' | 'production' };
 
+/** Who saved a section and when, and why it stopped working, if it did. */
+export type SavedMeta = { updatedBy: Actor; updatedAt: string; problem: string | null };
+
+export type EmailSettings = SavedMeta & {
+  from: string | null;
+  fromName: string | null;
+  replyTo: string | null;
+};
+
+export type VapidSettings = SavedMeta & {
+  subject: string | null;
+  publicKey: string | null;
+  privateKeySet: boolean;
+};
+
+export type ApnsSettings = SavedMeta & {
+  teamId: string | null;
+  keyId: string | null;
+  privateKeySet: boolean;
+  ios: ApnsApp | null;
+  macos: ApnsApp | null;
+};
+
+export type FcmSettings = SavedMeta & {
+  projectId: string | null;
+  clientEmail: string | null;
+  serviceAccountSet: boolean;
+};
+
+export type WnsSettings = SavedMeta & {
+  tenantId: string | null;
+  clientId: string | null;
+  clientSecretSet: boolean;
+};
+
+export type PushProvider = 'vapid' | 'apns' | 'fcm' | 'wns';
+
 export type ChannelsOverview = {
   /** Where this Worker runs, as CHASKI_ENVIRONMENT names it. */
   environment: string | null;
   realtime: boolean;
+  /** Whether CHASKI_SECRET can seal the push credentials. */
+  secret: 'set' | 'missing' | 'too_short';
+  bindings: { email: boolean; feed: boolean };
   channels: [
     {
       channel: 'email';
       enabled: boolean;
       paused: ChannelPause | null;
-      from: string | null;
-      fromName: string | null;
-      replyTo: string | null;
+      settings: EmailSettings | null;
     },
-    { channel: 'in_app'; enabled: boolean; paused: ChannelPause | null },
+    {
+      channel: 'in_app';
+      enabled: boolean;
+      paused: ChannelPause | null;
+      settings: SavedMeta | null;
+    },
     {
       channel: 'push';
       enabled: boolean;
       paused: ChannelPause | null;
-      web: { vapidPublicKey: string } | null;
-      ios: ApnsApp | null;
-      macos: ApnsApp | null;
-      android: { projectId: string } | null;
-      windows: { clientId: string } | null;
+      providers: {
+        vapid: VapidSettings | null;
+        apns: ApnsSettings | null;
+        fcm: FcmSettings | null;
+        wns: WnsSettings | null;
+      };
     },
   ];
+  defaultMutedTypes: {
+    mutedTypes: string[];
+    updatedBy: Actor | null;
+    updatedAt: string | null;
+    problem: string | null;
+  };
 };
 
 export type Percentiles = { p50: number | null; p95: number | null };

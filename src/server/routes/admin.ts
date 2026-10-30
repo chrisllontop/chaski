@@ -1,17 +1,18 @@
-import { type Context, Hono } from 'hono';
+import { Hono } from 'hono';
 import { z } from 'zod';
 import { channelSchema, OFFSET_TIMESTAMP_REGEX } from '../../contract/contract';
 import { ChaskiError, isChaskiError } from '../../contract/errors';
-import { type Actor, actorOf } from '../auth';
+import { actorOf, signedIn } from '../auth';
 import { DELIVERY_STATUS } from '../db/schema';
 import { eventsStub } from '../durable/events';
 import { logger } from '../lib/log';
 import { parseInput } from '../lib/validate';
-import { ChannelService } from '../services/channel.service';
 import { DeliveryAdminService } from '../services/delivery-admin.service';
 import { METRIC_PERIODS, MetricsService } from '../services/metrics.service';
 import { ScheduleService } from '../services/schedule.service';
+import { mutedTypesSchema, SettingsService } from '../services/settings.service';
 import { TemplateService } from '../services/template.service';
+import { channels } from './channels';
 
 const templateInputSchema = z.object({
   type: z
@@ -67,8 +68,6 @@ const heldSelectionSchema = z
   .refine((selection) => selection.ids || selection.channel || selection.type, {
     message: 'name the held deliveries: ids, a channel or a type',
   });
-
-const resumeSchema = z.object({ send: z.boolean().default(false) });
 
 const scheduleListSchema = z.object({
   recipientId: z.string().max(256).optional(),
@@ -248,29 +247,20 @@ admin.get('/events', async (c) => {
   return events.fetch(c.req.raw);
 });
 
-// The Access guard sets the actor before any admin route runs; a pause is recorded under it.
-const signedIn = (c: Context): Actor => {
-  const actor = actorOf(c);
-  if (!actor) throw new ChaskiError('forbidden', 'sign in through Cloudflare Access first');
-  return actor;
-};
+admin.route('/channels', channels);
 
-admin.get('/channels', async (c) => c.json(await ChannelService.overview()));
+const defaultsSchema = z.object({ mutedTypes: mutedTypesSchema });
 
-admin.post('/channels/:channel/pause', async (c) => {
+const defaults = async () => (await SettingsService.sections()).defaultMutedTypes;
+
+// Type mutes every contact has until they save preferences of their own.
+admin.get('/preferences/defaults', async (c) => c.json({ defaults: await defaults() }));
+
+admin.put('/preferences/defaults', async (c) => {
   const actor = signedIn(c);
-  await ChannelService.pause(parseInput(channelSchema, c.req.param('channel')), actor);
-  return c.json({ paused: true });
-});
-
-admin.post('/channels/:channel/resume', async (c) => {
-  const actor = signedIn(c);
-  const { send } = parseInput(resumeSchema, await c.req.json());
-  return c.json(
-    await ChannelService.resume(parseInput(channelSchema, c.req.param('channel')), actor, {
-      send,
-    }),
-  );
+  const { mutedTypes } = parseInput(defaultsSchema, await c.req.json());
+  await SettingsService.saveDefaultMutedTypes(mutedTypes, actor);
+  return c.json({ defaults: await defaults() });
 });
 
 admin.get('/schedules', async (c) =>

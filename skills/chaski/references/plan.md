@@ -115,7 +115,7 @@ Write every converted template into the template file ([sending.md](sending.md))
 ### State to bring over
 
 - **Preferences.** A global email opt-out becomes `channels: { email: false }`; a category opt-out
-  becomes a `mutedTypes` entry; a type people opt into becomes a **Default muted types** entry on
+  becomes a `mutedTypes` entry; a type people opt into becomes a **Muted by default** entry on
   the dashboard’s **Channels** page. A contact who never saved gets those defaults, but a saved
   list takes their place: a backfilled `mutedTypes` names every default-muted type the user hasn’t
   opted into, or it opts them in. A one-off backfill calls
