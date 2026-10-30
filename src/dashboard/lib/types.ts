@@ -148,11 +148,9 @@ export type ChannelPause = { pausedBy: Actor; pausedAt: string };
 export type ApnsApp = { bundleId: string; environment: 'sandbox' | 'production' };
 
 export type ChannelsOverview = {
-  /** The environment the host's config names; `local` opens the dashboard without signing in. */
+  /** Where this Worker runs, as CHASKI_ENVIRONMENT names it. */
   environment: string | null;
   realtime: boolean;
-  /** Whether the signed-in actor may pause channels and send or discard what they hold. */
-  canPause: boolean;
   channels: [
     {
       channel: 'email';

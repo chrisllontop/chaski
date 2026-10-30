@@ -34,11 +34,7 @@ export const LiveStatus = () => {
               <Pill tone="info">{capitalize(environment)}</Pill>
             </span>
           </TooltipTrigger>
-          <TooltipContent>
-            {environment === 'local'
-              ? 'Opens without signing in, and anyone here may pause a channel.'
-              : 'The environment your Chaski config names.'}
-          </TooltipContent>
+          <TooltipContent>Where this Worker runs, as CHASKI_ENVIRONMENT names it.</TooltipContent>
         </Tooltip>
       ) : null}
       {paused.map(({ channel }) => (
@@ -66,7 +62,7 @@ export const LiveStatus = () => {
         <TooltipContent>
           {channels.data.realtime
             ? live.hint
-            : 'Add bindings.events to your Chaski config to see changes as they happen.'}
+            : 'Add the CHASKI_EVENTS binding to see changes as they happen.'}
         </TooltipContent>
       </Tooltip>
     </div>
