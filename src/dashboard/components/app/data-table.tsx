@@ -56,8 +56,8 @@ export const DataCell = ({
 }: ComponentProps<typeof TableCell> & { numeric?: boolean }) => (
   <TableCell
     className={cn(
-      'h-11 px-3 py-1.5 first:pl-4 last:pr-4 whitespace-normal break-words',
-      numeric && 'whitespace-nowrap text-right tabular-nums',
+      'h-11 px-3 py-1.5 first:pl-4 last:pr-4',
+      numeric && 'text-right tabular-nums',
       className,
     )}
     {...props}

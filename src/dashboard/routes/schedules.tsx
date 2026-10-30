@@ -2,6 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ConfirmDialog } from '~/components/app/confirm-dialog';
+import { CopyableMono } from '~/components/app/copyable-mono';
 import {
   DataBody,
   DataCell,
@@ -55,7 +56,7 @@ export const SchedulesPage = () => {
   return (
     <>
       <SiteHeader />
-      <div className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col gap-5 px-6 pt-6 pb-10">
+      <div className="mx-auto flex min-w-0 w-full max-w-[1400px] flex-1 flex-col gap-5 px-6 pt-6 pb-10">
         <PageHeader title="Schedules" description="Notifications waiting for their time to send" />
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative w-60">
@@ -96,28 +97,40 @@ export const SchedulesPage = () => {
             ) : (
               list.data.schedules.map((item) => (
                 <DataRow key={item.id}>
-                  <DataCell>
-                    <div className="flex items-center gap-2 font-medium">
+                  <DataCell className="whitespace-normal">
+                    <div className="flex items-center gap-2 font-medium whitespace-nowrap">
                       {formatRelative(item.scheduledAt)}
                       {isOverdue(item.scheduledAt) ? <Pill tone="warning">Overdue</Pill> : null}
                     </div>
-                    <div className="text-muted-foreground text-xs tabular-nums">
+                    <div className="text-muted-foreground text-xs tabular-nums whitespace-nowrap">
                       {formatDateTime(item.scheduledAt)}
                     </div>
                   </DataCell>
-                  <DataCell>{item.recipientId}</DataCell>
+                  <DataCell>
+                    <CopyableMono value={item.recipientId} className="max-w-[6rem]" />
+                  </DataCell>
                   <DataCell className="font-mono text-xs">{item.type}</DataCell>
                   <DataCell>
                     {item.groupKey ? (
-                      <span className="inline-flex h-5 items-center rounded-md border px-1.5 font-mono text-muted-foreground text-xs">
-                        {item.groupKey}
-                      </span>
+                      <CopyableMono
+                        value={item.groupKey}
+                        pill
+                        className="max-w-[9.5rem]"
+                        textClassName="text-muted-foreground"
+                      />
                     ) : (
                       <span className="text-muted-foreground">–</span>
                     )}
                   </DataCell>
-                  <DataCell className="max-w-56 truncate font-mono text-muted-foreground text-xs">
-                    {item.idempotencyKey ?? '–'}
+                  <DataCell>
+                    {item.idempotencyKey ? (
+                      <CopyableMono
+                        value={item.idempotencyKey}
+                        textClassName="text-muted-foreground"
+                      />
+                    ) : (
+                      <span className="text-muted-foreground">–</span>
+                    )}
                   </DataCell>
                   <DataCell className="text-right">
                     <Button
