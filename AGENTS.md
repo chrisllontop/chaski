@@ -10,6 +10,9 @@ the dashboard and its admin API, behind Cloudflare Access. `ChaskiEntrypoint` se
 RPC (`env.CHASKI.send()`), and its `fetch()` serves the user routes and the open pixel, which the
 app's `userRoutes()` (from `chaskijs`) forwards for the signed-in user. `chaskijs/client`,
 `chaskijs/sw` and `chaskijs/react` wrap those routes for the page, the service worker and React.
+Channels are set up on the dashboard's Channels page and stored in the Worker's own D1, their
+secrets encrypted with the Wrangler secret `CHASKI_SECRET`; a channel with no saved settings is
+off.
 
 ## Guides
 
@@ -40,8 +43,10 @@ in the same change.
   `/app/notifications` and a shared inbox at `/app/team-notifications`; there is no hot reload,
   so rerun it after a dashboard change. Apply the migrations to the local D1 first:
   `pnpm wrangler d1 migrations apply CHASKI_DB --local -c test/fixture/wrangler.jsonc`.
-  `curl -X POST localhost:8787/dev/seed` then fills it with sample templates, sends and schedules
-  (`test/fixture/seed.ts`), so the dashboard has something to show.
+  `curl -X POST localhost:8787/dev/seed` then saves the email and in-app settings as the Channels
+  page does and fills it with sample templates, sends and schedules (`test/fixture/seed.ts`), so
+  the dashboard has something to show. `pnpm dev` turns no channel on from code, as a deployed
+  Chaski doesn't; the tests do.
 - `pnpm build:dashboard` (Vite) writes `src/generated/dashboard.ts`, which the server code imports.
   It is generated and gitignored; run it once before typechecking or testing on a fresh clone.
 - `pnpm typecheck` (tsc, ten projects), `pnpm lint` (Biome), `pnpm format` (Biome with fixes),
@@ -93,9 +98,10 @@ in the same change.
   in-process API's interface, the errors and the template file format.
 - `src/server` is the engine:
   - `api.ts` (the API), `entrypoint.ts` (`ChaskiEntrypoint`: that API over RPC, plus `fetch()`
-    for the user routes and the pixel) and `config.ts` (the `CHASKI_*` bindings and vars, validated
-    on every call). A service binding sees methods, never getters, so over RPC the groups are
-    methods: `feed()`, `push()`, `preferences()`, `schedules()`, `templates()`.
+    for the user routes and the pixel) and `config.ts` (the `CHASKI_*` bindings and vars, and the
+    channel settings saved on the Channels page, validated on every call). A service binding sees
+    methods, never getters, so over RPC the groups are methods: `feed()`, `push()`,
+    `preferences()`, `schedules()`, `templates()`.
   - `routes/` holds the Hono sub-apps: the dashboard shell and assets and the admin API under
     `/api`, behind the Access guard in `index.ts`, and the open-tracking pixel and the user routes,
     which only `ChaskiEntrypoint.fetch()` serves. The user routes take the contact from
@@ -103,7 +109,8 @@ in the same change.
   - `services/` holds the business logic (`.agents/services.md`), with one adapter per
     channel in `services/adapters`.
   - `db/` holds the Drizzle schema and the better-drizzle client; `migrations.ts` refuses to run
-    until every migration is applied.
+    until every migration is applied, and its `ready()`, which every entry point awaits first,
+    loads the channel settings (`services/settings.service.ts`) the config reads.
   - `consumer.ts` handles the queue batches, `durable/` holds the `ChaskiFeed` and `ChaskiEvents`
     Durable Objects and `workflows/` the `ChaskiScheduler` Workflow.
   - `auth.ts` keeps the `Actor` Access signed in, per request.
@@ -145,9 +152,9 @@ in the same change.
   quotes the config, the API and Chaski's error messages, so update it with them. It doesn't ship
   in the package.
 - `test/fixture` is the Chaski Worker with every binding it uses (D1, queue and dead-letter queue,
-  both Durable Objects, the Workflow, R2 and `send_email`), plus an app's `userRoutes()` under
-  `/app/*`, which reach it through the loopback binding `exports.ChaskiEntrypoint`. The tests and
-  `pnpm dev` both run it.
+  both Durable Objects, the Workflow, R2 and `send_email`) and a `CHASKI_SECRET` that is public
+  and test-only, plus an app's `userRoutes()` under `/app/*`, which reach it through the loopback
+  binding `exports.ChaskiEntrypoint`. The tests and `pnpm dev` both run it.
 
 ## Code conventions
 
@@ -207,7 +214,9 @@ another module relies on. A comment that repeats the name or the next lines goes
   `test/helpers.ts`. Only the end-to-end test lets the real queue and consumer run.
 - `useConfig()` overrides the config for one test, `stubEmail()` captures what the email binding
   would send, and `introspectWorkflow()` from `cloudflare:test` drives the scheduler without
-  waiting.
+  waiting. The fixture config turns email and in-app on from code; settings saved through the API
+  replace it section by section, so a test of saved settings starts from
+  `useConfig({ channels: {} })`, as a deployed Chaski does.
 - No placeholder tests.
 
 ## Working agreements

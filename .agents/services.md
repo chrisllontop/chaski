@@ -21,6 +21,14 @@ export class TemplateService extends BaseService {
 
 Chaski is its own Worker, and its wrangler.jsonc names every binding `CHASKI_*`. `src/server/config.ts` alone reads them from the env, into `config.bindings`, evaluated on every call; services go through `Service.bindings` and never read the env themselves, so a test can swap a binding. A binding may be missing: name it as wrangler.jsonc does (`bindingName()`) in the error.
 
+## Channel settings come through the config too
+
+Channels are set up on the dashboard and stored per section in the `settings` table, each section's one secret sealed with `CHASKI_SECRET` (`src/server/lib/sealed.ts`). `ready()` loads them on every request, and `Service.config` merges them over the env's config, so:
+
+- Every entry point (a route, an RPC method, the queue batch, a Workflow step) awaits `ready()` before anything reads `Service.config`; reading it first throws instead of seeing no channels. `Service.bindings` and `Service.client` need no settings, which is how the open pixel skips the load.
+- A saved section that stops validating never throws out of the config: its message goes into `config.problems`, its channel stays on, and its deliveries fail with it (see `errors.md`).
+- Save a section through `SettingsService`, which validates it with the same resolvers as `validateConfig()` and reloads the settings in its isolate.
+
 ## Persistence
 
 The database is **better-drizzle + Drizzle ORM + the Worker's Cloudflare D1** (`CHASKI_DB`):
