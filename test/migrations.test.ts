@@ -33,7 +33,7 @@ describe('migrations', () => {
     await expect(ensureMigrations(fresh)).rejects.toMatchObject({
       code: 'config',
       message: expect.stringContaining(
-        'missing migrations 0000_init.sql. Apply them with ' +
+        'missing migrations 0000_init.sql, 0001_send_in_several_languages.sql. Apply them with ' +
           '`wrangler d1 migrations apply CHASKI_DB --remote`, or `--local` under `wrangler dev`.',
       ),
     });
@@ -49,6 +49,7 @@ describe('migrations', () => {
       '0003_push_silent.sql',
       '0004_notification_data.sql',
       '0005_channel_settings.sql',
+      '0001_send_in_several_languages.sql',
     ]);
 
     await expect(ensureMigrations(preRelease)).resolves.toBeUndefined();

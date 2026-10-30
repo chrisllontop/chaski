@@ -76,6 +76,10 @@ export class DeliveryAdminService extends BaseService {
         providerMs: deliveries.providerMs,
         openedAt: deliveries.openedAt,
         updatedAt: deliveries.updatedAt,
+        // What the send asked for (its own locale or the contact's) and what the channel had.
+        requestedLocale: notifications.requestedLocale,
+        requestedLocaleFrom: notifications.requestedLocaleFrom,
+        renderedLocale: deliveries.renderedLocale,
         createdAt: notifications.createdAt,
         type: notifications.type,
         recipientId: notifications.recipientId,

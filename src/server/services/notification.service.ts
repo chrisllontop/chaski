@@ -8,7 +8,8 @@ import type {
 } from '../../contract/contract';
 import { sendRequestSchema } from '../../contract/contract';
 import { ChaskiError } from '../../contract/errors';
-import { deliveries, notifications } from '../db/schema';
+import { canonicalLocale } from '../../contract/locales';
+import { deliveries, type LocaleSource, notifications } from '../db/schema';
 import { publishAdminEvents } from '../lib/admin-events';
 import { newId } from '../lib/ids';
 import { resolveChannels } from '../lib/resolve-channels';
@@ -106,7 +107,24 @@ export const splitEmailOptions = (
   };
 };
 
-export type DispatchInput = {
+export type RequestedLocale = {
+  requestedLocale: string | null;
+  requestedLocaleFrom: LocaleSource | null;
+};
+
+/** The send's own locale, else the contact's; one Intl can't read counts as absent. */
+export const requestedLocaleOf = (
+  sendLocale: string | undefined,
+  snapshot: ContactSnapshot,
+): RequestedLocale => {
+  const fromSend = canonicalLocale(sendLocale);
+  if (fromSend) return { requestedLocale: fromSend, requestedLocaleFrom: 'send' };
+  const fromContact = canonicalLocale(snapshot.locale);
+  if (fromContact) return { requestedLocale: fromContact, requestedLocaleFrom: 'contact' };
+  return { requestedLocale: null, requestedLocaleFrom: null };
+};
+
+export type DispatchInput = RequestedLocale & {
   type: string;
   recipientId: string;
   snapshot: ContactSnapshot;
@@ -151,6 +169,7 @@ export class NotificationService extends BaseService {
       pushSilent: request.push?.silent ?? false,
       pushCollapseId: request.push?.collapseId ?? null,
       data: request.data ?? null,
+      ...requestedLocaleOf(request.locale, snapshot),
       storedAttachments,
       idempotencyKey: request.idempotencyKey ?? null,
       inline: request.inline,
@@ -211,6 +230,8 @@ export class NotificationService extends BaseService {
           pushSilent: input.pushSilent,
           pushCollapseId: input.pushCollapseId,
           data: input.data ? JSON.stringify(input.data) : null,
+          requestedLocale: input.requestedLocale,
+          requestedLocaleFrom: input.requestedLocaleFrom,
           transactional: input.transactional,
           idempotencyKey: input.idempotencyKey,
           createdAt: now,

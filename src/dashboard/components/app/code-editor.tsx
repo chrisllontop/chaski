@@ -32,7 +32,7 @@ import { classHighlighter } from '@lezer/highlight';
 import { configureNesting, parser as htmlParser } from '@lezer/html';
 import { cn } from 'cn';
 import { useEffect, useRef } from 'react';
-import { liquidNamesAt, liquidReference } from '~/lib/liquid';
+import { LIQUID_FILTERS, liquidFilterPrefix, liquidNamesAt, liquidReference } from '~/lib/liquid';
 
 // CodeMirror writes its base styles at runtime, so they take the nonce the
 // server put in the shell's CSP. Colors come from tok-* classes in styles.css.
@@ -72,7 +72,20 @@ const liquidHighlight = ViewPlugin.fromClass(
 const liquidCompletions =
   (sample: Record<string, unknown> | null) => (context: CompletionContext) => {
     const line = context.state.doc.lineAt(context.pos);
-    const reference = liquidReference(line.text.slice(0, context.pos - line.from));
+    const before = line.text.slice(0, context.pos - line.from);
+    const filter = liquidFilterPrefix(before);
+    if (filter !== null) {
+      return {
+        from: context.pos - filter.length,
+        options: LIQUID_FILTERS.map(({ name, usage }) => ({
+          label: name,
+          detail: usage,
+          type: 'function',
+        })),
+        validFor: /^\w*$/,
+      };
+    }
+    const reference = liquidReference(before);
     if (!reference) return null;
     if (!context.explicit && !reference.prefix && reference.path.length === 0) return null;
     return {

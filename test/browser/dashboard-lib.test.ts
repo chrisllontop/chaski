@@ -1,5 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { LOCALE_FILTERS } from '../../src/contract/liquid-filters';
 import { query } from '../../src/dashboard/lib/api';
 import { useDebounced } from '../../src/dashboard/lib/debounce';
 import {
@@ -10,7 +11,12 @@ import {
   formatUtcRange,
 } from '../../src/dashboard/lib/format';
 import { healthByType } from '../../src/dashboard/lib/health';
-import { liquidNamesAt, liquidReference } from '../../src/dashboard/lib/liquid';
+import {
+  LIQUID_FILTERS,
+  liquidFilterPrefix,
+  liquidNamesAt,
+  liquidReference,
+} from '../../src/dashboard/lib/liquid';
 import { isOverdue } from '../../src/dashboard/lib/schedules';
 
 describe('dashboard query strings', () => {
@@ -78,9 +84,20 @@ describe('dashboard health', () => {
 describe('liquid completions', () => {
   const sample = { amount: 1500, invoice: { id: 'INV-1', lines: [] }, recipient: { name: 'Ana' } };
 
-  it('offers the sample data and recipient at the top level', () => {
-    expect(liquidNamesAt(sample, [])).toEqual(['amount', 'invoice', 'recipient']);
-    expect(liquidNamesAt(null, [])).toEqual(['recipient']);
+  it('offers the sample data, recipient and locale at the top level', () => {
+    expect(liquidNamesAt(sample, [])).toEqual(['amount', 'invoice', 'locale', 'recipient']);
+    expect(liquidNamesAt(null, [])).toEqual(['locale', 'recipient']);
+  });
+
+  it('offers Chaski’s filters after a pipe, the ones the server formats with', () => {
+    expect(LIQUID_FILTERS.map((filter) => filter.name)).toEqual(
+      LOCALE_FILTERS.map((filter) => filter.name),
+    );
+    expect(liquidFilterPrefix('{{ amount | cur')).toBe('cur');
+    expect(liquidFilterPrefix('{{ amount |')).toBe('');
+    expect(liquidFilterPrefix('{% assign total = amount | num')).toBe('num');
+    expect(liquidFilterPrefix('{{ amount }} | cur')).toBeNull();
+    expect(liquidFilterPrefix('{{ amount')).toBeNull();
   });
 
   it('offers the fields under a dotted path, recipient’s included', () => {

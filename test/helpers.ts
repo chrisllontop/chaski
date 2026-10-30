@@ -4,6 +4,7 @@ import type { Channel } from '../src/contract/contract';
 import { type ChaskiConfig, setConfigure } from '../src/server/config';
 import { getClient } from '../src/server/db';
 import { DeliveryService } from '../src/server/services/delivery.service';
+import { SettingsService } from '../src/server/services/settings.service';
 import type { DeliveryMessage, SendEmailBinding } from '../src/worker';
 import { fixtureConfig } from './fixture/worker';
 
@@ -99,3 +100,10 @@ export const stubEmail = (
   });
   return sent;
 };
+
+// The Worker's languages, saved as the Channels page saves them.
+export const saveLocales = (defaultLocale: string, supported: string[]) =>
+  SettingsService.saveLocales(
+    { default: defaultLocale, supported },
+    { id: 'admin@chaski.test', name: 'Admin' },
+  );

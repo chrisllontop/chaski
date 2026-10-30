@@ -2,6 +2,7 @@ import { env } from 'cloudflare:workers';
 import type { ChannelProblem } from '../contract/api';
 import { CHANNELS, type Channel } from '../contract/contract';
 import { ChaskiError, isChaskiError } from '../contract/errors';
+import { canonicalLocale, type Locales } from '../contract/locales';
 import type { SettingsSection } from './db/schema/channels';
 import type { ChaskiEvents } from './durable/events';
 import type { ChaskiFeed } from './durable/feed';
@@ -157,6 +158,8 @@ export type ResolvedConfig = {
   /** The channels that are on: configured, or saved with settings that stopped validating. */
   enabledChannels: Channel[];
   defaultMutedTypes: string[];
+  /** The languages saved on the Channels page; with none, every send renders its default content. */
+  locales: Locales | null;
   environment: string | null;
   /**
    * Why each saved section that stopped validating can't be used, in validateConfig's words. Its
@@ -265,6 +268,22 @@ const resolveWns = (wns: WnsConfig): WnsCredentials => {
   return { tenantId: wns.tenantId, clientId: wns.clientId, clientSecret: wns.clientSecret };
 };
 
+// The default is left out of `supported`, which lists the other languages a translation can be in.
+const resolveLocales = (locales: Locales): Locales => {
+  const defaultLocale = canonicalLocale(locales.default);
+  if (!defaultLocale) fail('locales.default must be a BCP 47 language tag, such as en');
+  if (!Array.isArray(locales.supported)) fail('locales.supported must be a list of language tags');
+  const supported = locales.supported.map((tag) => {
+    const locale = canonicalLocale(tag);
+    if (!locale) fail(`locales.supported holds '${tag}', which is not a BCP 47 language tag`);
+    return locale as string;
+  });
+  return {
+    default: defaultLocale as string,
+    supported: [...new Set(supported)].filter((locale) => locale !== defaultLocale),
+  };
+};
+
 const resolveEmail = (email: EmailConfig): EmailConfig => {
   if (!email.from?.includes('@')) fail('channels.email.from must be an email address');
   return email;
@@ -288,6 +307,7 @@ export type StoredSections = {
   fcm: FcmConfig;
   wns: WnsConfig;
   default_muted_types: string[];
+  locales: Locales;
 };
 
 /** A saved section as loaded from the settings table: its fields, or why they can't be read. */
@@ -305,6 +325,7 @@ const RESOLVERS = {
   fcm: resolveFcm,
   wns: resolveWns,
   default_muted_types: (types: string[]) => types,
+  locales: resolveLocales,
 } satisfies { [S in SettingsSection]: (value: StoredSections[S]) => unknown };
 
 type Resolved<S extends SettingsSection> = ReturnType<(typeof RESOLVERS)[S]>;
@@ -320,7 +341,7 @@ export const resolveSection = <S extends SettingsSection>(
   return resolve(value);
 };
 
-/** The channel a section turns on; default_muted_types belongs to none. */
+/** The channel a section turns on; default_muted_types and locales belong to none. */
 export const SECTION_CHANNEL = {
   email: 'email',
   in_app: 'in_app',
@@ -329,6 +350,7 @@ export const SECTION_CHANNEL = {
   fcm: 'push',
   wns: 'push',
   default_muted_types: null,
+  locales: null,
 } as const satisfies Record<SettingsSection, Channel | null>;
 
 /** Each saved section that stopped validating, under the channel it fails. */
@@ -378,6 +400,8 @@ export const validateConfig = (
     fcm: channels.push?.fcm,
     wns: channels.push?.wns,
     default_muted_types: config.defaultMutedTypes,
+    // The languages are saved on the Channels page only, where a change of default is checked.
+    locales: undefined,
   };
 
   // A saved section replaces the code's. The code's throws, as a bad config always has; a saved one
@@ -411,6 +435,7 @@ export const validateConfig = (
     wns: section('wns'),
   };
   const defaultMutedTypes = section('default_muted_types') ?? [];
+  const locales = section('locales') ?? null;
   const configured: Record<Channel, boolean> = {
     email: Boolean(email),
     in_app: Boolean(inApp),
@@ -432,6 +457,7 @@ export const validateConfig = (
     channels: resolved,
     enabledChannels,
     defaultMutedTypes,
+    locales,
     environment: config.environment?.trim() || null,
     problems,
   };

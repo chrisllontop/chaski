@@ -1,4 +1,5 @@
 import { and, eq, sql } from 'drizzle-orm';
+import type { Channel } from '../../contract/contract';
 import { ChaskiError, isChaskiError, isRetryableChaskiError } from '../../contract/errors';
 import { deliveries } from '../db/schema';
 import { DeliveryError } from '../lib/errors';
@@ -7,6 +8,7 @@ import { CHANNEL_DEFS } from './adapters/registry';
 import type { DeliveryRow } from './adapters/types';
 import { BaseService } from './base.service';
 import { ChannelService } from './channel.service';
+import { TemplateService } from './template.service';
 
 export type ProcessOutcome =
   | { status: 'sent' }
@@ -91,18 +93,36 @@ export class DeliveryService extends BaseService {
       return { status: 'failed' };
     }
 
+    // The content is read when the delivery goes out, each channel in the language closest to
+    // the one the send asked for, so a translation saved after the send still reaches it.
+    const content = await TemplateService.findActiveContent(
+      notification.type,
+      delivery.channel as Channel,
+      notification.requestedLocale,
+    );
+    if (!content) {
+      await DeliveryService.markFailed(
+        delivery.id,
+        'no_template',
+        `no active ${channel} template for type '${notification.type}'`,
+      );
+      return { status: 'failed' };
+    }
+    const renderedLocale = content.locale;
+
     // Every call to the channel is an attempt, whatever it ends in; the
     // failures above never reached one.
     const attempts = delivery.attempts + 1;
     // workerd advances the clock only across I/O, which the provider call is.
     const startedAt = Date.now();
     try {
-      const result = await definition.deliver({ delivery, notification });
+      const result = await definition.deliver({ delivery, notification, content });
       await DeliveryService.client.deliveries.update({
         where: { id: delivery.id },
         data: {
           status: 'sent',
           attempts,
+          renderedLocale,
           providerMs: Date.now() - startedAt,
           providerMessageId: result.providerMessageId ?? null,
           sentAt: new Date(),
@@ -118,6 +138,7 @@ export class DeliveryService extends BaseService {
         await DeliveryService.markFailed(delivery.id, classified.code, classified.message, {
           attempts,
           providerMs,
+          renderedLocale,
         });
         return { status: 'failed' };
       }
@@ -126,6 +147,7 @@ export class DeliveryService extends BaseService {
         data: {
           attempts,
           providerMs,
+          renderedLocale,
           lastError: classified.message,
           errorCode: classified.code,
         },
@@ -178,7 +200,7 @@ export class DeliveryService extends BaseService {
     deliveryId: string,
     errorCode: string,
     message: string,
-    attempt?: { attempts: number; providerMs: number },
+    attempt?: { attempts: number; providerMs: number; renderedLocale: string | null },
   ): Promise<void> => {
     await DeliveryService.client.deliveries.update({
       where: { id: deliveryId },

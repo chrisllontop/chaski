@@ -2,6 +2,9 @@ import { sql } from 'drizzle-orm';
 import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { timestamp, timestampNow } from './timestamps';
 
+export const LOCALE_SOURCES = ['send', 'contact'] as const;
+export type LocaleSource = (typeof LOCALE_SOURCES)[number];
+
 // contactSnapshot freezes recipient data at ingest time so queue retries never
 // depend on a contacts row that may have changed or disappeared.
 export const notifications = sqliteTable(
@@ -18,6 +21,11 @@ export const notifications = sqliteTable(
     pushCollapseId: text('push_collapse_id'),
     // The send's data for its clients, read whole by the feed and the pushes.
     data: text('data'),
+    // The language the send asked for: its own `locale`, or else the contact's, canonical, and
+    // where it came from. Frozen with the snapshot it may come from, so the delivery detail and the
+    // language fallbacks read what the send asked for, whatever the contact says later.
+    requestedLocale: text('requested_locale'),
+    requestedLocaleFrom: text('requested_locale_from', { enum: LOCALE_SOURCES }),
     transactional: integer('transactional', { mode: 'boolean' }).notNull().default(false),
     idempotencyKey: text('idempotency_key'),
     createdAt: timestampNow('created_at'),
@@ -63,6 +71,9 @@ export const deliveries = sqliteTable(
     sentAt: timestamp('sent_at'),
     // How long the channel's provider took on the latest attempt, whatever it ended in.
     providerMs: integer('provider_ms'),
+    // The language of the content the delivery went out with: a translation's, or the default
+    // language; null while it has rendered nothing, and when the Worker has no languages saved.
+    renderedLocale: text('rendered_locale'),
     // Email open tracking via pixel: openedAt freezes the first open. Opens are a
     // read receipt, not a delivery state — status stays 'sent' and the UI surfaces
     // openedAt as a separate "seen" indicator.
@@ -118,6 +129,9 @@ export const scheduledNotifications = sqliteTable(
     pushCollapseId: text('push_collapse_id'),
     // The send's data for its clients, read whole by the feed and the pushes.
     data: text('data'),
+    // As on notifications: what the send asked for when it was scheduled.
+    requestedLocale: text('requested_locale'),
+    requestedLocaleFrom: text('requested_locale_from', { enum: LOCALE_SOURCES }),
     transactional: integer('transactional', { mode: 'boolean' }).notNull().default(false),
     idempotencyKey: text('idempotency_key'),
     groupKey: text('group_key'),

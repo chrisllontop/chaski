@@ -62,8 +62,10 @@ const providerSchema = z.enum(['vapid', 'apns', 'fcm', 'wns']);
 
 const resumeSchema = z.object({ send: z.boolean().default(false) });
 
-const saved = async (c: Context, section: Exclude<SettingsSection, 'default_muted_types'>) =>
-  c.json({ settings: (await SettingsService.sections())[section] });
+const saved = async (
+  c: Context,
+  section: Exclude<SettingsSection, 'default_muted_types' | 'locales'>,
+) => c.json({ settings: (await SettingsService.sections())[section] });
 
 const removed = async (c: Context, section: SettingsSection) => {
   await SettingsService.remove(section, signedIn(c));

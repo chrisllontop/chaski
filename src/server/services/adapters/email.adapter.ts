@@ -1,7 +1,6 @@
 import { injectOpenPixel, openPixelUrl } from '../../lib/email-open';
 import { DeliveryError } from '../../lib/errors';
 import { parseJson } from '../../lib/json';
-import { renderHtml, renderTemplate } from '../../lib/render';
 import type { EmailAttachment } from '../../types';
 import type { StoredAttachment } from '../attachment.service';
 import { AttachmentService } from '../attachment.service';
@@ -31,24 +30,12 @@ export class EmailAdapter extends BaseService {
       });
     }
 
-    const content = await TemplateService.findActiveContent(ctx.notification.type, 'email');
-    if (!content) {
-      throw new DeliveryError(
-        'no_template',
-        `no active email template for type '${ctx.notification.type}'`,
-        { permanent: true },
-      );
-    }
-
-    const payload = parseJson<Record<string, unknown>>(ctx.notification.payload, {});
-    const data = { ...payload, recipient: snapshot };
     const overrides = parseJson<EmailOverrides>(ctx.notification.emailOverrides, {});
-
-    const [subject, renderedHtml, text] = await Promise.all([
-      renderTemplate(content.subject ?? '', data),
-      renderHtml(content.body, data),
-      content.textBody ? renderTemplate(content.textBody, data) : Promise.resolve(undefined),
-    ]);
+    const {
+      subject,
+      body: renderedHtml,
+      textBody: text,
+    } = await TemplateService.renderDelivery(ctx.content, ctx.notification, { html: true });
 
     // The pixel loads through the app's userRoutes(), since Access closes Chaski's own URL to
     // mail clients; without CHASKI_PUBLIC_URL there is nowhere for it to load from.

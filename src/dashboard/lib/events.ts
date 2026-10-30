@@ -11,6 +11,7 @@ const QUERY_KEYS: Record<string, string[][]> = {
   metrics: [['metrics']],
   templates: [['templates'], ['template']],
   channels: [['channels']],
+  locales: [['locales']],
 };
 
 const invalidate = (client: QueryClient, topics: string[]) => {
