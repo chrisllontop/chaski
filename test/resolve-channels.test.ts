@@ -104,4 +104,23 @@ describe('resolveChannels', () => {
     const result = resolveChannels(base({ contact: {} }));
     expect(result).toEqual([{ channel: 'email', skipReason: 'missing_email' }]);
   });
+
+  // A type sent to a contact with no email or device, through channels its template doesn't use,
+  // reads as no_template: the missing address isn't why it didn't go out.
+  it('names the missing template before the contact or the preferences', () => {
+    const result = resolveChannels(
+      base({
+        enabledChannels: ['email', 'in_app', 'push'],
+        contact: {},
+        capabilities: {},
+        preferences: { channels: { email: false }, mutedTypes: [] },
+        templatesByChannel: { in_app: true },
+      }),
+    );
+    expect(result).toEqual([
+      { channel: 'email', skipReason: 'no_template' },
+      { channel: 'in_app' },
+      { channel: 'push', skipReason: 'no_template' },
+    ]);
+  });
 });

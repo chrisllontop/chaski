@@ -47,6 +47,12 @@ export const resolveChannels = (input: ResolveInput): ChannelResolution[] => {
       return { channel, skipReason: 'channel_not_configured' };
     }
 
+    // A channel the type's template doesn't use is skipped for that reason alone: whether the
+    // contact muted it or lacks an address for it says nothing about this send.
+    if (!input.templatesByChannel[channel]) {
+      return { channel, skipReason: 'no_template' };
+    }
+
     if (usePreferences && input.preferences) {
       if (input.preferences.channels[channel] === false) {
         return { channel, skipReason: 'muted_by_preferences' };
@@ -58,10 +64,6 @@ export const resolveChannels = (input: ResolveInput): ChannelResolution[] => {
 
     const gateSkip = passesGate(channel, input.contact, input.capabilities);
     if (gateSkip) return { channel, skipReason: gateSkip };
-
-    if (!input.templatesByChannel[channel]) {
-      return { channel, skipReason: 'no_template' };
-    }
 
     return { channel };
   });
