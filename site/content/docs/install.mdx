@@ -117,6 +117,9 @@ That line is all the code a Chaski project holds. New versions come through the 
 
 `init` writes `vars.CHASKI_PUBLIC_URL` only when you give it one, `r2_buckets` only with
 attachments and `send_email` only with email. `access.dev` takes your `git config user.email`.
+`compatibility_date` is the date Chaski’s own tests run on. Keep it, or move it to one no later
+than your Wrangler’s workerd, which ships behind today: past that date, `wrangler dev` warns and
+falls back.
 The binding names are fixed: Chaski reads them by name. Each one turns on a part of it:
 
 | Binding | Needed for |
@@ -149,13 +152,14 @@ before it does any of it:
 3. **Deploys** the Worker.
 4. **Sets `CHASKI_SECRET`** to a random value, when the Worker has none. It encrypts the push keys
    and credentials you save in the dashboard, such as your APNs key, so the database alone never
-   holds them in the clear.
+   holds them in the clear. It goes last, once the deploy went through: until the Worker exists,
+   `secret put` creates an empty one under its name.
 
 It prints the Worker’s URL, such as `https://chaski.<your-subdomain>.workers.dev`, which serves
 the dashboard. Run it again after every change or upgrade: it creates only what’s missing, and
 always migrates before it deploys. `--yes` answers its question, for a deploy job.
 
-Each step is a Wrangler command, should you rather run them yourself:
+Each step is a Wrangler command, should you rather run them yourself, in this order:
 
 ```bash
 npx wrangler d1 create chaski                      # its id goes in database_id
@@ -164,6 +168,7 @@ npx wrangler queues create chaski-deliveries-dlq
 npx wrangler r2 bucket create chaski-attachments   # only with attachments
 npx wrangler d1 migrations apply CHASKI_DB --remote
 npx wrangler deploy
+# After the deploy: until the Worker exists, secret put creates an empty one under its name.
 openssl rand -base64 32 | npx wrangler secret put CHASKI_SECRET
 ```
 

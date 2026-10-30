@@ -85,8 +85,10 @@ npx chaskijs deploy
 
 It lists what the Worker is missing in your Cloudflare account and asks before it acts: it creates
 the database, the queues and, with attachments, the R2 bucket, applies Chaski’s migrations, deploys,
-and sets `CHASKI_SECRET`, which encrypts the channel credentials you save in the dashboard. Run it
-again after every upgrade: it creates only what’s missing and migrates before it deploys.
+and then sets `CHASKI_SECRET`, which encrypts the channel credentials you save in the dashboard. The
+secret comes after the deploy, since until the Worker exists, `secret put` creates an empty one
+under its name. Run it again after every upgrade: it creates only what’s missing and migrates
+before it deploys.
 
 ### 3. Turn on Cloudflare Access
 

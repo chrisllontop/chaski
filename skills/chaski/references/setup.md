@@ -75,6 +75,13 @@ and `wrangler`, and applies Chaski’s migrations to the local database. It refu
 isn’t empty. Read the `wrangler.jsonc` it wrote: https://chaski.sh/docs/install#read-what-it-wrote
 explains each binding. `database_id` stays `"local"` until step 7 creates the database.
 
+- **`compatibility_date`**: keep the date in the generated `wrangler.jsonc`, the one Chaski’s own
+  tests run on. Never set today’s: a later date must be no later than the project’s Wrangler’s
+  workerd, which ships behind today, or `wrangler dev` warns and falls back.
+- **`package.json` scripts**: `init` writes `dev` alone. Add none named after a package-manager
+  command (`deploy`, `install`, `add`, `update`, `publish`): `pnpm deploy` runs pnpm’s own command,
+  never the script. Call `npx chaskijs deploy` directly.
+
 When the app’s repository is a workspace that hoists packages, point `migrations_dir` at the
 hoisted copy (`../node_modules/chaskijs/migrations`): it has to reach the installed package’s
 migrations folder from `wrangler.jsonc`.
@@ -133,7 +140,9 @@ In the app’s project:
    other than `Service<ChaskiEntrypoint>` gets declared over in the app’s own type.
 4. **Check the compatibility date.** Before `2026-04-21`, Chaski’s errors reach the app without
    their `code`. Moving the date changes the runtime’s behavior for the whole app, so ask the user
-   first.
+   first. Move it to the date in the Chaski project’s generated `wrangler.jsonc`, or one no later
+   than the app’s Wrangler’s workerd, never to today’s: `wrangler dev` warns and falls back past
+   it.
 5. **Mount the user routes**, after the app’s session middleware so `identify` can read what it
    set:
 
@@ -278,7 +287,10 @@ npx chaskijs deploy --yes
 ```
 
 It writes the new database’s id into `wrangler.jsonc`, applies the migrations before the code, and
-prints the Worker’s URL. The local database follows `database_id`, so `wrangler dev` starts over
+prints the Worker’s URL. It sets `CHASKI_SECRET` last, once the deploy went through in the same
+run. Never run `wrangler secret put` against a Worker that hasn’t been deployed: until the Worker
+exists, `secret put` creates an empty one under that name, and an app deployed then binds to a
+Worker without `ChaskiEntrypoint`. The local database follows `database_id`, so `wrangler dev` starts over
 on a new one, which the deploy migrates. The app deploys its binding after Chaski is up, since a
 service binding needs its Worker to exist; that deploy is the user’s, like any other of the app.
 The template file then loads into production with `--remote` ([sending.md](sending.md)); ask for
@@ -313,7 +325,9 @@ It adds `env.staging` to `wrangler.jsonc`, repeating every binding with that env
 (`chaski-staging`, `chaski-staging-deliveries`, `chaski-staging-scheduler`), since Wrangler carries
 neither bindings nor vars into an environment. Wrangler names its Worker `chaski-staging`. Then, as
 in step 7, show the user the plan of `npx chaskijs deploy --env staging`, and run it with `--yes`
-only on their yes. The app’s `env.staging` block binds `CHASKI` to `chaski-staging`, and Access and
+only on their yes. It sets that Worker’s `CHASKI_SECRET` after its deploy; any
+`wrangler secret put --env staging` of your own comes after that first deploy too, since until the
+Worker exists, `secret put` creates an empty one under its name. The app’s `env.staging` block binds `CHASKI` to `chaski-staging`, and Access and
 the channel settings of that Worker are the user’s again: settings never move between
 environments.
 
