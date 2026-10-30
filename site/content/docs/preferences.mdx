@@ -25,8 +25,8 @@ receipts, password resets and other notifications the contact must get.
 
 ## Build a settings screen
 
-Your frontend reads and changes the signed-in user’s preferences through the routes you mounted
-with `chaski.userRoutes()`. With React:
+Your frontend reads and changes the signed-in user’s preferences through the routes your app
+mounts with [`userRoutes()`](/docs/connect#mount-the-user-routes). With React:
 
 ```tsx title="src/settings/notifications.tsx"
 import { usePreferences } from 'chaskijs/react';
@@ -61,21 +61,16 @@ the same `get()`, `update()` and `topics()`.
 
 ## Mute types for everyone
 
-`defaultMutedTypes` in the config lists types every contact has muted until they save preferences
-of their own, such as a weekly digest people opt into.
-
-```ts
-export const chaski = createChaski((env: Env) => ({
-  // …
-  defaultMutedTypes: ['weekly_digest'],
-}));
-```
+**Default muted types**, on the **Channels** page of the dashboard, lists types every contact has
+muted until they save preferences of their own, such as a weekly digest people opt into. It takes
+the same entries as a contact’s muted types, `*` and `channel:` prefixes included.
 
 ## On the server
 
-`chaski.preferences` reads and writes any contact’s preferences from your Worker, by recipient id:
+`env.CHASKI.preferences()` reads and writes any contact’s preferences from your app, by recipient
+id:
 
 ```ts
-await chaski.preferences.set(user.id, { mutedTypes: ['marketing.*'] });
-const { channels, mutedTypes } = await chaski.preferences.get(user.id);
+await env.CHASKI.preferences().set(user.id, { mutedTypes: ['marketing.*'] });
+const { channels, mutedTypes } = await env.CHASKI.preferences().get(user.id);
 ```

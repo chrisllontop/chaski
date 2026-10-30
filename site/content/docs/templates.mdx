@@ -63,22 +63,22 @@ address you enter.
 
 ## Keep templates in a file
 
-Templates can also live in your repository, as a JSON file that `chaski.templates.import()` loads
-from a seed route, a deploy job, your tests or another Worker. Templates are keyed by type, so
+Templates can also live in your repository, as a JSON file your app loads over its binding with
+`env.CHASKI.templates().import()`, from a seed route or a deploy job. Templates are keyed by type, so
 loading the same file twice changes nothing, and channels the file leaves out are never touched.
 
 ```ts title="src/seed.ts"
 import templates from '../chaski-templates.json';
 
 // { applied: true, changes: [{ type, change: 'create' | 'update' | 'unchanged', fields, warnings }] }
-const result = await chaski.templates.import(templates);
+const result = await env.CHASKI.templates().import(templates);
 ```
 
 `{ preview: true }` reports the changes without applying them. A load overwrites the types the
 file holds, edits made in the dashboard included, so bring those into the file first:
-`chaski.templates.export()` returns every template in this format. To load the file with no Worker
+`templates().export()` returns every template in this format. To load the file with no Worker
 running, before `wrangler dev` or from a deploy job, turn it into SQL with
-`npx chaskijs templates sql` and run it with `wrangler d1 execute`:
+`npx chaskijs templates sql` and run it with `wrangler d1 execute` in the Chaski project:
 [Local development](/docs/local-development#seed-the-templates) has the script.
 
 ```json title="chaski-templates.json"

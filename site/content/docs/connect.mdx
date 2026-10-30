@@ -1,0 +1,119 @@
+---
+title: Connect your app
+description: Bind your app’s Worker to Chaski, send over RPC, and mount the routes your frontend calls for the signed-in user.
+---
+
+Your app’s Worker reaches Chaski through a service binding to `ChaskiEntrypoint`: a call goes
+straight to the Chaski Worker, with no public URL or token in between. Any Worker in the same
+Cloudflare account can bind to it the same way.
+
+## Bind to Chaski
+
+Add `chaskijs` and `hono` to your app. It takes `chaskijs` for its types and for `userRoutes()`,
+which weigh a few kilobytes; Chaski’s own code stays in the Chaski Worker.
+
+```npm
+npm install chaskijs hono
+```
+
+Then bind to the Chaski Worker by its name, in your app’s `wrangler.jsonc`:
+
+```jsonc title="wrangler.jsonc"
+{
+  "services": [{ "binding": "CHASKI", "service": "chaski", "entrypoint": "ChaskiEntrypoint" }]
+}
+```
+
+```ts title="src/env.ts"
+import type { ChaskiEntrypoint } from 'chaskijs';
+
+export type Env = { CHASKI: Service<ChaskiEntrypoint> };
+```
+
+Each environment of your app binds to the Chaski of that environment, such as `chaski-staging` in
+its `staging` block; see [Environments](/docs/environments).
+
+## Send
+
+```ts title="src/billing.ts"
+export const sendReceipt = async (env: Env, user: User, payment: Payment) => {
+  await env.CHASKI.send({
+    type: 'payment_received',
+    recipient: { id: user.id, email: user.email, name: user.name },
+    payload: { amount: payment.amount },
+    // A retried request with the same key sends only once.
+    idempotencyKey: `payment:${payment.id}`,
+  });
+};
+```
+
+[Sending](/docs/sending) covers what a send does, and [API](/docs/api) every call.
+
+## Groups are methods
+
+A service binding exposes methods only, so the groups of the API are methods too: `feed()`,
+`push()`, `preferences()`, `schedules()` and `templates()`. A call like
+`env.CHASKI.feed().list(query)` still takes a single round trip.
+
+```ts
+await env.CHASKI.schedules().cancel({ idempotencyKey: 'invoice-due:INV-1042' });
+const { unread } = await env.CHASKI.feed().unreadCount(user.id);
+await env.CHASKI.push().register({ recipient: { id: user.id }, platform: 'ios', deviceToken });
+```
+
+## Mount the user routes
+
+Your frontend reads the signed-in user’s feed, registers their devices and saves their
+preferences through routes your app mounts with `userRoutes()`. Your app says who is signed in,
+and forwards each request to Chaski for that contact:
+
+```ts title="src/index.ts"
+import { Hono } from 'hono';
+import { userRoutes } from 'chaskijs';
+import { currentUserId } from './session'; // your app’s own sign-in
+
+const app = new Hono<{ Bindings: Env }>();
+
+app.route(
+  '/me/notifications',
+  userRoutes({
+    chaski: (c) => c.env.CHASKI,
+    // The signed-in user's id; null answers 401, and a Response is returned as is.
+    identify: (c) => currentUserId(c),
+  }),
+);
+```
+
+Chaski takes the contact only from `identify`, never from what the browser sends, so a page only
+ever sees its own user’s data. Your app’s cookies and tokens stay in your app: what reaches Chaski
+is the contact’s id, the request’s body and its user agent. A mobile app calls the same routes
+with the token your app already accepts, which `identify` reads.
+
+Set `CHASKI_PUBLIC_URL` in the Chaski Worker’s `vars` to the absolute URL of this mount, such as
+`https://app.example.com/me/notifications`. The pixel that marks an email opened loads from it,
+and Chaski leaves the pixel out without it. [Browser clients](/docs/browser-clients) covers the
+frontend, and [Configuration](/docs/configuration#userroutes) every option.
+
+## Errors
+
+Chaski’s errors cross the binding with their `name` (`ChaskiError`), `message` and `code`, such as
+`validation`, when both Workers use a compatibility date on or after `2026-04-21`. Check them with
+`isChaskiError()`, since class identity doesn’t survive the trip:
+
+```ts
+import { isChaskiError } from 'chaskijs';
+
+try {
+  await env.CHASKI.send(request);
+} catch (error) {
+  if (isChaskiError(error) && error.code === 'validation') {
+    // the request needs fixing; trying again won't help
+  }
+  throw error;
+}
+```
+
+<Callout title="Between two local wrangler dev sessions, the code stays behind.">
+  There an error arrives as a plain `Error` whose message starts with `ChaskiError:`, so
+  `isChaskiError()` is `false`. Deployed Workers keep the `name` and the `code`.
+</Callout>

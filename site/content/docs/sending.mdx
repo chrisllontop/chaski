@@ -6,10 +6,10 @@ description: One call records a notification and fans it out to every channel it
 ## Send a notification
 
 Every notification has a type, and each type needs a [template](/docs/templates) before you send
-it. Then send from anywhere in your Worker:
+it. Then send from anywhere in your app, through its [binding](/docs/connect) to Chaski:
 
 ```ts title="src/billing.ts"
-const result = await chaski.send({
+const result = await env.CHASKI.send({
   type: 'payment_received',
   recipient: { id: user.id, email: user.email, name: user.name },
   payload: { amount: '$15.00' },
@@ -19,8 +19,8 @@ const result = await chaski.send({
 ```
 
 Chaski delivers through every channel the template has turned on, except the ones the contact
-muted. Each delivery goes through the queue, unless the send is [inline](#inline), and the
-dashboard shows it as it moves.
+muted. Each delivery goes through Chaski’s queue, unless the send is [inline](#inline), and
+the dashboard shows it as it moves.
 
 | Field | What it does |
 | --- | --- |
@@ -56,8 +56,8 @@ type SendResult = {
 ```
 
 `delivered` means at least one channel took the notification. `suppressed` means the contact’s
-own preferences skipped every channel, and `undeliverable` means the config or the contact’s data
-did, such as an email delivery for a recipient without an address.
+own preferences skipped every channel, and `undeliverable` means the channel settings or the
+contact’s data did, such as an email delivery for a recipient without an address.
 
 A channel is skipped, with its reason, when it isn’t configured (`channel_not_configured`), the
 contact muted it (`muted_by_preferences`), the recipient has no address or device for it
@@ -73,7 +73,7 @@ asked for it can tell that person when it didn’t go out:
 import { isChaskiError } from 'chaskijs';
 
 try {
-  await chaski.send({
+  await env.CHASKI.send({
     type: 'password_reset',
     recipient: { id: `email:${address}`, email: address },
     payload: { link },
@@ -103,10 +103,10 @@ went out is returned as it was: the key still never sends twice.
 ## Attachments
 
 Email attachments carry either base64 `content` or a `url` Chaski fetches. Chaski stores them in
-the R2 bucket you bind as `attachments` when the send is made, so retries read the same file.
+the R2 bucket bound as `CHASKI_ATTACHMENTS` when the send is made, so retries read the same file.
 
 ```ts
-await chaski.send({
+await env.CHASKI.send({
   type: 'invoice_issued',
   recipient: { id: user.id, email: user.email },
   payload: { invoice: 'INV-1042' },
@@ -122,16 +122,16 @@ Chaski deletes the files under `att/` once their email goes out, and when a sche
 them is cancelled or replaced. A delivery that ends `failed` or `dead` keeps its files, so a replay
 can send them. To bound what those keep, add an
 [R2 lifecycle rule](https://developers.cloudflare.com/r2/buckets/object-lifecycles/) that deletes
-objects under `att/` after a number of days. Make it outlast your farthest `chaski.schedule()` with
+objects under `att/` after a number of days. Make it outlast your farthest `schedule()` with
 attachments plus the time you allow for a replay. When a schedule fires, or a replay sends, after
 the rule took its files, the delivery fails as `attachment_missing`.
 
 ## How a delivery moves
 
-A delivery starts `pending` on your queue, and the channels skipped at send time are recorded as
-`skipped` with their reason. Your consumer hands each batch to `chaski.queue()`, which renders the
-template and calls the provider: the delivery is `sent` when the provider accepts it. Opening an
-email marks it opened, through a pixel served from your mount.
+A delivery starts `pending` on Chaski’s queue, and the channels skipped at send time are recorded
+as `skipped` with their reason. The Chaski Worker consumes the queue: it renders the template and
+calls the provider, and the delivery is `sent` when the provider accepts it. Opening an email marks
+it opened, through a pixel served from your app’s `userRoutes()` mount.
 
 ## Retries and replay [#retries]
 
@@ -144,7 +144,7 @@ A delivery that runs out of attempts is marked `dead`, and the queue moves it to
 queue. **Deliveries** in the dashboard shows each one with its last error. Replay a failed or dead
 delivery once the cause is fixed, or replay every dead one at once.
 
-<Callout title="Keep the two retry counts in step.">
-  `maxRetries` in Chaski’s config must match `max_retries` on your queue consumer. Chaski’s defaults
-  to 5, so set the consumer’s to 5 too, or set both.
+<Callout title="Keep the queue at five retries.">
+  Chaski counts on `max_retries: 5` on its queue consumer, as [Install](/docs/install) declares it,
+  to tell a delivery’s last attempt and mark it `dead`.
 </Callout>
