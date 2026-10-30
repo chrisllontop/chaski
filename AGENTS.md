@@ -91,7 +91,10 @@ in the same change.
   `chaskijs/client` (the page), `chaskijs/sw` (the service worker) and `chaskijs/react` (hooks
   over the client). React is an optional peer dependency. Only `chaskijs/worker` may import the
   engine; `chaskijs` stays a few kilobytes, and no browser entry may import server code. The package also ships
-  a `chaskijs` command for Node (`src/cli`): `chaskijs templates sql <file>` prints the SQL that
+  a `chaskijs` command for Node (`src/cli`). `init`, `deploy`, `env add` and `upgrade` create,
+  deploy, extend and upgrade a Chaski project: they edit its `wrangler.jsonc` with jsonc-parser,
+  which keeps its comments, and run the project's own Wrangler with a stdin that is never a
+  terminal, so only the command asks. `chaskijs templates sql <file>` prints the SQL that
   applies a template file the way `templates.import()` does; `test/templates-sql.test.ts` holds
   the two to the same result.
 - `src/contract` is what apps and clients see: the zod schemas and types of the API, the
@@ -175,7 +178,7 @@ generated files (such as `routeTree.gen.ts`) are excluded in `biome.json`.
   `src/dashboard/tsconfig.json` (DOM and JSX), `test/tsconfig.json` (Workers plus the Vitest
   plugin), `test/browser/tsconfig.json` (the browser tests), `test/sw/tsconfig.json` (a real service
   worker scope against `chaskijs/sw`, WebWorker types), `test/node/tsconfig.json` (the tests of the
-  skill's scripts, Node types), `site/tsconfig.json` (the site, DOM types),
+  skill's scripts and the command, Node types), `site/tsconfig.json` (the site, DOM types),
   `site/tsconfig.node.json` (its config files and build script) and `tsconfig.node.json` (the config
   files, the scripts and the `chaskijs` command).
 - tsdown bundles the JavaScript and TypeScript 7's compiler emits the declarations
@@ -207,8 +210,9 @@ another module relies on. A comment that repeats the name or the next lines goes
   `test/helpers.ts` builds; `api()` sends it. `browser` runs `test/browser` in happy-dom,
   with a fake network and a fake socket (`test/browser/fakes.ts`) and fake timers for the
   reconnection logic; it also covers the dashboard's `lib/`. `node` runs `test/node` against the
-  skill's scripts, on projects it writes to a temporary folder. The dashboard's screens have no
-  tests: check them in `pnpm dev`.
+  skill's scripts and the `chaskijs` command, on projects it writes to a temporary folder; the
+  command's tests answer for Wrangler with a fake runner, so none reaches a Cloudflare account.
+  The dashboard's screens have no tests: check them in `pnpm dev`.
 - `test/setup.ts` applies the migrations, empties the tables and restores the fixture config before
   each test, and stubs the queue producer: tests drain deliveries with `processDeliveries()` from
   `test/helpers.ts`. Only the end-to-end test lets the real queue and consumer run.

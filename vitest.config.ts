@@ -35,7 +35,7 @@ export default defineConfig({
         },
       },
       {
-        // The agent skill's scripts run in Node, against a project on disk.
+        // The agent skill's scripts and the chaskijs command run in Node, against a project on disk.
         test: { name: 'node', environment: 'node', include: ['test/node/**/*.test.ts'] },
       },
     ],

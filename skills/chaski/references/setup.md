@@ -5,11 +5,10 @@ it holds. Steps 1 to 6 run on the user’s machine and touch nothing in their Cl
 step 7 does, with their yes. The same guide for people: https://chaski.sh/docs/install and
 https://chaski.sh/docs/connect.
 
-The binding names (`CHASKI_DB`…), the class names and `ChaskiEntrypoint` are fixed. The rest are
-names to choose: below, the Chaski Worker is `chaski` and every resource is named after it
+The binding names (`CHASKI_DB`…), the class names and `ChaskiEntrypoint` are fixed. The Worker’s
+name is yours to choose: below it is `chaski`, and `chaskijs init` names every resource after it
 (`chaski-deliveries`). When the account may already hold another app’s Chaski, name the Worker
-`<app>-chaski` and derive the rest from it. The app’s binding names the Worker, so the two always
-match.
+`<app>-chaski`. The app’s binding names the Worker, so the two always match.
 
 ## 1. Read the app
 
@@ -44,134 +43,66 @@ Ask the user:
    code that sends through it, under the same CI.
 2. **A repository of its own**: when the team deploys infrastructure apart from the app.
 
-**Done when** the user picked one and its folder exists.
+**Done when** the user picked one: `--folder` or `--repo` in step 3.
 
 ## 3. Create the Chaski project
 
-In that folder, write `package.json`:
-
-```json
-{
-  "name": "chaski",
-  "private": true,
-  "type": "module",
-  "scripts": { "dev": "wrangler dev", "deploy": "wrangler deploy" }
-}
-```
-
-Then install with the app’s package manager, from npm only (no Git URLs, tarballs or local copies
-of the repository):
+From the folder that will hold it (the app’s repository root for a folder of it, or the parent of
+the new repository), run `chaskijs init` with a flag for every answer, since it can’t ask without a
+terminal. Run it with the app’s package manager (`pnpm dlx`, `yarn dlx`, `bunx` in place of `npx`):
+it installs with the one that runs it.
 
 ```sh
-npm install chaskijs@latest hono   # or pnpm add / yarn add / bun add
-npm install -D wrangler
+npx chaskijs@next init chaski --folder --name chaski --public-url https://app.example.com/me/notifications
 ```
 
-When `node_modules/chaskijs/dist/worker/index.d.ts` is missing after the install, that version
-predates the Chaski Worker. Tell the user which version installed
-(`node_modules/chaskijs/package.json`) and what `npm view chaskijs dist-tags` lists, try
-`chaskijs@next`, and stop when neither ships `dist/worker`.
+- **`--folder`** or **`--repo`**, from step 2. `--repo` runs `git init` in the new folder.
+- **`--name`**: the Worker’s name. The database takes it, the queues `<name>-deliveries` and
+  `<name>-deliveries-dlq`, the Workflow `<name>-scheduler`, the bucket `<name>-attachments`.
+- **`--no-email`** when the user doesn’t want email; **`--attachments`** when they want email
+  attachments, which add an R2 bucket. In-app, scheduling and live updates are always declared.
+- **`--public-url`**: the absolute production URL of the app’s `userRoutes()` mount (step 5). Ask
+  the user; leave the flag out until they know it, which only leaves emails without the open pixel.
+  A placeholder fails every call.
 
-The main module, the project’s only code:
+`@next` installs Chaski 0.1, in pre-release until it ships as `latest`; `npx chaskijs` alone runs
+an older version without these commands. Use npm only (no Git URLs, tarballs or local copies of
+the repository).
 
-```ts
-// src/index.ts
-export { ChaskiEntrypoint, ChaskiEvents, ChaskiFeed, ChaskiScheduler, default } from 'chaskijs/worker';
-```
+`init` writes `package.json`, `wrangler.jsonc`, the one-line `src/index.ts`, `.gitignore` and
+`.dev.vars` (a random `CHASKI_SECRET`, `CHASKI_ENVIRONMENT=local`), installs `chaskijs`, `hono`
+and `wrangler`, and applies Chaski’s migrations to the local database. It refuses a folder that
+isn’t empty. Read the `wrangler.jsonc` it wrote: https://chaski.sh/docs/install#read-what-it-wrote
+explains each binding. `database_id` stays `"local"` until step 7 creates the database.
 
-`wrangler.jsonc`, with every binding; keep only those the features from step 1 need:
+- **`compatibility_date`**: keep the date in the generated `wrangler.jsonc`, the one Chaski’s own
+  tests run on. Never set today’s: a later date must be no later than the project’s Wrangler’s
+  workerd, which ships behind today, or `wrangler dev` warns and falls back.
+- **`package.json` scripts**: `init` writes `dev` alone. Add none named after a package-manager
+  command (`deploy`, `install`, `add`, `update`, `publish`): `pnpm deploy` runs pnpm’s own command,
+  never the script. Call `npx chaskijs deploy` directly.
 
-```jsonc
-{
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "chaski",
-  "main": "src/index.ts",
-  "compatibility_date": "<today, 2026-04-21 or later>",
-  "observability": { "enabled": true },
-  "vars": {
-    "CHASKI_ENVIRONMENT": "production",
-    // The absolute production URL of the app's userRoutes() mount (step 5).
-    "CHASKI_PUBLIC_URL": "https://app.example.com/me/notifications"
-  },
-  // wrangler dev signs this identity in to the local dashboard: the user's email.
-  "access": {
-    "dev": { "aud": "chaski-local", "identity": { "email": "you@example.com", "name": "You" } }
-  },
-  "d1_databases": [
-    {
-      "binding": "CHASKI_DB",
-      "database_name": "chaski",
-      // Until step 7 creates the database.
-      "database_id": "00000000-0000-0000-0000-000000000000",
-      "migrations_dir": "node_modules/chaskijs/migrations"
-    }
-  ],
-  "queues": {
-    "producers": [{ "binding": "CHASKI_QUEUE", "queue": "chaski-deliveries" }],
-    "consumers": [
-      {
-        "queue": "chaski-deliveries",
-        "max_batch_size": 10,
-        "max_batch_timeout": 1,
-        "max_retries": 5,
-        "dead_letter_queue": "chaski-deliveries-dlq"
-      }
-    ]
-  },
-  "durable_objects": {
-    "bindings": [
-      { "name": "CHASKI_FEED", "class_name": "ChaskiFeed" },
-      { "name": "CHASKI_EVENTS", "class_name": "ChaskiEvents" }
-    ]
-  },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ChaskiFeed", "ChaskiEvents"] }],
-  "workflows": [
-    { "name": "chaski-scheduler", "binding": "CHASKI_SCHEDULER", "class_name": "ChaskiScheduler" }
-  ],
-  "r2_buckets": [{ "binding": "CHASKI_ATTACHMENTS", "bucket_name": "chaski-attachments" }],
-  "send_email": [{ "name": "CHASKI_EMAIL" }]
-}
-```
+When the app’s repository is a workspace that hoists packages, point `migrations_dir` at the
+hoisted copy (`../node_modules/chaskijs/migrations`): it has to reach the installed package’s
+migrations folder from `wrangler.jsonc`.
 
-- **`max_retries: 5`** is what Chaski counts on to tell a delivery’s last attempt.
-- **`migrations`** lists only the Durable Object classes you bind; with neither bound, drop it.
-- **`CHASKI_PUBLIC_URL`** is a real absolute URL or absent: a placeholder fails every call. Ask the
-  user for the production URL of the mount; until they know it, leave the var out, since
-  `.dev.vars` sets the local one (step 4).
-- **`migrations_dir`** points from `wrangler.jsonc` to wherever `chaskijs/migrations` installed. A
-  workspace that hoists packages puts it in a parent `node_modules`
-  (`../node_modules/chaskijs/migrations`).
+**Done when** `npx wrangler deploy --dry-run --outdir "${TMPDIR:-/tmp}/chaski-dry-run"` builds in
+the Chaski project, which bundles the Worker and checks the config without deploying or signing
+in, and `git check-ignore .dev.vars` prints the file.
 
-Add a `.gitignore` with `node_modules`, `.wrangler` and `.dev.vars`.
+## 4. Point the local settings at the app
 
-**Done when** `node_modules/chaskijs/dist/worker/index.d.ts` exists, `migrations_dir` reaches a
-folder holding `0000_init.sql`, and `npx wrangler deploy --dry-run --outdir
-"${TMPDIR:-/tmp}/chaski-dry-run"` builds in the Chaski project. That command bundles the Worker
-and checks the config without deploying or signing in.
-
-## 4. Create the local database
-
-Write `.dev.vars` in the Chaski project, which only `wrangler dev` reads and which overrides
-`vars`:
+`.dev.vars` holds what only `wrangler dev` reads. When `init` got `--public-url`, it copied the
+production URL there; make it the app’s local mount, at the port of step 6:
 
 ```sh
-CHASKI_SECRET=<the output of: openssl rand -base64 32>
-CHASKI_ENVIRONMENT=local
-# The app's local port (step 6) and its mount path (step 5).
 CHASKI_PUBLIC_URL=http://localhost:8788/me/notifications
 ```
 
-Then apply Chaski’s migrations to the local database:
+Leave `CHASKI_SECRET` as `init` wrote it. After every Chaski upgrade, the migrations go to the local
+database again; `npx chaskijs upgrade` does it.
 
-```sh
-npx wrangler d1 migrations apply CHASKI_DB --local
-```
-
-Apply them again after every Chaski upgrade, and after `database_id` changes: a new id is a new,
-empty local database.
-
-**Done when** the command lists every file of `node_modules/chaskijs/migrations` as applied, or
-reports nothing left to apply, and `git check-ignore .dev.vars` prints the file.
+**Done when** `.dev.vars` names the local mount, or the app has none yet.
 
 ## 5. Bind the app and mount the user routes
 
@@ -209,7 +140,9 @@ In the app’s project:
    other than `Service<ChaskiEntrypoint>` gets declared over in the app’s own type.
 4. **Check the compatibility date.** Before `2026-04-21`, Chaski’s errors reach the app without
    their `code`. Moving the date changes the runtime’s behavior for the whole app, so ask the user
-   first.
+   first. Move it to the date in the Chaski project’s generated `wrangler.jsonc`, or one no later
+   than the app’s Wrangler’s workerd, never to today’s: `wrangler dev` warns and falls back past
+   it.
 5. **Mount the user routes**, after the app’s session middleware so `identify` can read what it
    set:
 
@@ -238,6 +171,10 @@ In the app’s project:
    - `allowPush: (c, id) => boolean` answers 403 to contacts that may not register a device.
    - An app with no frontend for notifications still mounts it for the email open pixel
      (`GET <mount>/t/o/:id`), with `groups: []` and `identify: () => null`.
+   - An app that puts its routes behind a session or an origin check registers that pixel-only
+     mount, `userRoutes({ chaski, identify: () => null, groups: [] })`, at the same path ahead of
+     those gates: email clients load the pixel without a session, and webmail sends it
+     `Sec-Fetch-Site: cross-site`.
 
    `CHASKI_PUBLIC_URL` in the Chaski project is this mount’s absolute URL: its production URL in
    `vars`, its local one in `.dev.vars`.
@@ -333,25 +270,38 @@ Take the temporary routes out once the checks pass.
 
 ## 7. Go to production
 
-Only when the user asks, and with their yes for each command that touches the account. In the
-Chaski project:
+Only when the user asks. In the Chaski project, signed in to Cloudflare (`npx wrangler whoami`;
+the user runs `npx wrangler login` themselves). First check that `CHASKI_ENVIRONMENT` in `vars`
+names production, and that `CHASKI_PUBLIC_URL` is the production URL of the app’s mount, or
+absent while the user doesn’t know it yet.
+
+Then get the plan. Without a terminal and without `--yes`, `deploy` only reads the account, prints
+what it would do and stops:
 
 ```sh
-npx wrangler d1 create chaski                     # its id replaces database_id
-npx wrangler queues create chaski-deliveries
-npx wrangler queues create chaski-deliveries-dlq
-npx wrangler r2 bucket create chaski-attachments  # only with attachments
-openssl rand -base64 32 | npx wrangler secret put CHASKI_SECRET
-npx wrangler d1 migrations apply CHASKI_DB --remote
-npx wrangler deploy
+npx chaskijs deploy
 ```
 
-Before `deploy`, check that `CHASKI_ENVIRONMENT` in `vars` names production, and that
-`CHASKI_PUBLIC_URL` is the production URL of the app’s mount, or absent while the user doesn’t
-know it yet, which only leaves emails without the open pixel. The Durable Objects and the Workflow are created by the
-deploy. The app deploys its binding after Chaski is up, since a service binding needs its Worker
-to exist; that deploy is the user’s, like any other of the app. The template file then loads into
-production with `--remote` ([sending.md](sending.md)); ask for that too.
+Show the user that list: the resources it creates (database, queues, the bucket with
+attachments), the migrations it applies to the deployed database, and the deploy, which carries a
+new `CHASKI_SECRET` on the Worker’s first deploy. With their yes, and only then:
+
+```sh
+npx chaskijs deploy --yes
+```
+
+It writes the new database’s id into `wrangler.jsonc`, applies the migrations before the code, and
+prints the Worker’s URL. On the first deploy, the secret goes up with the Worker
+(`wrangler deploy --secrets-file`, from a file it writes readable by the user only and deletes), so
+the Worker never runs without one. A Worker that already runs without it gets `secret put` right
+after the deploy. By hand, keep the same order: never run `wrangler secret put` against a Worker
+that hasn’t been deployed. Until the Worker exists, `secret put` creates an empty one under
+that name, and an app deployed then binds to a Worker without `ChaskiEntrypoint`. The local
+database follows `database_id`, so `wrangler dev` starts over on a new one, which the deploy
+migrates. The app deploys its binding after Chaski is up, since a
+service binding needs its Worker to exist; that deploy is the user’s, like any other of the app.
+The template file then loads into production with `--remote` ([sending.md](sending.md)); ask for
+that too.
 
 Then hand the user what is theirs to do:
 
@@ -372,29 +322,39 @@ them through Access and its **Channels** page shows the channels they turned on.
 
 ### More environments
 
-Each other environment of the app, such as `staging`, gets a Chaski of its own, with the user’s
-yes for each command again:
+Each other environment of the app, such as `staging`, gets a Chaski of its own:
 
-- **Resources** under names of their own: `chaski-staging`, `chaski-staging-deliveries`,
-  `chaski-staging-deliveries-dlq`.
-- **An `env.staging` block** in the Chaski project’s `wrangler.jsonc` that repeats every binding
-  and var with that environment’s names, since Wrangler carries neither into an environment. Its
-  Workflow takes a name of its own (`chaski-staging-scheduler`): Workflow names are unique in the
-  account. Wrangler names the Worker `chaski-staging`. https://chaski.sh/docs/environments has the
-  whole block.
-- **`--env staging`** on every command: the secret, the remote migrations and the deploy.
-- **The app’s `env.staging` block** binds `CHASKI` to `chaski-staging`.
-- **Access and channel settings** for that Worker, the user’s again. Settings never move between
-  environments.
+```sh
+npx chaskijs env add staging --public-url https://staging.example.com/me/notifications
+```
+
+It adds `env.staging` to `wrangler.jsonc`, repeating every binding with that environment’s names
+(`chaski-staging`, `chaski-staging-deliveries`, `chaski-staging-scheduler`), since Wrangler carries
+neither bindings nor vars into an environment. Wrangler names its Worker `chaski-staging`. Then, as
+in step 7, show the user the plan of `npx chaskijs deploy --env staging`, and run it with `--yes`
+only on their yes. Its first deploy carries that Worker’s own `CHASKI_SECRET`
+(`wrangler deploy --env staging --secrets-file <file>` by hand); `wrangler secret put --env
+staging` comes only once `chaski-staging` runs, since until the Worker exists, `secret put` creates
+an empty one under its name. The app’s `env.staging` block binds `CHASKI` to `chaski-staging`, and
+Access and the channel settings of that Worker are the user’s again: settings never move between
+environments.
 
 **Done when** each environment’s deploy printed its URL and the app’s matching environment binds to
 it.
 
 ## Upgrade
 
-Update `chaskijs` in the Chaski project, and in the app for its types. Apply the migrations
-locally, then with `--remote` in each environment (with the user’s yes, staging first), and deploy
-each environment after its migrations: Chaski refuses to run against a database that misses one.
+In the Chaski project:
+
+```sh
+npx chaskijs upgrade --tag next   # --tag latest once 0.1.0 is released
+```
+
+It installs that `chaskijs`, has it bring `wrangler.jsonc` and `src/index.ts` up to what the new
+version needs in every environment (it reports each change), applies the migrations locally and
+prints a deploy per environment. Update `chaskijs` in the app too, for its types. Each deploy
+applies the migrations before the code: show the user each plan and deploy with their yes,
+staging first.
 
 **Done when** `env.CHASKI.ready()` answers without an error in every upgraded environment: from
 the app’s health route, or locally from the temporary route of step 6.

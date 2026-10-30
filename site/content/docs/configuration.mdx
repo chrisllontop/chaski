@@ -28,7 +28,7 @@ The names are fixed: Chaski reads each binding by its name.
 | --- | --- | --- |
 | `CHASKI_ENVIRONMENT` | Var | Where the Worker runs, such as `production`, shown in the dashboard’s header and returned by `ready()`. Unrelated to an APNs app’s environment, which picks the APNs server. |
 | `CHASKI_PUBLIC_URL` | Var | The absolute http(s) URL where your app mounts `userRoutes()`. Emails load their open-tracking pixel from it; without it, they carry none. |
-| `CHASKI_SECRET` | Secret | Encrypts the channel credentials saved in the dashboard. Set it with `wrangler secret put CHASKI_SECRET`, at least 32 characters. |
+| `CHASKI_SECRET` | Secret | Encrypts the channel credentials saved in the dashboard. At least 32 characters. `chaskijs deploy` uploads a random one with the Worker’s first deploy (`wrangler deploy --secrets-file`). On a Worker that already runs, set it with `wrangler secret put CHASKI_SECRET`: until the Worker exists, `secret put` creates an empty one under its name. |
 
 `access.dev` in `wrangler.jsonc` is the identity `wrangler dev` signs in to the local dashboard; see
 [Local development](/docs/local-development#run-chaski).
