@@ -18,8 +18,8 @@ const contentSecurityPolicy = (nonce: string) =>
     "object-src 'none'",
   ].join('; ');
 
-// The host picks the mount path in app.route(), so Chaski reads it per request instead of asking
-// for it twice. A parameterized mount resolves to the concrete path.
+// Read per request from where the app is mounted, the Worker's root in production, so the shell
+// and its assets don't depend on the path. A parameterized mount resolves to the concrete path.
 export const mountPath = (c: Context): string => basePath(c).replace(/\/$/, '');
 
 export const relativePath = (c: Context): string => c.req.path.slice(mountPath(c).length);

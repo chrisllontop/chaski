@@ -1,8 +1,6 @@
 import type { AttachmentInput } from '../../contract/contract';
 import { ChaskiError } from '../../contract/errors';
-import type { ErrorContext } from '../config';
 import { parseJson } from '../lib/json';
-import { reportError } from '../lib/report-error';
 import { BaseService } from './base.service';
 
 export type StoredAttachment = {
@@ -35,7 +33,10 @@ export class AttachmentService extends BaseService {
     if (attachments.length === 0) return stored;
     const bucket = AttachmentService.bindings.attachments;
     if (!bucket) {
-      throw new ChaskiError('config', 'email attachments need bindings.attachments (an R2 bucket)');
+      throw new ChaskiError(
+        'config',
+        'email attachments need the CHASKI_ATTACHMENTS binding (an R2 bucket)',
+      );
     }
     for (let i = 0; i < attachments.length; i++) {
       const attachment = attachments[i];
@@ -73,7 +74,7 @@ export class AttachmentService extends BaseService {
    */
   static discard = async (
     stored: StoredAttachment[] | string | null,
-    context: Omit<ErrorContext, 'source'>,
+    context: { deliveryId?: string; scheduledId?: string; channel?: string },
   ): Promise<void> => {
     const keys = (
       typeof stored === 'string' ? parseJson<StoredAttachment[]>(stored, []) : (stored ?? [])
@@ -84,8 +85,10 @@ export class AttachmentService extends BaseService {
     try {
       await bucket.delete(keys);
     } catch (error) {
-      reportError(error, { source: 'attachments', ...context });
-      AttachmentService.log.error('attachments not deleted', error, { keys: keys.length });
+      AttachmentService.log.error('attachments not deleted', error, {
+        ...context,
+        keys: keys.length,
+      });
     }
   };
 

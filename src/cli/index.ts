@@ -5,7 +5,7 @@ import { templatesToSql } from './templates-sql';
 
 const USAGE = `Usage: chaskijs templates sql <file>
 
-Prints the SQL that loads a chaski.templates file the way chaski.templates.import() does, for
+Prints the SQL that loads a chaski.templates file the way templates().import() does, for
 \`wrangler d1 execute <database> --local --file <sql>\`. Apply Chaski's migrations first.`;
 
 const [group, command, path] = process.argv.slice(2);

@@ -1,17 +1,15 @@
 # Chaski
 
-Embeddable notification infrastructure for Cloudflare Workers, dashboard included. A project mounts
-Chaski on a route of its own Worker, and Chaski runs on that project's Cloudflare resources: email,
-web push and in-app notifications, with templates, scheduling, retries and a dashboard. Open source
-(MIT), published on npm as `chaskijs`.
+Notification infrastructure that runs as its own Cloudflare Worker, dashboard included: email, web
+push, APNs, FCM, WNS and in-app notifications, with templates, preferences, scheduled sends, retries
+and realtime events. Each environment of an app gets a Chaski Worker with resources of its own, and
+the app calls it over a service binding. Open source (MIT), published on npm as `chaskijs`.
 
-**Current stage: the engine, the browser clients, the dashboard and the setup guide in the README.**
-`createChaski()` takes the host's config; Chaski sends email, web push, APNs, FCM and in-app
-notifications through the host's queue, with templates, preferences, scheduled sends, retries and
-realtime events. `chaski.routes()` mounts the dashboard and its admin API, and `chaski.userRoutes()`
-the endpoints the host's frontend calls for the signed-in user, which `chaskijs/client`,
-`chaskijs/sw` and `chaskijs/react` wrap for the page, the service worker and React.
-`ChaskiEntrypoint` serves the same in-process API over RPC to the host's other Workers.
+**Current stage: Chaski as its own Worker.** `chaskijs/worker` is the whole Worker. Its URL serves
+the dashboard and its admin API, behind Cloudflare Access. `ChaskiEntrypoint` serves the app over
+RPC (`env.CHASKI.send()`), and its `fetch()` serves the user routes and the open pixel, which the
+app's `userRoutes()` (from `chaskijs`) forwards for the signed-in user. `chaskijs/client`,
+`chaskijs/sw` and `chaskijs/react` wrap those routes for the page, the service worker and React.
 
 ## Guides
 
@@ -35,12 +33,12 @@ in the same change.
 
 - `pnpm i` installs the dependencies (Node 24 and pnpm 12). `devEngines` holds contributors to
   Node 24 without putting that constraint on the people who install `chaskijs`.
-- `pnpm dev` builds the dashboard and runs the fixture host (`test/fixture`) with Wrangler, in
-  the `local` environment, so the dashboard opens without `authorize`; Wrangler keeps every email
-  on disk, under `test/fixture/.wrangler/tmp/email/`. It mounts the dashboard at `/chaski` and
-  `/admin/notifications`, the user routes at `/me/notifications` and a shared inbox at
-  `/me/team-notifications`; there is no hot reload, so rerun it after a dashboard change. Apply
-  the migrations to the local D1 first:
+- `pnpm dev` builds the dashboard and runs the fixture Worker (`test/fixture`) with Wrangler, as
+  `CHASKI_ENVIRONMENT=local`; Wrangler keeps every email on disk, under
+  `test/fixture/.wrangler/tmp/email/`, and signs in the identity under `access.dev` in its
+  wrangler.jsonc, as Cloudflare Access would. The dashboard is at `/`, an app's user routes at
+  `/app/notifications` and a shared inbox at `/app/team-notifications`; there is no hot reload,
+  so rerun it after a dashboard change. Apply the migrations to the local D1 first:
   `pnpm wrangler d1 migrations apply CHASKI_DB --local -c test/fixture/wrangler.jsonc`.
   `curl -X POST localhost:8787/dev/seed` then fills it with sample templates, sends and schedules
   (`test/fixture/seed.ts`), so the dashboard has something to show.
@@ -83,32 +81,39 @@ in the same change.
   dependency; React and the rest of the dashboard stack are dev dependencies, because they ship
   already built inside `dist`. So is `better-drizzle`, which tsdown bundles into `dist` (its peer
   range would make npm install a second `drizzle-orm`); keep it out of `dependencies`.
-- Four entries, one per runtime: `chaskijs` (the Worker), `chaskijs/client` (the page),
-  `chaskijs/sw` (the service worker) and `chaskijs/react` (hooks over the client). React is an
-  optional peer dependency, and no browser entry may import server code. The package also ships
+- Five entries, one per runtime: `chaskijs/worker` (the Chaski Worker), `chaskijs` (what the
+  app's Worker imports: `userRoutes()`, the API's types and `type ChaskiEntrypoint`),
+  `chaskijs/client` (the page), `chaskijs/sw` (the service worker) and `chaskijs/react` (hooks
+  over the client). React is an optional peer dependency. Only `chaskijs/worker` may import the
+  engine; `chaskijs` stays a few kilobytes, and no browser entry may import server code. The package also ships
   a `chaskijs` command for Node (`src/cli`): `chaskijs templates sql <file>` prints the SQL that
   applies a template file the way `templates.import()` does; `test/templates-sql.test.ts` holds
   the two to the same result.
-- `src/contract` is what hosts and clients see: the zod schemas and types of the API, the
+- `src/contract` is what apps and clients see: the zod schemas and types of the API, the
   in-process API's interface, the errors and the template file format.
 - `src/server` is the engine:
-  - `chaski.ts` (`createChaski()`), `api.ts` (the in-process API), `entrypoint.ts`
-    (`ChaskiEntrypoint`, that API over RPC) and `config.ts` (the host's config, validated on every
-    call). A service binding sees methods, never getters, so over RPC the groups are methods:
-    `feed()`, `push()`, `preferences()`, `schedules()`, `templates()`.
-  - `routes/` holds the Hono sub-apps: the dashboard shell and assets, the admin API under `/api`,
-    the open-tracking pixel and the user routes.
+  - `api.ts` (the API), `entrypoint.ts` (`ChaskiEntrypoint`: that API over RPC, plus `fetch()`
+    for the user routes and the pixel) and `config.ts` (the `CHASKI_*` bindings and vars, validated
+    on every call). A service binding sees methods, never getters, so over RPC the groups are
+    methods: `feed()`, `push()`, `preferences()`, `schedules()`, `templates()`.
+  - `routes/` holds the Hono sub-apps: the dashboard shell and assets and the admin API under
+    `/api`, behind the Access guard in `index.ts`, and the open-tracking pixel and the user routes,
+    which only `ChaskiEntrypoint.fetch()` serves. The user routes take the contact from
+    `x-chaski-recipient`, which only the app's `userRoutes()` can set.
   - `services/` holds the business logic (`.agents/services.md`), with one adapter per
     channel in `services/adapters`.
   - `db/` holds the Drizzle schema and the better-drizzle client; `migrations.ts` refuses to run
-    until the host applied every migration.
+    until every migration is applied.
   - `consumer.ts` handles the queue batches, `durable/` holds the `ChaskiFeed` and `ChaskiEvents`
-    Durable Objects and `workflows/` the `ChaskiScheduler` Workflow. The host re-exports all three
-    from its main module, plus `ChaskiEntrypoint` when its other Workers call Chaski.
-  - `auth.ts` defines `Actor`, `Authorize` and the `cloudflareAccess()` and `basicAuth()` helpers.
+    Durable Objects and `workflows/` the `ChaskiScheduler` Workflow.
+  - `auth.ts` keeps the `Actor` Access signed in, per request.
+- `src/worker` is `chaskijs/worker`: the default export (the dashboard's `fetch` and the queue
+  consumer) and the four classes a Chaski project's main module re-exports.
+- `src/app` is the app side: `userRoutes()`, which identifies the signed-in contact with the app's
+  own `identify` and forwards their requests over the service binding.
 - `src/client`, `src/sw` and `src/react` are the browser entries; `src/react` builds its elements
   with `createElement`, so the package ships no JSX.
-- `migrations/` holds the D1 migrations drizzle-kit generates; hosts apply them from
+- `migrations/` holds the D1 migrations drizzle-kit generates; a Chaski project applies them from
   `node_modules/chaskijs/migrations`.
 - `src/dashboard` is the dashboard (Vite root), React with TanStack Router and Query, shadcn
   (new-york, neutral) and lucide, dark and light. `vite.config.ts` embeds its build into
@@ -134,13 +139,14 @@ in the same change.
   `skills/chaski` at `/skill/`, so the setup prompt can point agents at it. The pages hydrate from inline scripts, so `scripts/headers.ts` writes
   each page's Content-Security-Policy, with those scripts by hash, into `_headers` after the build.
   It doesn't ship in the package either.
-- `skills/chaski` is the agent skill hosts install with `npx skills add chrisllontop/chaski`:
+- `skills/chaski` is the agent skill apps install with `npx skills add chrisllontop/chaski`:
   `SKILL.md` routes to `references/` (setup, browser clients, sending, the audit and its plan,
   troubleshooting), and `scripts/find-sends.mjs` lists the sends in a codebase for the audit. It
   quotes the config, the API and Chaski's error messages, so update it with them. It doesn't ship
   in the package.
-- `test/fixture` is a host Worker that mounts Chaski and declares every binding it uses (D1, queue
-  and dead-letter queue, both Durable Objects, the Workflow, R2 and `send_email`); the tests and
+- `test/fixture` is the Chaski Worker with every binding it uses (D1, queue and dead-letter queue,
+  both Durable Objects, the Workflow, R2 and `send_email`), plus an app's `userRoutes()` under
+  `/app/*`, which reach it through the loopback binding `exports.ChaskiEntrypoint`. The tests and
   `pnpm dev` both run it.
 
 ## Code conventions
@@ -155,8 +161,8 @@ generated files (such as `routeTree.gen.ts`) are excluded in `biome.json`.
 - Use `~/` when a dashboard import crosses feature boundaries (`import { Button } from
   '~/components/ui/button'`). Relative imports are fine within one module tree, in
   registry-managed files and from root build or Worker entrypoints.
-- Chaski runs inside the host's Worker and only on the bindings the host declares. Do not assume
-  binding names or reach for resources the host did not hand over.
+- Bindings reach code through `config.bindings`, never the env directly (see
+  `.agents/services.md`), so tests can swap them.
 - Each runtime has its own types: `tsconfig.json` (the Worker side of `src`, Workers types),
   `tsconfig.browser.json` (the browser entries and the contract, DOM types),
   `src/dashboard/tsconfig.json` (DOM and JSX), `test/tsconfig.json` (Workers plus the Vitest
@@ -188,8 +194,10 @@ another module relies on. A comment that repeats the name or the next lines goes
 - **Never wait with sleeps or arbitrary timeouts.** Use the test runner's own waiting, `vi.waitFor`
   or fake timers.
 - Vitest runs three projects. `worker` runs inside workerd with `@cloudflare/vitest-plugin`, against
-  the fixture host through `exports.default.fetch()`: assert status, headers and JSON; the only
-  markup a test reads is the injected `<base href>`. `browser` runs `test/browser` in happy-dom,
+  the fixture Worker through `exports.default.fetch()` and `exports.ChaskiEntrypoint`: assert
+  status, headers and JSON; the only markup a test reads is the injected `<base href>`. A request
+  is signed in through Access only with the `MF-Access-Blob` header `signedIn()` from
+  `test/helpers.ts` builds; `api()` sends it. `browser` runs `test/browser` in happy-dom,
   with a fake network and a fake socket (`test/browser/fakes.ts`) and fake timers for the
   reconnection logic; it also covers the dashboard's `lib/`. `node` runs `test/node` against the
   skill's scripts, on projects it writes to a temporary folder. The dashboard's screens have no

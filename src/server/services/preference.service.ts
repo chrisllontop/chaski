@@ -24,7 +24,7 @@ export class PreferenceService extends BaseService {
     };
   };
 
-  // The host's default mutes hold until the recipient saves preferences of
+  // The default mutes hold until the recipient saves preferences of
   // their own, which then stand on their own instead of merging with them.
   private static defaults = (): ChaskiPreferences => ({
     channels: {},

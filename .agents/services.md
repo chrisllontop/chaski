@@ -1,10 +1,10 @@
 ## Services
 
-Business logic lives in services under `src/server/services/`, not in route handlers. Route handlers stay thin: parse and validate input, call a service, and shape the HTTP response. The in-process API (`createChaski()`) calls the same services.
+Business logic lives in services under `src/server/services/`, not in route handlers. Route handlers stay thin: parse and validate input, call a service, and shape the HTTP response. The API `ChaskiEntrypoint` serves (`src/server/api.ts`) calls the same services.
 
 - Services extend `BaseService` (`src/server/services/base.service.ts`).
 - All service methods are **static**: `TemplateService.get(id)`. No instance plumbing, no `db`, config or env passed as arguments. Never add singletons, `instance` getters, or constructors to a service.
-- `BaseService` exposes static getters: `config` (the host's resolved config), `bindings` (its D1, queue, Durable Object and Workflow bindings), `client` (better-drizzle), `db` (raw Drizzle) and `log`.
+- `BaseService` exposes static getters: `config` (the resolved config), `bindings` (the Worker's D1, queue, Durable Object and Workflow bindings), `client` (better-drizzle), `db` (raw Drizzle) and `log`.
 - Only declare a local `const client = SomeService.client` when the function uses it more than once; for a single call, inline directly.
 - One service per domain concept. Keep cross-cutting helpers in `src/server/lib/`.
 
@@ -17,15 +17,15 @@ export class TemplateService extends BaseService {
 }
 ```
 
-## The host owns the bindings
+## Bindings come through the config
 
-Chaski runs inside the host's Worker. Bindings and secrets arrive through the config function given to `createChaski()`, evaluated on every call. Never read a binding by a fixed name, and never assume one the host did not hand over.
+Chaski is its own Worker, and its wrangler.jsonc names every binding `CHASKI_*`. `src/server/config.ts` alone reads them from the env, into `config.bindings`, evaluated on every call; services go through `Service.bindings` and never read the env themselves, so a test can swap a binding. A binding may be missing: name it as wrangler.jsonc does (`bindingName()`) in the error.
 
 ## Persistence
 
-The database is **better-drizzle + Drizzle ORM + the host's Cloudflare D1**:
+The database is **better-drizzle + Drizzle ORM + the Worker's Cloudflare D1** (`CHASKI_DB`):
 
-- Any **schema or data-model change** ships a **generated migration** under `migrations/` (`drizzle-kit generate --name <name>`), and its file name goes into `MIGRATIONS` in `src/server/migrations.ts`. Hosts apply the files with `wrangler d1 migrations apply`; Chaski refuses to run until every listed migration is applied.
+- Any **schema or data-model change** ships a **generated migration** under `migrations/` (`drizzle-kit generate --name <name>`), and its file name goes into `MIGRATIONS` in `src/server/migrations.ts`. They go in with `wrangler d1 migrations apply`; Chaski refuses to run until every listed migration is applied.
 - Use `SomeService.client` for ordinary reads/writes (`findMany`, `create`, `update`, `paginate`, `include`, `upsertMany`, `transaction`). Timestamps and soft delete are handled by plugins in `src/server/db/plugins/`.
 - **When the client API is not enough:** use the raw Drizzle handle exposed by `BaseService.db` only for D1 `batch()`, conditional writes whose `meta.changes` is part of correctness, SQL aggregation, or an explicit retention/repair hard delete. Keep raw operations local and documented because they bypass Better Drizzle plugins.
 - **Soft delete:** use `better-drizzle/soft-delete` only on recoverable business tables carrying nullable `deletedAt` (templates). Ordinary reads exclude tombstones; audit/recovery paths opt in with `deleted: 'with'` or `deleted: 'only'`; `delete()` is logical by default; and `mode: 'hard'` is restricted to explicit retention/repair purge paths. Device tokens, delivery rows and other operational data stay on hard deletion or their domain-specific terminal state.

@@ -4,7 +4,7 @@ import { createPreferencesClient, type PreferencesClient } from './preferences';
 import { createPushClient, type PushClient, type PushOptions } from './push';
 
 export type ChaskiClientOptions = {
-  /** Where the host mounted chaski.userRoutes(), e.g. `/me/notifications` or a full URL. */
+  /** Where the app mounted userRoutes(), e.g. `/me/notifications` or a full URL. */
   baseUrl: string;
   /**
    * Used instead of the global fetch; a frontend on another origin passes one with
@@ -21,7 +21,7 @@ export type ChaskiClient = {
   preferences: PreferencesClient;
 };
 
-/** The browser side of chaski.userRoutes(): the signed-in user's feed, push and preferences. */
+/** The browser side of userRoutes(): the signed-in user's feed, push and preferences. */
 export const createChaskiClient = (options: ChaskiClientOptions): ChaskiClient => {
   const baseUrl = options.baseUrl.replace(/\/+$/, '');
   // Bound late, so a global fetch stubbed after this call (by a test, say) still applies.

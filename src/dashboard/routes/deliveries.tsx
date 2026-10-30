@@ -181,7 +181,6 @@ const Timeline = ({ steps }: { steps: Step[] }) => (
 
 // What can happen to a held delivery: sent once its channel runs, or discarded.
 type HeldActions = {
-  canAct: boolean;
   isPaused: (channel: Channel) => boolean;
   onSend: (delivery: Delivery) => void;
   onDiscard: (delivery: Delivery) => void;
@@ -285,7 +284,7 @@ const DeliverySheet = ({
             </Button>
           </SheetFooter>
         ) : null}
-        {delivery?.status === 'held' && held.canAct ? (
+        {delivery?.status === 'held' ? (
           <SheetFooter className="border-t">
             {held.isPaused(delivery.channel) ? (
               <p className="text-muted-foreground text-xs">
@@ -378,7 +377,6 @@ export const DeliveriesPage = () => {
   const all = Object.values(byStatus).reduce((sum, n) => sum + n, 0);
   const dead = unfiltered.data?.counts.dead ?? 0;
   const heldTotal = heldCounts.data?.counts.held ?? 0;
-  const canAct = channels.data?.canPause ?? false;
   const isPaused = (key: Channel) =>
     channels.data?.channels.some((c) => c.channel === key && c.paused !== null) ?? false;
 
@@ -403,7 +401,6 @@ export const DeliveriesPage = () => {
     },
   });
   const held: HeldActions = {
-    canAct,
     isPaused,
     onSend: setSending,
     onDiscard: setDiscarding,
@@ -424,7 +421,7 @@ export const DeliveriesPage = () => {
           description="One row per notification and channel, latest change first"
           actions={
             <>
-              {canAct && heldTotal > 0 ? (
+              {heldTotal > 0 ? (
                 <>
                   <Button variant="outline" size="sm" onClick={() => setBulk('discard')}>
                     <Trash2 /> Discard {formatNumber(heldTotal)} held
@@ -606,7 +603,7 @@ export const DeliveriesPage = () => {
                             Replay delivery
                           </DropdownMenuItem>
                         ) : null}
-                        {delivery.status === 'held' && canAct ? (
+                        {delivery.status === 'held' ? (
                           <>
                             <DropdownMenuItem
                               disabled={isPaused(delivery.channel)}

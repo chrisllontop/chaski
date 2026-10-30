@@ -3,7 +3,7 @@ import { channelSchema, typeNameSchema } from './contract';
 import { htmlEntities, isPlainTextField } from './html-entities';
 
 // The file that carries templates from a repository, or from another
-// environment, into Chaski through chaski.templates.import(). Templates are
+// environment, into Chaski through templates().import(). Templates are
 // keyed by type, so loading the same file twice changes nothing; format and
 // version let a later Chaski read an older file and refuse one it does not know.
 export const TEMPLATE_FILE_FORMAT = 'chaski.templates';

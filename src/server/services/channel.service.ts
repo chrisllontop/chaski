@@ -12,7 +12,7 @@ export type ChannelPause = { pausedBy: Actor; pausedAt: string };
 export class ChannelService extends BaseService {
   protected static override name = 'channels';
 
-  /** The channels the host configured, without a single secret, and which of them are paused. */
+  /** The channels the config turns on, without a single secret, and which of them are paused. */
   static overview = async () => {
     const { channels, environment, bindings } = ChannelService.config;
     const { email, push } = channels;

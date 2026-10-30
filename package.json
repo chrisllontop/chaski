@@ -1,7 +1,7 @@
 {
   "name": "chaskijs",
   "version": "0.1.0",
-  "description": "Embeddable notification infrastructure for Cloudflare Workers, dashboard included.",
+  "description": "Notification infrastructure that runs as its own Cloudflare Worker, dashboard included.",
   "keywords": [
     "cloudflare-workers",
     "notifications",
@@ -31,6 +31,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./worker": {
+      "types": "./dist/worker/index.d.ts",
+      "import": "./dist/worker.js"
     },
     "./client": {
       "types": "./dist/client/index.d.ts",
@@ -74,7 +78,7 @@
     }
   },
   "scripts": {
-    "dev": "pnpm build:dashboard && wrangler dev -c test/fixture/wrangler.jsonc --var ENVIRONMENT:local",
+    "dev": "pnpm build:dashboard && wrangler dev -c test/fixture/wrangler.jsonc --var CHASKI_ENVIRONMENT:local",
     "build:dashboard": "vite build",
     "build:types": "tsc -p tsconfig.json --noEmit false --declaration --emitDeclarationOnly --outDir dist --rootDir src && tsc -p tsconfig.browser.json --noEmit false --declaration --emitDeclarationOnly --outDir dist --rootDir src && node scripts/fix-declaration-imports.ts dist",
     "build": "pnpm build:dashboard && tsdown && pnpm build:types",

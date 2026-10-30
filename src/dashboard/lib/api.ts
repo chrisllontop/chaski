@@ -1,5 +1,5 @@
-// The dashboard is served from wherever the host mounts Chaski, and the server
-// writes that path into <base href>, so every request resolves against it.
+// The server writes the dashboard's path into <base href>, so every request
+// resolves against it.
 const endpoint = (path: string) => new URL(`api/${path}`, document.baseURI).toString();
 
 export class ApiError extends Error {

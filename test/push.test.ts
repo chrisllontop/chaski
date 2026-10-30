@@ -1,12 +1,13 @@
 import { env, exports } from 'cloudflare:workers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { PushConfig } from '../src';
+import { api as chaski } from '../src/server/api';
+import type { PushConfig } from '../src/server/config';
 import { validateConfig } from '../src/server/config';
 import { getClient } from '../src/server/db';
 import { decodeBase64Url, encodeBase64Url } from '../src/server/lib/base64';
 import { NotificationService } from '../src/server/services/notification.service';
 import { ScheduleService } from '../src/server/services/schedule.service';
-import { chaski, fixtureConfig } from './fixture/worker';
+import { fixtureConfig } from './fixture/worker';
 import { processDeliveries, recipient, seedTemplate, useConfig } from './helpers';
 
 const generateP256 = async () =>
@@ -159,9 +160,9 @@ const stubFetch = (
   return calls;
 };
 
-const usePush = (push: PushConfig, overrides = {}) => {
+const usePush = (push: PushConfig) => {
   const config = fixtureConfig(env);
-  useConfig({ channels: { ...config.channels, push }, ...overrides });
+  useConfig({ channels: { ...config.channels, push } });
 };
 
 const sendPush = async (
@@ -450,8 +451,8 @@ describe('APNs', () => {
   });
 
   it('reports and forgets a token Apple refuses in its environment', async () => {
-    const onError = vi.fn();
-    usePush({ apns }, { onError });
+    const warn = vi.spyOn(console, 'warn');
+    usePush({ apns });
     await chaski.push.register({ recipient: recipient(), platform: 'ios', deviceToken: IOS_TOKEN });
     stubFetch(() => Response.json({ reason: 'BadDeviceToken' }, { status: 400 }));
 
@@ -461,10 +462,10 @@ describe('APNs', () => {
     expect(delivery?.lastError).toMatch(
       /^every device of the recipient was dropped: APNs refused the ios device dt_\w+ in sandbox \(BadDeviceToken\)/,
     );
-    expect(onError).toHaveBeenCalledWith(
-      expect.objectContaining({ message: expect.stringContaining("environment: 'sandbox'") }),
-      expect.objectContaining({ source: 'queue', channel: 'push', deliveryId: delivery?.id }),
-    );
+    expect(warn).toHaveBeenCalledWith('[chaski:push]', 'device refused', {
+      deliveryId: delivery?.id,
+      refusal: expect.stringContaining("environment: 'sandbox'"),
+    });
     expect(await devices()).toEqual([]);
   });
 });
@@ -512,8 +513,7 @@ describe('APNs for macOS', () => {
   });
 
   it('reports a token of another app and still delivers to the rest', async () => {
-    const onError = vi.fn();
-    usePush({ apns: { ...apns, macos } }, { onError });
+    const warn = vi.spyOn(console, 'warn');
     await chaski.push.register({ recipient: recipient(), platform: 'ios', deviceToken: IOS_TOKEN });
     await chaski.push.register({
       recipient: recipient(),
@@ -527,14 +527,12 @@ describe('APNs for macOS', () => {
     );
 
     expect(await sendPush()).toMatchObject({ status: 'sent', providerMessageId: 'push:1/2' });
-    expect(onError).toHaveBeenCalledWith(
-      expect.objectContaining({
-        message: expect.stringContaining(
-          'for com.host.desktop (DeviceTokenNotForTopic): the token belongs to another app',
-        ),
-      }),
-      expect.objectContaining({ source: 'queue', channel: 'push' }),
-    );
+    expect(warn).toHaveBeenCalledWith('[chaski:push]', 'device refused', {
+      deliveryId: expect.any(String),
+      refusal: expect.stringContaining(
+        'for com.host.desktop (DeviceTokenNotForTopic): the token belongs to another app',
+      ),
+    });
     expect(await devices()).toEqual([expect.objectContaining({ platform: 'ios' })]);
   });
 
@@ -768,7 +766,7 @@ describe('devices whose app holds the feed open', () => {
 
   const openFeed = async (query = '') => {
     const response = await exports.default.fetch(
-      `https://host.test/me/notifications/feed/socket${query}`,
+      `https://app.test/app/notifications/feed/socket${query}`,
       { headers: { upgrade: 'websocket', 'x-fixture-user': 'user_1' } },
     );
     const socket = response.webSocket;
@@ -835,7 +833,7 @@ describe('devices whose app holds the feed open', () => {
 
   it('refuses a socket that names something other than a device id', async () => {
     const response = await exports.default.fetch(
-      'https://host.test/me/notifications/feed/socket?device=everything',
+      'https://app.test/app/notifications/feed/socket?device=everything',
       { headers: { upgrade: 'websocket', 'x-fixture-user': 'user_1' } },
     );
 

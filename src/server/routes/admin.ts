@@ -2,7 +2,7 @@ import { type Context, Hono } from 'hono';
 import { z } from 'zod';
 import { channelSchema, OFFSET_TIMESTAMP_REGEX } from '../../contract/contract';
 import { ChaskiError, isChaskiError } from '../../contract/errors';
-import { type Actor, actorOf, mayPauseChannels } from '../auth';
+import { type Actor, actorOf } from '../auth';
 import { DELIVERY_STATUS } from '../db/schema';
 import { eventsStub } from '../durable/events';
 import { logger } from '../lib/log';
@@ -96,8 +96,8 @@ export const admin = new Hono();
 
 const log = logger('admin');
 
-// Every change made through the dashboard is logged under the actor that
-// authorize let in.
+// Every change made through the dashboard is logged under the actor Access
+// signed in.
 // Previews change nothing, and the editor asks for one on every edit.
 const READ_ONLY_POSTS = /\/preview(\/document)?$/;
 
@@ -237,7 +237,10 @@ admin.post('/templates/:id/test-send', async (c) => {
 admin.get('/events', async (c) => {
   const events = eventsStub();
   if (!events) {
-    throw new ChaskiError('not_found', 'realtime events are off: bindings.events is missing');
+    throw new ChaskiError(
+      'not_found',
+      'realtime events are off: the CHASKI_EVENTS binding is missing',
+    );
   }
   if (c.req.header('upgrade')?.toLowerCase() !== 'websocket') {
     return c.json({ error: 'upgrade_required', message: 'expected a WebSocket upgrade' }, 426);
@@ -245,30 +248,23 @@ admin.get('/events', async (c) => {
   return events.fetch(c.req.raw);
 });
 
-// Pausing stops password resets along with everything else, so it takes the host's own say-so.
-const pauser = async (c: Context): Promise<Actor> => {
+// The Access guard sets the actor before any admin route runs; a pause is recorded under it.
+const signedIn = (c: Context): Actor => {
   const actor = actorOf(c);
-  if (!actor || !(await mayPauseChannels(c))) {
-    throw new ChaskiError(
-      'forbidden',
-      'pausing channels and handling held deliveries needs canPauseChannels to allow you',
-    );
-  }
+  if (!actor) throw new ChaskiError('forbidden', 'sign in through Cloudflare Access first');
   return actor;
 };
 
-admin.get('/channels', async (c) =>
-  c.json({ ...(await ChannelService.overview()), canPause: await mayPauseChannels(c) }),
-);
+admin.get('/channels', async (c) => c.json(await ChannelService.overview()));
 
 admin.post('/channels/:channel/pause', async (c) => {
-  const actor = await pauser(c);
+  const actor = signedIn(c);
   await ChannelService.pause(parseInput(channelSchema, c.req.param('channel')), actor);
   return c.json({ paused: true });
 });
 
 admin.post('/channels/:channel/resume', async (c) => {
-  const actor = await pauser(c);
+  const actor = signedIn(c);
   const { send } = parseInput(resumeSchema, await c.req.json());
   return c.json(
     await ChannelService.resume(parseInput(channelSchema, c.req.param('channel')), actor, {
@@ -296,19 +292,15 @@ admin.get('/deliveries/counts', async (c) => {
 
 admin.post('/deliveries/replay-dead', async (c) => c.json(await DeliveryAdminService.replayDead()));
 
-admin.post('/deliveries/held/send', async (c) => {
-  await pauser(c);
-  return c.json(
-    await DeliveryAdminService.sendHeld(parseInput(heldSelectionSchema, await c.req.json())),
-  );
-});
+admin.post('/deliveries/held/send', async (c) =>
+  c.json(await DeliveryAdminService.sendHeld(parseInput(heldSelectionSchema, await c.req.json()))),
+);
 
-admin.post('/deliveries/held/discard', async (c) => {
-  await pauser(c);
-  return c.json(
+admin.post('/deliveries/held/discard', async (c) =>
+  c.json(
     await DeliveryAdminService.discardHeld(parseInput(heldSelectionSchema, await c.req.json())),
-  );
-});
+  ),
+);
 
 admin.get('/deliveries/:id', async (c) =>
   c.json({ delivery: await DeliveryAdminService.get(c.req.param('id')) }),

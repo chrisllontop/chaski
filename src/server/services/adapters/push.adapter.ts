@@ -19,7 +19,6 @@ import {
 } from '../../lib/fcm';
 import { parseJson } from '../../lib/json';
 import { renderTemplate } from '../../lib/render';
-import { reportError } from '../../lib/report-error';
 import { encryptPushPayload, MAX_PAYLOAD_BYTES, vapidAuthorization } from '../../lib/web-push';
 import {
   buildToast,
@@ -346,12 +345,6 @@ export class PushAdapter extends BaseService {
     });
     for (const refusal of refusals) {
       PushAdapter.log.warn('device refused', { deliveryId: ctx.delivery.id, refusal });
-      reportError(new Error(refusal), {
-        source: 'queue',
-        deliveryId: ctx.delivery.id,
-        notificationId: notification.id,
-        channel: 'push',
-      });
     }
     const droppedIds = devices
       .filter((_, i) => outcome(i) !== null && outcome(i) !== 'delivered')

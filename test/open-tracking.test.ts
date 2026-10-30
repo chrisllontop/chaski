@@ -66,13 +66,14 @@ describe('DeliveryService.markOpened', () => {
   });
 });
 
+// The fixture mounts the app's userRoutes() at /app/notifications, as CHASKI_PUBLIC_URL says.
 describe('GET /t/o/:deliveryId', () => {
-  it('answers the pixel without credentials and records the open', async () => {
+  it('answers the pixel through the app without a session and records the open', async () => {
     const deliveryId = await createEmailDelivery('sent');
 
-    const response = await exports.default.fetch(`https://host.test/chaski/t/o/${deliveryId}`, {
-      headers: { 'x-fixture-authorize': 'deny' },
-    });
+    const response = await exports.default.fetch(
+      `https://app.test/app/notifications/t/o/${deliveryId}`,
+    );
 
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toBe('image/gif');
@@ -81,7 +82,9 @@ describe('GET /t/o/:deliveryId', () => {
   });
 
   it('answers the pixel for an unknown delivery too', async () => {
-    const response = await exports.default.fetch('https://host.test/chaski/t/o/d_missing');
+    const response = await exports.default.fetch(
+      'https://app.test/app/notifications/t/o/d_missing',
+    );
 
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toBe('image/gif');

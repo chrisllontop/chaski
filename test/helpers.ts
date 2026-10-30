@@ -1,14 +1,10 @@
 import { env, exports } from 'cloudflare:workers';
 import { vi } from 'vitest';
-import {
-  type ChaskiConfig,
-  createChaski,
-  type DeliveryMessage,
-  type SendEmailBinding,
-} from '../src';
 import type { Channel } from '../src/contract/contract';
+import { type ChaskiConfig, setConfigure } from '../src/server/config';
 import { getClient } from '../src/server/db';
 import { DeliveryService } from '../src/server/services/delivery.service';
+import type { DeliveryMessage, SendEmailBinding } from '../src/worker';
 import { fixtureConfig } from './fixture/worker';
 
 // A bare template row (no channel content): enough for a type to pass ingest
@@ -38,14 +34,23 @@ export const seedTemplate = async (type: string, channel: Channel) => {
 
 export const recipient = (id = 'user_1') => ({ id, email: 'ana@example.com', name: 'Ana' });
 
-// Admin API requests go through the fixture host, so they cross the same mount,
-// guard and error handler a real host uses.
+export const CHASKI_URL = 'https://chaski.test';
+
+// The fixture's wrangler.jsonc has access.dev, so Miniflare reads ctx.access from this header the
+// way Cloudflare Access fills it; a request without it reaches the Worker as one Access never saw.
+export const signedIn = (identity: Record<string, unknown> = { email: 'admin@chaski.test' }) => ({
+  'MF-Access-Blob': JSON.stringify({ app_aud: 'chaski-fixture', jwt_claims: identity }),
+});
+
+// Admin API requests go through the fixture Worker, so they cross the same guard and error
+// handler as the deployed Worker.
 export const api = (path: string, init: RequestInit = {}) =>
-  exports.default.fetch(`https://host.test/chaski/api${path}`, {
+  exports.default.fetch(`${CHASKI_URL}/api${path}`, {
     ...init,
     headers: {
       'content-type': 'application/json',
-      origin: 'https://host.test',
+      origin: CHASKI_URL,
+      ...signedIn(),
       ...init.headers,
     },
   });
@@ -60,7 +65,6 @@ export const processDeliveries = async (notificationId: string): Promise<void> =
   for (const delivery of deliveries) {
     if (delivery.status !== 'pending') continue;
     await DeliveryService.process({
-      kind: 'chaski.delivery',
       deliveryId: delivery.id,
       notificationId,
       channel: delivery.channel,
@@ -76,10 +80,10 @@ export const queuedMessages = (): DeliveryMessage[] =>
     .mocked(env.CHASKI_QUEUE.sendBatch)
     .mock.calls.flatMap(([messages]) => [...messages].map((message) => message.body));
 
-// Registers Chaski again with the fixture's config plus the overrides; the
-// fixture Worker shares this isolate, so its routes and queue see it too.
+// The fixture's config plus the overrides; the fixture Worker shares this isolate, so its routes,
+// its queue and ChaskiEntrypoint see it too.
 export const useConfig = (overrides: Partial<ChaskiConfig> = {}) =>
-  createChaski(() => ({ ...fixtureConfig(env), ...overrides }));
+  setConfigure(() => ({ ...fixtureConfig(env), ...overrides }));
 
 export type SentEmail = Parameters<SendEmailBinding['send']>[0];
 

@@ -32,7 +32,7 @@ export class ScheduleService extends BaseService {
     if (!scheduler) {
       throw new ChaskiError(
         'config',
-        'Chaski config: bindings.scheduler is missing; chaski.schedule() needs the ChaskiScheduler Workflow',
+        'Chaski config: the CHASKI_SCHEDULER binding is missing; schedule() needs the ChaskiScheduler Workflow',
       );
     }
     return scheduler;
@@ -227,7 +227,7 @@ export class ScheduleService extends BaseService {
     return { scheduledAtMs, due: scheduledAtMs <= Date.now() };
   };
 
-  /** Sends a due schedule through the same path as chaski.send(), then retires it. */
+  /** Sends a due schedule through the same path as send(), then retires it. */
   static fire = async (scheduledId: string): Promise<void> => {
     const row = await ScheduleService.load(scheduledId);
     if (row?.status !== 'pending') return;

@@ -6,8 +6,7 @@ import { resolveConfig } from '../config';
 // each running aggregate SQL on D1: invalidations inside this window merge.
 const FLUSH_WINDOW_MS = 2_000;
 
-// One instance serves every dashboard session; null when the host left
-// realtime events out.
+// One instance serves every dashboard session; null without the CHASKI_EVENTS binding.
 export const eventsStub = () => {
   const namespace = resolveConfig().bindings.events;
   return namespace ? namespace.get(namespace.idFromName('chaski')) : null;
@@ -77,8 +76,8 @@ export class ChaskiEvents extends DurableObject<unknown> {
     ws.close(1003, 'unsupported message');
   }
 
-  // See ChaskiFeed: hosts on compatibility dates before 2026-04-07 must
-  // reciprocate the close frame themselves.
+  // See ChaskiFeed: on compatibility dates before 2026-04-07 the Worker must
+  // reciprocate the close frame itself.
   override webSocketClose(ws: WebSocket): void {
     ws.close();
   }

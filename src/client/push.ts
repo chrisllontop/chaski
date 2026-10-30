@@ -3,7 +3,7 @@ import type { FeedDeviceLink } from './feed';
 import type { Request } from './http';
 
 export type PushOptions = {
-  /** Where the host serves its service worker. Defaults to `/sw.js`. */
+  /** Where the app serves its service worker. Defaults to `/sw.js`. */
   serviceWorkerPath?: string;
   /** The scope it registers under. Defaults to `/`. */
   serviceWorkerScope?: string;

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { api as chaski } from '../src/server/api';
 import { getClient } from '../src/server/db';
-import { chaski } from './fixture/worker';
 import { api, processDeliveries, recipient, seedTemplate, stubEmail } from './helpers';
 
 const UNCLOSED = '<p>Hi {{ recipient.</p>';

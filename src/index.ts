@@ -1,4 +1,10 @@
-export type { AdminEventTopic, AdminSocketEvent } from './contract/admin-events';
+export {
+  type ChaskiService,
+  type Identify,
+  type UserRouteGroup,
+  type UserRoutesOptions,
+  userRoutes,
+} from './app/user-routes';
 export type {
   ChaskiApi,
   ChaskiFeedApi,
@@ -49,37 +55,5 @@ export type {
   TemplateImportResult,
   TemplateRecord,
 } from './contract/template-file';
-export {
-  type Actor,
-  type Authorize,
-  basicAuth,
-  type CanPauseChannels,
-  cloudflareAccess,
-} from './server/auth';
-export { type Chaski, createChaski } from './server/chaski';
-export type {
-  ApnsAppConfig,
-  ApnsConfig,
-  ChaskiBindings,
-  ChaskiConfig,
-  EmailConfig,
-  ErrorContext,
-  ErrorSource,
-  FcmConfig,
-  InAppConfig,
-  PushConfig,
-  VapidConfig,
-  WnsConfig,
-} from './server/config';
-export { ChaskiEvents } from './server/durable/events';
-export { ChaskiFeed } from './server/durable/feed';
-export { ChaskiEntrypoint } from './server/entrypoint';
-export type { RoutesOptions } from './server/routes';
-export type { Identify, UserRouteGroup, UserRoutesOptions } from './server/routes/user';
-export type {
-  DeliveryMessage,
-  EmailAttachment,
-  ScheduleParams,
-  SendEmailBinding,
-} from './server/types';
-export { ChaskiScheduler } from './server/workflows/scheduler';
+// Type only: the app binds to the class, and its code stays in the Chaski Worker.
+export type { ChaskiEntrypoint } from './server/entrypoint';

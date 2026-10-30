@@ -31,7 +31,7 @@ const PERMANENT_SEND_ERRORS = new Set([
 export class EmailSenderService extends BaseService {
   protected static override name = 'email';
 
-  // Mail only leaves through the host's send_email binding.
+  // Mail only leaves through the CHASKI_EMAIL send_email binding.
   static send = async (
     message: Parameters<SendEmailBinding['send']>[0],
   ): Promise<{ messageId?: string }> => {

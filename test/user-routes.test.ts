@@ -1,16 +1,17 @@
 import { exports } from 'cloudflare:workers';
 import { Hono } from 'hono';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { FeedPage, FeedSocketEvent } from '../src';
+import { type FeedPage, type FeedSocketEvent, userRoutes } from '../src';
+import { RECIPIENT_HEADER } from '../src/contract/api';
+import { api as chaski } from '../src/server/api';
 import { getClient } from '../src/server/db';
-import { chaski } from './fixture/worker';
 import { processDeliveries, recipient, seedTemplate, seedTemplateType } from './helpers';
 
-const ORIGIN = 'https://host.test';
+const ORIGIN = 'https://app.test';
 
 const me = (path: string, init: RequestInit & { user?: string | null } = {}) => {
   const { user = 'user_1', ...rest } = init;
-  return exports.default.fetch(`${ORIGIN}/me/notifications${path}`, {
+  return exports.default.fetch(`${ORIGIN}/app/notifications${path}`, {
     ...rest,
     headers: {
       'content-type': 'application/json',
@@ -51,7 +52,28 @@ describe('identify', () => {
     expect(await response.json()).toEqual({ error: 'unauthorized', message: 'not signed in' });
   });
 
-  it('refuses a write from a foreign origin and accepts the frontend the host lists', async () => {
+  // Chaski takes the contact from this header, so the app sends its own and never the browser's.
+  it('never forwards a contact the browser names', async () => {
+    await seedTemplate('payment_received', 'in_app');
+    await sendInApp('user_2');
+
+    const signedIn = await me('/feed/unread-count', { headers: { [RECIPIENT_HEADER]: 'user_2' } });
+    const anonymous = await me('/feed/unread-count', {
+      user: null,
+      headers: { [RECIPIENT_HEADER]: 'user_2' },
+    });
+
+    expect(await json(signedIn)).toEqual({ unread: 0 });
+    expect(anonymous.status).toBe(401);
+  });
+
+  it('answers 401 over the binding to a request that names nobody', async () => {
+    const response = await exports.ChaskiEntrypoint.fetch('https://chaski/feed/unread-count');
+
+    expect(response.status).toBe(401);
+  });
+
+  it('refuses a write from a foreign origin and accepts the frontend the app lists', async () => {
     const foreign = await me('/feed/read', {
       method: 'POST',
       body: '{}',
@@ -60,7 +82,7 @@ describe('identify', () => {
     const frontend = await me('/feed/read', {
       method: 'POST',
       body: '{}',
-      headers: { origin: 'https://frontend.host.test' },
+      headers: { origin: 'https://frontend.app.test' },
     });
 
     expect(foreign.status).toBe(403);
@@ -252,7 +274,7 @@ describe('preferences', () => {
 });
 
 describe('routes', () => {
-  it('leaves a path it does not serve to the host, without asking identify', async () => {
+  it('leaves a path it does not serve to the app, without asking identify', async () => {
     const response = await me('/whatever', { user: null });
 
     expect(response.status).toBe(404);
@@ -262,7 +284,7 @@ describe('routes', () => {
 
 describe('a second mount for a shared inbox', () => {
   const team = (path: string, init: RequestInit = {}) =>
-    exports.default.fetch(`${ORIGIN}/me/team-notifications${path}`, {
+    exports.default.fetch(`${ORIGIN}/app/team-notifications${path}`, {
       ...init,
       headers: {
         'content-type': 'application/json',
@@ -328,15 +350,16 @@ describe('a second mount for a shared inbox', () => {
 });
 
 describe('allowPush', () => {
-  const host = new Hono().route(
+  const app = new Hono().route(
     '/me',
-    chaski.userRoutes({
+    userRoutes({
+      chaski: () => exports.ChaskiEntrypoint,
       identify: (c) => c.req.header('x-user') ?? null,
       allowPush: (_c, recipientId) => !recipientId.startsWith('guest'),
     }),
   );
   const call = (user: string, method: string) =>
-    host.request('/me/push/subscriptions', {
+    app.request('/me/push/subscriptions', {
       method,
       headers: { 'x-user': user, 'content-type': 'application/json' },
       body: JSON.stringify(method === 'POST' ? SUBSCRIPTION : { endpoint: SUBSCRIPTION.endpoint }),
@@ -357,11 +380,20 @@ describe('allowPush', () => {
 });
 
 // A mount must not answer for paths it doesn't serve, so mounts nested under its path work in
-// whichever order the host registers them, and its identify doesn't run for them.
+// whichever order the app registers them, and its identify doesn't run for them.
 describe('nested mounts', () => {
   const personal = () =>
-    chaski.userRoutes({ identify: (c) => c.req.header('x-user') ?? null, groups: ['feed'] });
-  const team = () => chaski.userRoutes({ identify: () => 'team:shared', groups: ['feed'] });
+    userRoutes({
+      chaski: () => exports.ChaskiEntrypoint,
+      identify: (c) => c.req.header('x-user') ?? null,
+      groups: ['feed'],
+    });
+  const team = () =>
+    userRoutes({
+      chaski: () => exports.ChaskiEntrypoint,
+      identify: () => 'team:shared',
+      groups: ['feed'],
+    });
 
   it.each([
     [
@@ -375,16 +407,16 @@ describe('nested mounts', () => {
   ])('answers both with %s', async (_, build) => {
     await seedTemplate('payment_received', 'in_app');
     await sendInApp('team:shared');
-    const host = build();
+    const app = build();
 
-    const teamCount = await host.request('/inbox/team/feed/unread-count');
-    const personalCount = await host.request('/inbox/feed/unread-count', {
+    const teamCount = await app.request('/inbox/team/feed/unread-count');
+    const personalCount = await app.request('/inbox/feed/unread-count', {
       headers: { 'x-user': 'user_1' },
     });
 
     expect(teamCount.status).toBe(200);
     expect(await teamCount.json()).toEqual({ unread: 1 });
     expect(await personalCount.json()).toEqual({ unread: 0 });
-    expect((await host.request('/inbox/elsewhere')).status).toBe(404);
+    expect((await app.request('/inbox/elsewhere')).status).toBe(404);
   });
 });

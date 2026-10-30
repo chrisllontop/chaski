@@ -6,7 +6,8 @@ import { resolveConfig } from '../config';
 // One instance per recipient, named by the recipient id.
 export const feedStub = (recipientId: string) => {
   const namespace = resolveConfig().bindings.feed;
-  if (!namespace) throw new ChaskiError('config', 'Chaski config: bindings.feed is missing');
+  if (!namespace)
+    throw new ChaskiError('config', 'Chaski config: the CHASKI_FEED binding is missing');
   return namespace.get(namespace.idFromName(recipientId));
 };
 
@@ -61,8 +62,8 @@ export class ChaskiFeed extends DurableObject<unknown> {
     ws.close(1003, 'unsupported message');
   }
 
-  // Hosts on compatibility dates before 2026-04-07 must reciprocate the close
-  // frame themselves; on later dates the runtime already did and this is a no-op.
+  // On compatibility dates before 2026-04-07 the Worker must reciprocate the close
+  // frame itself; on later dates the runtime already did and this is a no-op.
   override webSocketClose(ws: WebSocket): void {
     ws.close();
   }

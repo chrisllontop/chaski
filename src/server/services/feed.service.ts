@@ -5,7 +5,6 @@ import { ChaskiError } from '../../contract/errors';
 import { feedItems, notifications } from '../db/schema';
 import { feedStub } from '../durable/feed';
 import { parseJson } from '../lib/json';
-import { reportError } from '../lib/report-error';
 import { parseInput } from '../lib/validate';
 import { BaseService } from './base.service';
 
@@ -130,7 +129,6 @@ export class FeedService extends BaseService {
     try {
       await feedStub(recipientId).publish(event);
     } catch (error) {
-      reportError(error, { source: 'feed' });
       FeedService.log.error('feed read signal failed', error, { recipientId });
     }
   };

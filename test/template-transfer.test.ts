@@ -1,8 +1,8 @@
 import { env, exports } from 'cloudflare:workers';
 import { describe, expect, it } from 'vitest';
 import type { TemplateFile } from '../src';
+import { api as chaski } from '../src/server/api';
 import { getClient } from '../src/server/db';
-import { chaski } from './fixture/worker';
 import { recipient } from './helpers';
 
 const updatedAt = async (type: string) =>

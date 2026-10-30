@@ -19,9 +19,7 @@ describe('ChaskiEntrypoint', () => {
     });
 
     expect(result).toMatchObject({ replayed: false, outcome: 'delivered' });
-    expect(queuedMessages()).toEqual([
-      expect.objectContaining({ kind: 'chaski.delivery', channel: 'in_app' }),
-    ]);
+    expect(queuedMessages()).toEqual([expect.objectContaining({ channel: 'in_app' })]);
     const stored = await getClient().notifications.findFirst({
       where: { id: result.notificationId },
     });

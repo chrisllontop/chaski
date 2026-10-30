@@ -17,7 +17,6 @@ import {
 } from '~/components/ui/alert-dialog';
 import { Button } from '~/components/ui/button';
 import { Skeleton } from '~/components/ui/skeleton';
-import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip';
 import { ApiError, api, query } from '~/lib/api';
 import { useChannelsOverview } from '~/lib/channels';
 import { CHANNEL_LABELS, formatDateTime, formatNumber, formatRelative } from '~/lib/format';
@@ -32,11 +31,8 @@ const Row = ({ label, children }: { label: string; children: ReactNode }) => (
   </div>
 );
 
-const SetupHint = ({ configKey }: { configKey: string }) => (
-  <p className="px-4 py-3 text-muted-foreground text-sm">
-    Add <code className="font-mono text-foreground text-xs">{configKey}</code> to the config your
-    Worker passes to <code className="font-mono text-foreground text-xs">createChaski()</code>.
-  </p>
+const SetupHint = () => (
+  <p className="px-4 py-3 text-muted-foreground text-sm">This Worker has no settings for it.</p>
 );
 
 const ChannelPanel = ({
@@ -96,36 +92,22 @@ const PausedRow = ({ paused }: { paused: ChannelPause }) => (
 const PauseButton = ({
   channel,
   paused,
-  canPause,
   onPause,
   onResume,
 }: {
   channel: Channel;
   paused: boolean;
-  canPause: boolean;
   onPause: (channel: Channel) => void;
   onResume: (channel: Channel) => void;
-}) => {
-  const button = (
-    <Button
-      variant="outline"
-      size="sm"
-      disabled={!canPause}
-      onClick={() => (paused ? onResume(channel) : onPause(channel))}
-    >
-      {paused ? <Play /> : <Pause />} {paused ? 'Resume' : 'Pause'}
-    </Button>
-  );
-  if (canPause) return button;
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span>{button}</span>
-      </TooltipTrigger>
-      <TooltipContent>Your Chaski setup doesn’t let you pause channels.</TooltipContent>
-    </Tooltip>
-  );
-};
+}) => (
+  <Button
+    variant="outline"
+    size="sm"
+    onClick={() => (paused ? onResume(channel) : onPause(channel))}
+  >
+    {paused ? <Play /> : <Pause />} {paused ? 'Resume' : 'Pause'}
+  </Button>
+);
 
 /** Resuming asks what to do with what the pause held: send it now, or keep it for review. */
 const ResumeDialog = ({
@@ -207,7 +189,6 @@ export const ChannelsPage = () => {
     <PauseButton
       channel={channel}
       paused={paused !== null}
-      canPause={data?.canPause ?? false}
       onPause={(key) => {
         setTarget(key);
         setDialog('pause');
@@ -224,7 +205,7 @@ export const ChannelsPage = () => {
       <div className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col gap-6 px-6 pt-6 pb-10">
         <PageHeader
           title="Channels"
-          description="Set in your Worker’s Chaski config, so changes ship with a deploy. Secrets never show here. A pause stays until someone resumes the channel, deploys included."
+          description="Secrets never show here. A pause stays until someone resumes the channel, deploys included."
         />
         {error ? <ErrorAlert error={error} /> : null}
         {!data || !email || !inApp || !push ? (
@@ -251,7 +232,7 @@ export const ChannelsPage = () => {
                   <Row label="Reply-to">{email.replyTo}</Row>
                 </>
               ) : (
-                <SetupHint configKey="channels.email" />
+                <SetupHint />
               )}
             </ChannelPanel>
             <ChannelPanel
@@ -267,7 +248,7 @@ export const ChannelsPage = () => {
                   <Row label="Feed">One ChaskiFeed object per contact, live over a WebSocket</Row>
                 </>
               ) : (
-                <SetupHint configKey="channels.in_app" />
+                <SetupHint />
               )}
             </ChannelPanel>
             <ChannelPanel
@@ -299,7 +280,7 @@ export const ChannelsPage = () => {
                   <Row label="Windows">{push.windows?.clientId ?? 'Not configured'}</Row>
                 </>
               ) : (
-                <SetupHint configKey="channels.push" />
+                <SetupHint />
               )}
             </ChannelPanel>
             <ChannelPanel
@@ -316,11 +297,9 @@ export const ChannelsPage = () => {
                     <Pill tone="neutral">Not named</Pill>
                   )}
                   <span className="text-muted-foreground">
-                    {data.environment === 'local'
-                      ? 'The dashboard opens without signing in, and anyone here may pause a channel.'
-                      : data.environment
-                        ? 'The dashboard asks authorize who may use it.'
-                        : 'Set environment in the config to show where this dashboard runs.'}
+                    {data.environment
+                      ? 'Named by CHASKI_ENVIRONMENT in this Worker’s wrangler.jsonc.'
+                      : 'Set CHASKI_ENVIRONMENT in this Worker’s wrangler.jsonc to show where it runs.'}
                   </span>
                 </div>
               </Row>
@@ -330,7 +309,7 @@ export const ChannelsPage = () => {
                   <span className="text-muted-foreground">
                     {data.realtime
                       ? 'The dashboard shows changes as they happen.'
-                      : 'Add bindings.events to see changes as they happen.'}
+                      : 'Add the CHASKI_EVENTS binding to see changes as they happen.'}
                   </span>
                 </div>
               </Row>

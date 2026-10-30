@@ -16,6 +16,9 @@ import type {
 } from './contract';
 import type { TemplateFile, TemplateImportResult } from './template-file';
 
+/** Names the contact the app signed in, on a user route the app forwards to ChaskiEntrypoint. */
+export const RECIPIENT_HEADER = 'x-chaski-recipient';
+
 export interface ChaskiSchedulesApi {
   /** Pending schedules, soonest first. */
   list(query?: { recipientId?: string }): Promise<ScheduledItem[]>;
@@ -65,7 +68,7 @@ export type ChaskiReadiness = {
   templates: number;
 };
 
-/** Chaski's in-process API: the host's Worker calls it directly, with no HTTP in between. */
+/** Chaski's API, as ChaskiEntrypoint serves it to the app over its service binding. */
 export interface ChaskiApi {
   /**
    * Checks the config, asks the database for the applied migrations and counts the templates,

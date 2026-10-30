@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { describe, expect, it, vi } from 'vitest';
+import { api as chaski } from '../src/server/api';
 import { getClient } from '../src/server/db';
-import { chaski } from './fixture/worker';
 import { recipient, seedTemplate, stubEmail } from './helpers';
 
 describe('send through the real queue', () => {
