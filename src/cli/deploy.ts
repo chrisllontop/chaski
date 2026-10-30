@@ -183,6 +183,8 @@ export const deploy = async (context: Context, flags: DeployFlags) => {
       },
     },
     {
+      // Only once the deploy above went through: on a Worker that doesn't exist yet, `secret put`
+      // creates an empty one under its name, which an app could bind to.
       title: 'Set CHASKI_SECRET, if the Worker has none',
       act: async () => {
         const secrets = parseJson<{ name: string }[]>(

@@ -39,7 +39,7 @@ describe('chaskijs init', () => {
       name: 'chaski',
       private: true,
       type: 'module',
-      scripts: { dev: 'wrangler dev', deploy: 'chaskijs deploy' },
+      scripts: { dev: 'wrangler dev' },
       dependencies: { chaskijs: '^0.1.0', hono: '^4.8.0' },
       devDependencies: { wrangler: '^4' },
     });
@@ -171,6 +171,20 @@ describe('chaskijs init', () => {
       '  pnpm wrangler dev      Runs it here, the dashboard at http://localhost:8787',
       '  pnpm chaskijs deploy   Creates its resources in your Cloudflare account and deploys it',
     ]);
+  });
+
+  // pnpm runs its own `deploy` rather than a script by that name, and npm, Yarn and Bun have
+  // commands of their own too.
+  it('names no script after a command of the package manager', async () => {
+    const cwd = tempDir();
+    const { context } = fakeContext({ cwd, interactive: false });
+    await init(context, { folder: true, skipInstall: true });
+
+    const { scripts } = JSON.parse(read(join(cwd, 'chaski'), 'package.json')) as {
+      scripts: Record<string, string>;
+    };
+    const commands = ['add', 'deploy', 'install', 'link', 'pack', 'publish', 'remove', 'update'];
+    expect(Object.keys(scripts).filter((name) => commands.includes(name))).toEqual([]);
   });
 
   it('declares no email binding without email', async () => {

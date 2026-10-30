@@ -127,6 +127,21 @@ describe('chaskijs deploy', () => {
     expect(config.d1_databases?.[0]?.database_id).toBe('local');
   });
 
+  // On a Worker that doesn't exist yet, `secret put` creates an empty one under its name.
+  it('sets no secret when the deploy fails', async () => {
+    const { respond } = fakeAccount();
+    const { context, calls } = fakeContext({
+      cwd: project(),
+      answers: [true],
+      respond: (call: Call) =>
+        call.args[0] === 'deploy' ? { code: 1, stdout: '', stderr: 'Build failed' } : respond(call),
+    });
+
+    await expect(deploy(context, {})).rejects.toThrow('wrangler deploy failed');
+    expect(calls.map((call) => call.args[0]).at(-1)).toBe('deploy');
+    expect(calls.some((call) => call.args[0] === 'secret')).toBe(false);
+  });
+
   it('changes nothing when the user says no', async () => {
     const root = project();
     const before = readFileSync(join(root, 'wrangler.jsonc'), 'utf8');

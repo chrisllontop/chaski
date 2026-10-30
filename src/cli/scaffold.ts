@@ -109,7 +109,9 @@ const packageJson = ({ worker, version }: ProjectOptions) =>
       name: worker,
       private: true,
       type: 'module',
-      scripts: { dev: 'wrangler dev', deploy: 'chaskijs deploy' },
+      // `deploy`, like `install` or `publish`, is a command of the package manager itself, which
+      // pnpm runs instead of a script by that name: the docs call `chaskijs deploy` directly.
+      scripts: { dev: 'wrangler dev' },
       dependencies: { chaskijs: `^${version}`, hono: '^4.8.0' },
       devDependencies: { wrangler: '^4' },
     },
