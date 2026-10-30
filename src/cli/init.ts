@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { CliError, type Context, runOrFail } from './context';
 import { execPrefix, fromUserAgent } from './package-manager';
@@ -78,7 +78,7 @@ export const init = async (context: Context, flags: InitFlags) => {
     'chaski',
   );
   const target = resolve(context.cwd, directory);
-  if (existsSync(target) && readdirSync(target).length > 0) {
+  if (existsSync(target) && (!statSync(target).isDirectory() || readdirSync(target).length > 0)) {
     throw new CliError(`${directory} isn't empty; init writes a new project into an empty folder`);
   }
 
@@ -139,7 +139,8 @@ export const init = async (context: Context, flags: InitFlags) => {
   });
   for (const [path, content] of Object.entries(files)) {
     mkdirSync(dirname(join(target, path)), { recursive: true });
-    writeFileSync(join(target, path), content);
+    // .dev.vars holds the local CHASKI_SECRET.
+    writeFileSync(join(target, path), content, { mode: path === '.dev.vars' ? 0o600 : 0o644 });
   }
   const shown = relative(context.cwd, target) || '.';
   context.print();

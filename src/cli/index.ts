@@ -124,13 +124,12 @@ const main = async (argv: string[], context: Context) => {
   }
 };
 
-const prompts = terminalPrompts();
 const argv = process.argv.slice(2);
 const context: Context = {
   cwd: process.cwd(),
   env: process.env,
   interactive: Boolean(process.stdin.isTTY),
-  prompts,
+  prompts: terminalPrompts,
   run,
   print: (line = '') => process.stdout.write(`${line}\n`),
   version: version(),
@@ -146,6 +145,4 @@ try {
       String((error as NodeJS.ErrnoException).code).startsWith('ERR_PARSE_ARGS'));
   console.error(known ? (error as Error).message : error);
   process.exitCode = 1;
-} finally {
-  prompts.close();
 }
