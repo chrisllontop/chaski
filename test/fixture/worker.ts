@@ -87,6 +87,7 @@ const app = new Hono<{ Bindings: FixtureEnv }>()
       actor,
     );
     await SettingsService.saveInApp(actor);
+    await SettingsService.saveLocales({ default: 'en', supported: ['es', 'pt-BR'] }, actor);
     return c.json(await seed(api));
   })
   .route('/app/notifications', notifications)

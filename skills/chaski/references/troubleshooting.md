@@ -169,6 +169,17 @@ the two Workers has a `compatibility_date` before `2026-04-21`.
 | `channel_paused`: `the email channel is paused: delivery <id> is held until someone sends or discards it in the dashboard` | Someone paused email under **Channels**. The email waits under **Deliveries**, **Held**; resuming the channel and sending it, or the same send with its `idempotencyKey` once email runs again, lets it go out. |
 | `delivery_failed`: `the email didn't go out: <provider error> (<code>, delivery <id>)` | An inline send the provider refused or couldn’t take; the delivery is `failed` in the dashboard with the same error. `sender_not_verified` and `sender_domain_not_available` are the setup’s to fix (the sender address on **Channels** must be on the domain onboarded to Email Service), `recipient_suppressed` the address’s. |
 
+Loading templates:
+
+| The load fails with | Fix |
+| --- | --- |
+| `the file has translations, and this Chaski has no languages` (`import()`), or `bad JSON path: 'Chaski: this file has its default content in en…'` (the SQL) | Save the languages under **Languages** on **Channels**, with the file’s `defaultLocale` as the default, then load the file again. Nothing was written. |
+| `the file's default content is in en, and this Chaski's default language is es` | The file was written for another default. Load a file exported from a Chaski with the same default, or, while this one has no translations, change its default under **Languages**. |
+| `translations need a file of version 2` | The file says `"version": 1`, the format before translations: make it `"version": 2` with a `defaultLocale`. |
+| `a file with translations names its defaultLocale` | Add `"defaultLocale"`, the language of each channel’s own content. |
+| `<locale> is the default language: its content is the channel's own` | A translation in the default language: move its text into the channel’s own fields. |
+| `the default language stays 'en' while templates have translations` (saving **Languages**) | Every translation was written from the default content, so the default changes only once no template has any. |
+
 A delivery skipped at send time carries its reason:
 
 | `reason` | Means |
@@ -194,6 +205,20 @@ as `device refused`:
 
 The device comes back the next time the app registers its token, once the settings or the
 registration are right.
+
+**A contact got the default language instead of theirs.** Open the delivery under **Deliveries**:
+its language row shows the language the send asked for, and whether it came from the send’s
+`locale` or from the contact’s, and the one it went out in. Each channel picks on its own, so:
+
+- **Nothing was asked for**: the send had no `locale`, and `recipient.locale` was missing or not a
+  language tag (`english`, `Spanish (Peru)`). Send a BCP 47 tag: `es`, `es-PE`, `pt-BR`.
+- **The language isn’t the Worker’s**: only the languages under **Languages** on **Channels** take
+  part. A language taken off there keeps its translations, unused until it comes back.
+- **That channel has no translation** in the locale or its language: an email in Spanish and an
+  in-app item in English means only the email is translated. The template’s languages on
+  **Templates** show what each channel lacks, and the **Overview** counts these fallbacks per
+  type, channel and language.
+- **No languages are saved**: every send renders the default content.
 
 **Deliveries show `held`.** Their channel is paused under **Channels**, the dashboard’s emergency
 brake, and `ready()` lists it under `paused`. They wait until someone resumes the channel and

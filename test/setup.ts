@@ -17,6 +17,7 @@ const TABLES = [
   'device_tokens',
   'preferences',
   'contacts',
+  'template_translations',
   'template_channels',
   'templates',
 ];

@@ -27,6 +27,10 @@ Write down:
   project, or from another host, and whether that’s the origin of the app’s routes.
   [browser-clients.md](browser-clients.md) picks it up after step 6.
 - **The dev command** and the port it serves on.
+- **The languages**: whether the app sends in more than one (an i18n library, message catalogs,
+  emails per language), its default, and the others. The user saves them under **Languages** on
+  **Channels** in each environment, before templates with translations load
+  ([sending.md](sending.md), Languages).
 - **The features**: ask the user which channels (email, in-app, web push, iOS and macOS, Android,
   Windows), and whether they want scheduling and email attachments. They decide the bindings
   (SKILL.md, “Bindings decide features”).
@@ -301,7 +305,7 @@ database follows `database_id`, so `wrangler dev` starts over on a new one, whic
 migrates. The app deploys its binding after Chaski is up, since a
 service binding needs its Worker to exist; that deploy is the user’s, like any other of the app.
 The template file then loads into production with `--remote` ([sending.md](sending.md)); ask for
-that too.
+that too. A file with translations waits until the user saved the languages (item 2 below).
 
 Then hand the user what is theirs to do:
 
@@ -315,7 +319,8 @@ Then hand the user what is theirs to do:
    policy is the whole permission model.
 2. **Save the production channel settings** on the deployed dashboard’s **Channels** page: the
    email sender on the domain onboarded to Email Service (it needs the Workers Paid plan), the web
-   push key pair, the APNs, FCM and WNS credentials, and the types muted by default.
+   push key pair, the APNs, FCM and WNS credentials, the types muted by default, and the
+   **Languages**, with the default the template file names, when it has translations.
 
 **Done when** the deploy printed the Worker’s URL, and the user confirms the dashboard opens for
 them through Access and its **Channels** page shows the channels they turned on.

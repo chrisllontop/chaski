@@ -1,10 +1,6 @@
 import { feedStub } from '../../durable/feed';
-import { DeliveryError } from '../../lib/errors';
 import { newId } from '../../lib/ids';
-import { parseJson } from '../../lib/json';
-import { renderTemplate } from '../../lib/render';
 import { BaseService } from '../base.service';
-import type { ContactSnapshot } from '../contact.service';
 import { toFeedItem } from '../feed.service';
 import { TemplateService } from '../template.service';
 import type { AdapterContext, AdapterResult } from './types';
@@ -14,28 +10,13 @@ export class InAppAdapter extends BaseService {
 
   static deliver = async (ctx: AdapterContext): Promise<AdapterResult> => {
     const { notification } = ctx;
-    const content = await TemplateService.findActiveContent(notification.type, 'in_app');
-    if (!content) {
-      throw new DeliveryError(
-        'no_template',
-        `no active in_app template for type '${notification.type}'`,
-        { permanent: true },
-      );
-    }
-
-    const snapshot = parseJson<ContactSnapshot>(notification.contactSnapshot, {});
-    const data = {
-      ...parseJson<Record<string, unknown>>(notification.payload, {}),
-      recipient: snapshot,
-    };
-
     // An in_app template keeps the title in subject, the message in body and
     // the link the item opens in textBody.
-    const [title, body, href] = await Promise.all([
-      renderTemplate(content.subject ?? '', data),
-      renderTemplate(content.body, data),
-      content.textBody ? renderTemplate(content.textBody, data) : Promise.resolve(undefined),
-    ]);
+    const {
+      subject: title,
+      body,
+      textBody: href,
+    } = await TemplateService.renderDelivery(ctx.content, notification, { html: false });
 
     const item = await InAppAdapter.client.feedItems.create({
       data: {

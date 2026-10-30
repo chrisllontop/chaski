@@ -63,4 +63,42 @@ describe('find-sends', () => {
     ]);
     expect(names(found['other settings'])).toEqual(['ACME_API_KEY', 'ACME_URL', 'GAMMA_TOKEN']);
   });
+
+  // Chaski keeps a template's content per language, so text an app translates before sending
+  // moves into the template's translations.
+  it('lists the app’s translations and the sends that carry translated text', () => {
+    const found = findSends({
+      'package.json': JSON.stringify({ dependencies: { i18next: '^23.0.0' } }),
+      'locales/es/emails.json': '{"welcome": {"subject": "Hola"}}',
+      'emails/welcome.es.html': '<p>Hola</p>',
+      'emails/welcome.html': '<p>Hi</p>',
+      'src/welcome.ts': [
+        "import { sendEmail } from './mail';",
+        'export const welcome = async (user: User) => {',
+        '  await sendEmail({',
+        '    to: user.email,',
+        "    subject: i18n.t('emails.welcome.subject', { lng: user.locale }),",
+        '  });',
+        '};',
+      ].join('\n'),
+      'src/paid.ts': [
+        'export const paid = (env: Env, user: User, t: T) =>',
+        '  env.CHASKI.send({',
+        "    type: 'payment_received',",
+        '    recipient: { id: user.id },',
+        "    payload: { title: t('payments.received') },",
+        '  });',
+      ].join('\n'),
+      'src/page.tsx': "export const Title = () => <h1>{t('home.title')}</h1>;",
+    });
+
+    expect(found.packages).toEqual(['package.json: i18next@^23.0.0 (i18n)']);
+    // The order files are walked in is the file system's.
+    expect(found['message catalogs']?.sort()).toEqual([
+      'emails/welcome.es.html',
+      'locales/es/emails.json',
+    ]);
+    expect(names(found['translated sends']).sort()).toEqual(['src/paid.ts', 'src/welcome.ts']);
+    expect(names(found.i18n).sort()).toEqual(['src/page.tsx', 'src/paid.ts', 'src/welcome.ts']);
+  });
 });

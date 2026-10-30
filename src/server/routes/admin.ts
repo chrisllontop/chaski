@@ -1,7 +1,8 @@
-import { Hono } from 'hono';
+import { type Context, Hono } from 'hono';
 import { z } from 'zod';
 import { channelSchema, OFFSET_TIMESTAMP_REGEX } from '../../contract/contract';
 import { ChaskiError, isChaskiError } from '../../contract/errors';
+import { localeSchema } from '../../contract/locales';
 import { actorOf, signedIn } from '../auth';
 import { DELIVERY_STATUS } from '../db/schema';
 import { eventsStub } from '../durable/events';
@@ -12,6 +13,7 @@ import { METRIC_PERIODS, MetricsService } from '../services/metrics.service';
 import { ScheduleService } from '../services/schedule.service';
 import { mutedTypesSchema, SettingsService } from '../services/settings.service';
 import { TemplateService } from '../services/template.service';
+import { TranslationService } from '../services/translation.service';
 import { channels } from './channels';
 
 const templateInputSchema = z.object({
@@ -37,6 +39,20 @@ const channelContentSchema = z.object({
   subject: z.string().max(512).nullable().optional(),
   body: z.string().nullable().optional(),
   textBody: z.string().nullable().optional(),
+});
+
+// A translation saves like a channel's content: an omitted field keeps the saved value, null clears
+// it (.agents/types.md). Its body can't be cleared, and the first save needs one.
+const translationSchema = z.object({
+  subject: z.string().max(512).nullable().optional(),
+  body: z.string().optional(),
+  textBody: z.string().nullable().optional(),
+});
+
+// The Worker's languages, saved whole: the default and the others a translation can be in.
+const localesSchema = z.object({
+  default: localeSchema,
+  supported: z.array(localeSchema).max(100),
 });
 
 const instantSchema = z
@@ -79,6 +95,8 @@ const scheduleListSchema = z.object({
 const previewSchema = z.object({
   channel: channelSchema,
   data: z.record(z.string(), z.unknown()).optional(),
+  // Renders what a contact asking for this locale gets; with `content`, that draft in it.
+  locale: localeSchema.optional(),
   // Content being edited and not saved yet; without it the stored content renders.
   content: z
     .object({
@@ -156,6 +174,41 @@ admin.put('/templates/:id/channels/:channel', async (c) => {
   return c.json({ channel: row });
 });
 
+const translationParams = (c: Context) => ({
+  id: c.req.param('id') ?? '',
+  channel: parseInput(channelSchema, c.req.param('channel')),
+  locale: parseInput(localeSchema, c.req.param('locale')),
+});
+
+admin.get('/templates/:id/channels/:channel/translations/:locale', async (c) => {
+  const { id, channel, locale } = translationParams(c);
+  return c.json({ translation: await TranslationService.get(id, channel, locale) });
+});
+
+admin.put('/templates/:id/channels/:channel/translations/:locale', async (c) => {
+  const { id, channel, locale } = translationParams(c);
+  const input = parseInput(translationSchema, await c.req.json());
+  return c.json({ translation: await TranslationService.save(id, channel, locale, input) });
+});
+
+admin.post('/templates/:id/channels/:channel/translations/:locale/mark-current', async (c) => {
+  const { id, channel, locale } = translationParams(c);
+  return c.json({ translation: await TranslationService.markCurrent(id, channel, locale) });
+});
+
+admin.delete('/templates/:id/channels/:channel/translations/:locale', async (c) => {
+  const { id, channel, locale } = translationParams(c);
+  await TranslationService.delete(id, channel, locale);
+  return c.json({ id: locale, channel, deleted: true as const });
+});
+
+// Removes a language from the template: its translation on every channel.
+admin.delete('/templates/:id/translations/:locale', async (c) => {
+  const locale = parseInput(localeSchema, c.req.param('locale'));
+  const channels = await TranslationService.deleteLanguage(c.req.param('id'), locale);
+  return c.json({ id: locale, channels, deleted: true as const });
+});
+
 // The dashboard renders the email inside an iframe it posts this form into,
 // so the email's own inline styles and remote images apply there without
 // loosening the dashboard's CSP. The sandbox lets no script run.
@@ -171,6 +224,7 @@ const PREVIEW_DOCUMENT_CSP = [
 const previewDocumentSchema = z.object({
   subject: z.string().max(512).optional(),
   body: z.string(),
+  locale: localeSchema.optional(),
   data: z
     .string()
     .optional()
@@ -198,9 +252,10 @@ admin.post('/templates/:id/preview/document', async (c) => {
     'X-Content-Type-Options': 'nosniff',
   };
   try {
-    const rendered = await TemplateService.preview(c.req.param('id'), 'email', form.data, {
-      subject: form.subject ?? null,
-      body: form.body,
+    const rendered = await TemplateService.preview(c.req.param('id'), 'email', {
+      data: form.data,
+      content: { subject: form.subject ?? null, body: form.body },
+      locale: form.locale,
     });
     return c.html(rendered.html, 200, headers);
   } catch (error) {
@@ -216,9 +271,7 @@ admin.post('/templates/:id/preview/document', async (c) => {
 
 admin.post('/templates/:id/preview', async (c) => {
   const input = parseInput(previewSchema, await c.req.json());
-  return c.json(
-    await TemplateService.preview(c.req.param('id'), input.channel, input.data, input.content),
-  );
+  return c.json(await TemplateService.preview(c.req.param('id'), input.channel, input));
 });
 
 admin.post('/templates/:id/test-send', async (c) => {
@@ -226,6 +279,7 @@ admin.post('/templates/:id/test-send', async (c) => {
     z.object({
       to: z.string().email(),
       data: z.record(z.string(), z.unknown()).optional(),
+      locale: localeSchema.optional(),
     }),
     await c.req.json(),
   );
@@ -261,6 +315,15 @@ admin.put('/preferences/defaults', async (c) => {
   const { mutedTypes } = parseInput(defaultsSchema, await c.req.json());
   await SettingsService.saveDefaultMutedTypes(mutedTypes, actor);
   return c.json({ defaults: await defaults() });
+});
+
+// The Worker's languages: the default every template starts in, and the others it can add.
+admin.get('/settings/locales', async (c) => c.json({ locales: await SettingsService.locales() }));
+
+admin.put('/settings/locales', async (c) => {
+  const actor = signedIn(c);
+  await SettingsService.saveLocales(parseInput(localesSchema, await c.req.json()), actor);
+  return c.json({ locales: await SettingsService.locales() });
 });
 
 admin.get('/schedules', async (c) =>

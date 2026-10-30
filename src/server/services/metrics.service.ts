@@ -83,13 +83,15 @@ export class MetricsService extends BaseService {
 
   static overview = async (period: MetricPeriod) => {
     const { from, to, previousFrom } = windowFor(period);
-    const [current, previous, topErrorCodes, skipReasons, scheduledPending] = await Promise.all([
-      MetricsService.totals(from, to),
-      MetricsService.totals(previousFrom, from),
-      MetricsService.topBy('errorCode', from, to),
-      MetricsService.topBy('skipReason', from, to),
-      MetricsService.scheduledPending(),
-    ]);
+    const [current, previous, topErrorCodes, skipReasons, scheduledPending, languageFallbacks] =
+      await Promise.all([
+        MetricsService.totals(from, to),
+        MetricsService.totals(previousFrom, from),
+        MetricsService.topBy('errorCode', from, to),
+        MetricsService.topBy('skipReason', from, to),
+        MetricsService.scheduledPending(),
+        MetricsService.languageFallbacks(from, to),
+      ]);
     return {
       period,
       from: from.toISOString(),
@@ -105,6 +107,7 @@ export class MetricsService extends BaseService {
       topErrorCodes,
       skipReasons,
       scheduledPending,
+      languageFallbacks,
     };
   };
 
@@ -359,6 +362,47 @@ export class MetricsService extends BaseService {
       .limit(5)
       .all();
     return rows.map((row) => ({ [field]: row.key ?? '', count: Number(row.count) }));
+  };
+
+  /**
+   * Deliveries that went out in another language than the send asked for, by type, channel and
+   * requested locale, busiest first. A regional match (es for es-PE) is the language asked for,
+   * so only a different language counts: the default content standing in for a translation.
+   */
+  private static languageFallbacks = async (from: Date, to: Date) => {
+    const language = (column: SQL) => sql`substr(${column}, 1, instr(${column} || '-', '-') - 1)`;
+    const requested = sql`${notifications.requestedLocale}`;
+    const rendered = sql`${deliveries.renderedLocale}`;
+    const where = and(
+      gte(deliveries.updatedAt, from),
+      lt(deliveries.updatedAt, to),
+      eq(deliveries.status, 'sent'),
+      isNotNull(notifications.requestedLocale),
+      isNotNull(deliveries.renderedLocale),
+      sql`${language(requested)} != ${language(rendered)}`,
+    );
+    const rows = await MetricsService.db
+      .select({
+        type: notifications.type,
+        channel: deliveries.channel,
+        requestedLocale: notifications.requestedLocale,
+        count: sql<number>`count(*)`,
+      })
+      .from(deliveries)
+      .innerJoin(notifications, eq(notifications.id, deliveries.notificationId))
+      .where(where)
+      .groupBy(notifications.type, deliveries.channel, notifications.requestedLocale)
+      .orderBy(sql`count(*) desc`, notifications.type, deliveries.channel)
+      .all();
+    return {
+      total: rows.reduce((sum, row) => sum + Number(row.count), 0),
+      rows: rows.slice(0, 20).map((row) => ({
+        type: row.type,
+        channel: row.channel as Channel,
+        requestedLocale: row.requestedLocale ?? '',
+        count: Number(row.count),
+      })),
+    };
   };
 
   private static scheduledPending = async () => {

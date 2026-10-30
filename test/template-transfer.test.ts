@@ -151,7 +151,7 @@ describe('template import and export', () => {
   });
 
   it('refuses another format or version', async () => {
-    await expect(chaski.templates.import({ ...FILE, version: 2 })).rejects.toMatchObject({
+    await expect(chaski.templates.import({ ...FILE, version: 3 })).rejects.toMatchObject({
       code: 'validation',
     });
     await expect(chaski.templates.import({ ...FILE, format: 'other' })).rejects.toMatchObject({

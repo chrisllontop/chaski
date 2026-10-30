@@ -19,14 +19,16 @@ export const SETTINGS_SECTIONS = [
   'fcm',
   'wns',
   'default_muted_types',
+  'locales',
 ] as const;
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
 
-// A row per section someone saved on the Channels page; removing a section deletes its row, which
-// turns its channel, or its push provider, off. `value` holds the section's plain fields as one
-// document, read and written whole; `secret` holds its one secret field (a private key, a service
-// account, a client secret), sealed with CHASKI_SECRET and bound to the section, never in plain
-// text. The actor is frozen as Access signed them in, as on channel_pauses.
+// A row per section someone saved on the Channels page, the Worker's languages included; removing
+// a section deletes its row, which turns its channel, or its push provider, off. `value` holds the
+// section's plain fields as one document, read and written whole; `secret` holds its one secret
+// field (a private key, a service account, a client secret), sealed with CHASKI_SECRET and bound to
+// the section, never in plain text. The actor is frozen as Access signed them in, as on
+// channel_pauses.
 export const settings = sqliteTable('settings', {
   section: text('section', { enum: SETTINGS_SECTIONS }).primaryKey(),
   value: text('value').notNull(),

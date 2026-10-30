@@ -95,6 +95,9 @@ export const sendRequestSchema = z.object({
   email: emailOptionsSchema.optional(),
   push: pushOptionsSchema.optional(),
   data: notificationDataSchema.optional(),
+  // The language for this send alone, ahead of the contact's; it isn't saved to the contact. A
+  // value that isn't a language tag counts as absent, as an unreadable recipient.locale does.
+  locale: z.string().max(35).optional(),
   idempotencyKey: z.string().min(1).max(512).optional(),
   // Delivers the email within the call instead of through the queue, so a provider failure
   // reaches the caller; only for one transactional email (see NotificationService.send).

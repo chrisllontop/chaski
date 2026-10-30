@@ -47,10 +47,10 @@ const version = () =>
     ) as { version: string }
   ).version;
 
-const templatesSql = (path: string | undefined) => {
+const templatesSql = async (path: string | undefined) => {
   if (!path) throw new CliError('Name the template file: chaskijs templates sql <file>');
   try {
-    const { statements, warnings } = templatesToSql(JSON.parse(readFileSync(path, 'utf8')));
+    const { statements, warnings } = await templatesToSql(JSON.parse(readFileSync(path, 'utf8')));
     for (const warning of warnings) console.error(`warning: ${warning}`);
     process.stdout.write(
       `-- chaski templates from ${path}; run it after Chaski's migrations.\n` +

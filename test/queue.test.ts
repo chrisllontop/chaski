@@ -5,6 +5,7 @@ import { DeliveryError } from '../src/server/lib/errors';
 import { CHANNEL_DEFS, type ChannelDefinition } from '../src/server/services/adapters/registry';
 import { DeliveryService } from '../src/server/services/delivery.service';
 import worker, { type DeliveryMessage } from '../src/worker';
+import { seedTemplate } from './helpers';
 
 const MESSAGE: DeliveryMessage = {
   deliveryId: 'd_queue',
@@ -14,7 +15,9 @@ const MESSAGE: DeliveryMessage = {
   recipientId: 'user_1',
 };
 
+// The consumer reads the template before it calls the channel, so the type has one.
 const seedDelivery = async (channel = 'email') => {
+  await seedTemplate('payment_received', 'email');
   await getClient().notifications.create({
     data: {
       id: 'n_queue',

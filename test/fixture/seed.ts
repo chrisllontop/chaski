@@ -5,9 +5,12 @@ import type { ChaskiApi } from '../../src/contract/api';
 // in through the API ChaskiEntrypoint serves an app: templates, sends and
 // schedules.
 
+// Spanish everywhere but payment_received's in-app item, and Portuguese only on its email, so the
+// dashboard has every language status to show.
 const TEMPLATES: TemplateFile = {
   format: 'chaski.templates',
-  version: 1,
+  version: 2,
+  defaultLocale: 'en',
   templates: [
     {
       type: 'payment_received',
@@ -21,6 +24,17 @@ const TEMPLATES: TemplateFile = {
           subject: 'We received {{ amount }}',
           body: '<h1 style="font-family:sans-serif">Thanks, {{ recipient.name }}</h1><p style="font-family:sans-serif">We received your payment of <strong>{{ amount }}</strong>.</p>',
           textBody: 'We received your payment of {{ amount }}.',
+          translations: {
+            es: {
+              subject: "Recibimos {{ amount | currency: 'USD' }}",
+              body: '<h1 style="font-family:sans-serif">Gracias, {{ recipient.name }}</h1><p style="font-family:sans-serif">Recibimos tu pago de <strong>{{ amount | currency: \'USD\' }}</strong>.</p>',
+              textBody: "Recibimos tu pago de {{ amount | currency: 'USD' }}.",
+            },
+            'pt-BR': {
+              subject: "Recebemos {{ amount | currency: 'USD' }}",
+              body: '<p style="font-family:sans-serif">Recebemos seu pagamento de <strong>{{ amount | currency: \'USD\' }}</strong>.</p>',
+            },
+          },
         },
         {
           channel: 'in_app',
@@ -42,6 +56,12 @@ const TEMPLATES: TemplateFile = {
           enabled: true,
           subject: 'Invoice {{ invoice }} is due {{ due }}',
           body: '<p style="font-family:sans-serif">Invoice {{ invoice }} is due {{ due }}.</p>',
+          translations: {
+            es: {
+              subject: 'La factura {{ invoice }} vence el {{ due }}',
+              body: '<p style="font-family:sans-serif">La factura {{ invoice }} vence el {{ due }}.</p>',
+            },
+          },
         },
         {
           channel: 'push',
@@ -49,6 +69,13 @@ const TEMPLATES: TemplateFile = {
           subject: 'Invoice due',
           body: '{{ invoice }} is due {{ due }}',
           textBody: '/invoices',
+          translations: {
+            es: {
+              subject: 'Factura por vencer',
+              body: '{{ invoice }} vence el {{ due }}',
+              textBody: '/invoices',
+            },
+          },
         },
       ],
     },
@@ -62,14 +89,31 @@ const TEMPLATES: TemplateFile = {
           enabled: true,
           subject: 'Welcome, {{ recipient.name }}',
           body: '<p style="font-family:sans-serif">Welcome aboard.</p>',
+          translations: {
+            es: {
+              subject: 'Te damos la bienvenida, {{ recipient.name }}',
+              body: '<p style="font-family:sans-serif">Tu cuenta está lista.</p>',
+            },
+          },
         },
-        { channel: 'in_app', enabled: true, subject: 'Welcome', body: 'Your account is ready.' },
+        {
+          channel: 'in_app',
+          enabled: true,
+          subject: 'Welcome',
+          body: 'Your account is ready.',
+          translations: {
+            es: { subject: 'Te damos la bienvenida', body: 'Tu cuenta está lista.' },
+          },
+        },
       ],
     },
   ],
 };
 
 const NAMES = ['Ana', 'Luis', 'Marta', 'Jo', 'Sam', 'Noor', 'Kim', 'Leo'];
+// Contacts in English, Spanish (some from Peru), Brazilian Portuguese and French, which the
+// Worker doesn't have: every language a send can resolve to, and the fallbacks.
+const LOCALES = ['en', 'es-PE', 'es', 'pt-BR', 'fr', 'en-GB', 'es-MX', 'en'];
 const TYPES = ['payment_received', 'invoice_due', 'welcome'] as const;
 
 export const seed = async (chaski: ChaskiApi) => {
@@ -81,8 +125,10 @@ export const seed = async (chaski: ChaskiApi) => {
     await chaski.send({
       type: TYPES[i % TYPES.length] ?? 'welcome',
       // Every fifth contact has no email, so some email deliveries skip.
-      recipient:
-        i % 5 === 4 ? { id, name } : { id, name, email: `${name.toLowerCase()}@example.com` },
+      recipient: {
+        ...(i % 5 === 4 ? { id, name } : { id, name, email: `${name.toLowerCase()}@example.com` }),
+        locale: LOCALES[i % LOCALES.length],
+      },
       payload: { amount: 100 + i * 25, invoice: `INV-${1000 + i}`, due: 'Feb 20' },
     });
     sent++;

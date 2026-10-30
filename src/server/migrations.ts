@@ -7,7 +7,10 @@ import { SettingsService } from './services/settings.service';
 // against a database that is missing any of them. The pre-release migrations
 // were folded into 0000_init.sql, which keeps its name: a database that applied
 // them has the same schema and still lists it.
-export const MIGRATIONS: readonly string[] = ['0000_init.sql'];
+export const MIGRATIONS: readonly string[] = [
+  '0000_init.sql',
+  '0001_send_in_several_languages.sql',
+];
 
 // Wrangler's own table: Chaski's wrangler.jsonc leaves migrations_table unset.
 const MIGRATIONS_TABLE = 'd1_migrations';

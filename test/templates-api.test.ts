@@ -67,7 +67,7 @@ describe('templates API', () => {
       body: JSON.stringify({ channel: 'email', data: { name: 'Ana' } }),
     });
 
-    expect(await response.json()).toEqual({ subject: 'Hi Ana', html: '<p>Ana</p>' });
+    expect(await response.json()).toEqual({ subject: 'Hi Ana', html: '<p>Ana</p>', locale: null });
   });
 
   it('soft-deletes a template and lists it among the deleted ones', async () => {
@@ -102,7 +102,7 @@ describe('templates API', () => {
       body: JSON.stringify({ to: 'ops@host.test', data: { name: 'Ana' } }),
     });
 
-    expect(await response.json()).toEqual({ messageId: 'msg_1' });
+    expect(await response.json()).toEqual({ messageId: 'msg_1', locale: null });
     expect(sent).toEqual([
       expect.objectContaining({
         to: 'ops@host.test',

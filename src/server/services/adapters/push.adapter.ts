@@ -19,7 +19,6 @@ import {
   readFcmError,
 } from '../../lib/fcm';
 import { parseJson } from '../../lib/json';
-import { renderTemplate } from '../../lib/render';
 import { encryptPushPayload, MAX_PAYLOAD_BYTES, vapidAuthorization } from '../../lib/web-push';
 import {
   buildToast,
@@ -30,7 +29,6 @@ import {
   type WnsCredentials,
 } from '../../lib/wns';
 import { BaseService } from '../base.service';
-import type { ContactSnapshot } from '../contact.service';
 import {
   type ApnsPushDevice,
   type FcmPushDevice,
@@ -236,27 +234,13 @@ export class PushAdapter extends BaseService {
         permanent: true,
       });
     }
-    const content = await TemplateService.findActiveContent(notification.type, 'push');
-    if (!content) {
-      throw new DeliveryError(
-        'no_template',
-        `no active push template for type '${notification.type}'`,
-        { permanent: true },
-      );
-    }
-
-    const snapshot = parseJson<ContactSnapshot>(notification.contactSnapshot, {});
-    const data = {
-      ...parseJson<Record<string, unknown>>(notification.payload, {}),
-      recipient: snapshot,
-    };
     // Same layout as in_app templates: title in subject, message in body and
     // the link the notification opens in textBody.
-    const [title, body, href] = await Promise.all([
-      renderTemplate(content.subject ?? '', data),
-      renderTemplate(content.body, data),
-      content.textBody ? renderTemplate(content.textBody, data) : Promise.resolve(undefined),
-    ]);
+    const {
+      subject: title,
+      body,
+      textBody: href,
+    } = await TemplateService.renderDelivery(ctx.content, notification, { html: false });
 
     const platforms = PushSubscriptionService.configuredPlatforms();
     const registered = (

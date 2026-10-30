@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { timestamp, timestampNow } from './timestamps';
 
 // A template is one notification type; the per-channel content lives in
@@ -38,4 +38,26 @@ export const templateChannels = sqliteTable(
     updatedAt: timestampNow('updated_at'),
   },
   (t) => [uniqueIndex('uq_template_channels').on(t.templateId, t.channel)],
+);
+
+// A channel's content in one more language; the channel row holds it in the default language, and
+// its `enabled` decides for every language. Each field is the translation's own, never the
+// default's. `source_hash` fingerprints the default content the translation was written from, so
+// it reads as outdated once that content changes, until it is saved again or marked current.
+export const templateTranslations = sqliteTable(
+  'template_translations',
+  {
+    templateChannelId: text('template_channel_id')
+      .notNull()
+      .references(() => templateChannels.id, { onDelete: 'cascade' }),
+    // Canonical BCP 47, as Intl.getCanonicalLocales writes it: `es-PE`, never `es-pe`.
+    locale: text('locale').notNull(),
+    subject: text('subject'),
+    body: text('body').notNull(),
+    textBody: text('text_body'),
+    sourceHash: text('source_hash').notNull(),
+    createdAt: timestampNow('created_at'),
+    updatedAt: timestampNow('updated_at'),
+  },
+  (t) => [primaryKey({ columns: [t.templateChannelId, t.locale] })],
 );

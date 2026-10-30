@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { ChaskiError, isChaskiError } from '../../contract/errors';
+import { canonicalLocale, type Locales } from '../../contract/locales';
 import type { Actor } from '../auth';
 import {
   type ApnsAppConfig,
@@ -31,6 +32,7 @@ export const SECTION_PATH: Record<SettingsSection, string> = {
   fcm: 'channels.push.fcm',
   wns: 'channels.push.wns',
   default_muted_types: 'defaultMutedTypes',
+  locales: 'locales',
 };
 
 // Each section has at most one secret, sealed in the row's `secret` column instead of its value.
@@ -268,7 +270,8 @@ export class SettingsService extends BaseService {
     // This isolate reads the change at once; the others on their next request.
     await SettingsService.load();
     SettingsService.log.info(line, { section, actor: actor.id });
-    await publishAdminEvents(['channels']);
+    // A template's languages are the Worker's, so its status per language moves with them.
+    await publishAdminEvents(section === 'locales' ? ['locales', 'templates'] : ['channels']);
   };
 
   static saveEmail = (
@@ -338,6 +341,53 @@ export class SettingsService extends BaseService {
 
   static saveDefaultMutedTypes = (mutedTypes: string[], actor: Actor) =>
     SettingsService.store('default_muted_types', { mutedTypes }, actor);
+
+  /**
+   * Saves the Worker's languages whole. Each translation was written from the default content,
+   * so the default can change only while no template has one, deleted templates included.
+   */
+  static saveLocales = async (locales: Locales, actor: Actor): Promise<void> => {
+    const translations = await SettingsService.client.templateTranslations.count({ where: {} });
+    // Stored canonical, so comparing two defaults is comparing strings; a tag Intl can't read
+    // stays as given, for the resolver to name.
+    const canonical = (tag: string) => canonicalLocale(tag) ?? tag;
+    const defaultLocale = canonical(locales.default);
+    const next = {
+      default: defaultLocale,
+      supported: [...new Set(locales.supported.map(canonical))].filter(
+        (locale) => locale !== defaultLocale,
+      ),
+    };
+    await SettingsService.store('locales', next, actor, {
+      check: (current) => {
+        if (translations === 0 || current.default === undefined) return;
+        if (current.default === next.default) return;
+        throw new ChaskiError(
+          'conflict',
+          `the default language stays '${current.default}' while templates have translations ` +
+            `(${translations}): each was written from the '${current.default}' content, so ` +
+            'delete them before changing it',
+        );
+      },
+    });
+  };
+
+  /** The languages as the dashboard edits them, and how many translations lock the default. */
+  static locales = async () => {
+    const config = SettingsService.config;
+    const [row, translations] = await Promise.all([
+      SettingsService.row('locales'),
+      SettingsService.client.templateTranslations.count({ where: {} }),
+    ]);
+    return {
+      default: config.locales?.default ?? null,
+      supported: config.locales?.supported ?? [],
+      translations,
+      updatedBy: row ? actorOf(row) : null,
+      updatedAt: row?.updatedAt.toISOString() ?? null,
+      problem: config.problems.locales ?? null,
+    };
+  };
 
   /** Deleting a channel's section turns it off; deleting a push provider's turns that one off. */
   static remove = async (section: SettingsSection, actor: Actor): Promise<void> => {

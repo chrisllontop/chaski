@@ -91,6 +91,21 @@ A device that registers with an `environment` of its own overrides its app’s.
 Types every contact has muted until they save preferences of their own, such as a weekly digest
 people opt into; see [Preferences](/docs/preferences#mute-types-for-everyone).
 
+### Languages
+
+The languages your templates are written in: the **default**, which every template starts in, and
+the others a template can add [translations](/docs/templates#languages) in. With none saved,
+Chaski sends every template’s content as written, in one language, and the
+[formatting filters](/docs/templates#numbers-money-and-dates) write English.
+
+| Setting | |
+| --- | --- |
+| Default language | A [BCP 47](https://www.rfc-editor.org/info/bcp47) tag, such as `en`. It changes only while no template has a translation. |
+| Other languages | Tags such as `es`, `pt-BR`. Taking one off keeps its translations, unused until you add it back. |
+
+A [template file](/docs/templates#keep-templates-in-a-file) with translations loads only once the
+languages are saved, with its `defaultLocale` as the default.
+
 ## userRoutes()
 
 The options of the routes your app mounts for its frontend:
