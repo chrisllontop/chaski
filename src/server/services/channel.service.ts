@@ -25,11 +25,12 @@ export class ChannelService extends BaseService {
       ChannelService.pauses(),
       SettingsService.sections(),
     ]);
-    const state = (channel: Channel) => ({
-      channel,
-      enabled: enabledChannels.includes(channel),
-      paused: pauses.get(channel) ?? null,
-    });
+    // A pause outlives the settings, so it holds again if the channel is set up again; while the
+    // channel is off it holds nothing, as ready() reports it.
+    const state = (channel: Channel) => {
+      const enabled = enabledChannels.includes(channel);
+      return { channel, enabled, paused: (enabled && pauses.get(channel)) || null };
+    };
     return {
       environment,
       // Without the ChaskiEvents binding the dashboard refreshes on its own instead of live.

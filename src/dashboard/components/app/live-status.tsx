@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip';
-import { useChannelsOverview } from '~/lib/channels';
+import { failingChannels, useChannelsOverview } from '~/lib/channels';
 import { useLiveStatus } from '~/lib/events';
 import { CHANNEL_LABELS } from '~/lib/format';
 import { Pill } from './pill';
@@ -25,6 +25,7 @@ export const LiveStatus = () => {
   const live = LIVE[status];
   const { environment } = channels.data;
   const paused = channels.data.channels.filter((channel) => channel.paused);
+  const failing = failingChannels(channels.data);
   return (
     <div className="flex items-center gap-2">
       {environment ? (
@@ -45,6 +46,18 @@ export const LiveStatus = () => {
             </Link>
           </TooltipTrigger>
           <TooltipContent>Its deliveries wait as held until someone resumes it.</TooltipContent>
+        </Tooltip>
+      ))}
+      {failing.map((channel) => (
+        <Tooltip key={channel}>
+          <TooltipTrigger asChild>
+            <Link to="/channels">
+              <Pill tone="danger">{CHANNEL_LABELS[channel]} failing</Pill>
+            </Link>
+          </TooltipTrigger>
+          <TooltipContent>
+            Its saved settings stopped working, so its deliveries fail.
+          </TooltipContent>
         </Tooltip>
       ))}
       <Tooltip>
