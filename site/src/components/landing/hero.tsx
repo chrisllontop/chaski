@@ -110,17 +110,15 @@ export const Hero = () => (
         Notifications you own.
       </h1>
       <p className="hero-in max-w-[600px] text-[17px] leading-7 text-pretty text-muted-foreground [animation-delay:160ms] sm:text-[19px] sm:leading-[30px]">
-        Stop building notification infrastructure. One call sends your receipts, password resets,
-        reminders, and everything else your app tells its users, by email, by push, and inside the
-        app itself. It all runs on your own Cloudflare account: retried when a delivery fails,
-        recorded when it lands, never billed per message, and your users’ data never leaves.
+        Stop building notification infrastructure. One call sends your receipts, password resets and
+        reminders by email, push and in-app, from your own Cloudflare account. No bill per message.
       </p>
       <div className="hero-in flex flex-wrap items-center gap-3 pt-2 [animation-delay:240ms]">
         <GetStartedButton />
         <InstallChip initial="npm" />
       </div>
       <p className="hero-in font-mono text-xs leading-[18px] text-muted-foreground [animation-delay:300ms]">
-        Free and open source · An early release · Made for apps on Cloudflare
+        Free and open source · Made for apps on Cloudflare
       </p>
     </div>
     <RelayCard />
