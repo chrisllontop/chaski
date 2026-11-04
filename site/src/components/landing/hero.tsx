@@ -110,16 +110,17 @@ export const Hero = () => (
         Notifications that run in a Worker of your own.
       </h1>
       <p className="hero-in max-w-[600px] text-[17px] leading-7 text-pretty text-muted-foreground [animation-delay:160ms] sm:text-[19px] sm:leading-[30px]">
-        Email, push and an in-app feed for the web, iOS, macOS, Android and Windows, without
-        building the queues, retries, templates and preferences behind them. Chaski runs as a Worker
-        on your Cloudflare account, so you pay Cloudflare, not per notification.
+        Receipts, password resets, reminders, and everything else your app tells its users, by
+        email, by push, and inside the app itself. Chaski sends each one from your own Cloudflare
+        account, tries again when a delivery fails, and keeps a record you can open. No bill per
+        message, and your users’ data never leaves your account.
       </p>
       <div className="hero-in flex flex-wrap items-center gap-3 pt-2 [animation-delay:240ms]">
         <GetStartedButton />
         <InstallChip initial="npm" />
       </div>
       <p className="hero-in font-mono text-xs leading-[18px] text-muted-foreground [animation-delay:300ms]">
-        MIT · 0.1 pre-release · For apps on Cloudflare Workers · Email needs Workers Paid
+        Free and open source · An early release · Made for apps on Cloudflare
       </p>
     </div>
     <RelayCard />
