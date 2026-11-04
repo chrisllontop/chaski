@@ -110,10 +110,10 @@ export const Hero = () => (
         Notifications you own.
       </h1>
       <p className="hero-in max-w-[600px] text-[17px] leading-7 text-pretty text-muted-foreground [animation-delay:160ms] sm:text-[19px] sm:leading-[30px]">
-        Receipts, password resets, reminders, and everything else your app tells its users, by
-        email, by push, and inside the app itself. Chaski sends each one from your own Cloudflare
-        account, tries again when a delivery fails, and keeps a record you can open. No bill per
-        message, and your users’ data never leaves your account.
+        Stop building notification infrastructure. One call sends your receipts, password resets,
+        reminders, and everything else your app tells its users, by email, by push, and inside the
+        app itself. It all runs on your own Cloudflare account: retried when a delivery fails,
+        recorded when it lands, never billed per message, and your users’ data never leaves.
       </p>
       <div className="hero-in flex flex-wrap items-center gap-3 pt-2 [animation-delay:240ms]">
         <GetStartedButton />

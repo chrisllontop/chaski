@@ -51,7 +51,7 @@ export const Route = createFileRoute('/')({
     seo({
       title: 'Chaski · Notifications you own',
       description:
-        'Receipts, password resets, reminders and everything else your app tells its users, sent by email, push and an in-app feed from a Worker on your own Cloudflare account. Free and open source, with no bill per message.',
+        'Stop building notification infrastructure. One call sends your receipts, password resets and reminders by email, push and an in-app feed, from a Worker on your own Cloudflare account. Retried, recorded, and never billed per message.',
       path: '/',
     }),
   component: Landing,
