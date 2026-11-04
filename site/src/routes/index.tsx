@@ -49,7 +49,7 @@ const Landing = () => {
 export const Route = createFileRoute('/')({
   head: () =>
     seo({
-      title: 'Chaski · Notifications that run in a Worker of your own',
+      title: 'Chaski · Notifications you own',
       description:
         'Receipts, password resets, reminders and everything else your app tells its users, sent by email, push and an in-app feed from a Worker on your own Cloudflare account. Free and open source, with no bill per message.',
       path: '/',
