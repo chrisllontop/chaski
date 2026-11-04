@@ -7,7 +7,7 @@ export const sendSample = `await env.CHASKI.send({
 // The commands' own output, as of chaskijs 0.1, trimmed to 26 lines so that with the shell's next
 // prompt they fill the panel's 27: what npm and Wrangler print is left out, and so are deploy's
 // notes between its steps. The terminal plays them back line by line (terminal.tsx).
-export const initSample = `$ npx chaskijs init
+export const initSample = `$ npx chaskijs@next init
 ? Where should the Chaski project live?
   1. A folder of this repository
   2. A new repository
@@ -92,4 +92,30 @@ app.post('/payments', async (c) => {
 export const rpcSample = `await env.CHASKI.send({
   type: 'order_shipped',
   recipient: { id: order.userId },
+});`;
+
+export const receiptSample = `await env.CHASKI.send({
+  type: 'payment_received',
+  recipient: { id: payment.userId },
+  payload: { amount: payment.amount },
+  // A retried request sends only once.
+  idempotencyKey: \`payment:\${payment.id}\`,
+});`;
+
+export const resetSample = `await env.CHASKI.send({
+  type: 'password_reset',
+  recipient: { id: user.id, email },
+  payload: { link },
+  channels: ['email'],
+  transactional: true,
+  // Deliver before send() returns.
+  inline: true,
+});`;
+
+export const reminderSample = `await env.CHASKI.schedule({
+  type: 'trial_ending',
+  recipient: { id: trial.userId },
+  scheduledAt: trial.endsAt,
+  // Scheduling again moves it.
+  idempotencyKey: \`trial:\${trial.id}\`,
 });`;

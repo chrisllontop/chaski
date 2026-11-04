@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { DocsButton, InstallChip } from '../actions';
+import { GetStartedButton, InstallChip } from '../actions';
 import { BellIcon, MailIcon, PhoneIcon } from '../icons';
 import { Code } from './code';
 import { sendSample } from './samples';
@@ -110,14 +110,17 @@ export const Hero = () => (
         Notifications that run in a Worker of your own.
       </h1>
       <p className="hero-in max-w-[600px] text-[17px] leading-7 text-pretty text-muted-foreground [animation-delay:160ms] sm:text-[19px] sm:leading-[30px]">
-        Email, in-app and push notifications for the web, iOS, macOS, Android and Windows, with
-        templates, scheduling, retries and a dashboard. Deploy Chaski next to your app, on your own
-        Cloudflare account, and send with one call.
+        Email, push and an in-app feed for the web, iOS, macOS, Android and Windows, without
+        building the queues, retries, templates and preferences behind them. Chaski runs as a Worker
+        on your Cloudflare account, so you pay Cloudflare, not per notification.
       </p>
       <div className="hero-in flex flex-wrap items-center gap-3 pt-2 [animation-delay:240ms]">
-        <DocsButton />
-        <InstallChip initial="agent" />
+        <GetStartedButton />
+        <InstallChip initial="npm" />
       </div>
+      <p className="hero-in font-mono text-xs leading-[18px] text-muted-foreground [animation-delay:300ms]">
+        MIT · 0.1 pre-release · For apps on Cloudflare Workers · Email needs Workers Paid
+      </p>
     </div>
     <RelayCard />
   </section>

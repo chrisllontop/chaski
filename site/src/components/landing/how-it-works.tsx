@@ -12,7 +12,7 @@ const CASCADE_END = CASCADE * appSample.split('\n').length + 420;
 const stepLength = (played: number) => Math.max(6000, played + 3000);
 
 const FILES = [
-  { id: 'init', name: 'npx chaskijs init', code: initSample, terminal: true },
+  { id: 'init', name: 'npx chaskijs@next init', code: initSample, terminal: true },
   { id: 'deploy', name: 'npx chaskijs deploy', code: deploySample, terminal: true },
   { id: 'app', name: 'app/src/index.ts', code: appSample, terminal: false },
 ].map((file) => ({

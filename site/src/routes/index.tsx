@@ -3,11 +3,13 @@ import { useRef } from 'react';
 import { Agent } from '~/components/landing/agent';
 import { Browser } from '~/components/landing/browser';
 import { Closing } from '~/components/landing/closing';
+import { Compare } from '~/components/landing/compare';
 import { Features } from '~/components/landing/features';
 import { Handoffs } from '~/components/landing/handoffs';
 import { Hero } from '~/components/landing/hero';
 import { HowItWorks } from '~/components/landing/how-it-works';
 import { ProductShot } from '~/components/landing/product-shot';
+import { Recipes } from '~/components/landing/recipes';
 import { SiteFooter } from '~/components/landing/site-footer';
 import { SiteHeader } from '~/components/landing/site-header';
 import { Usage } from '~/components/landing/usage';
@@ -31,10 +33,12 @@ const Landing = () => {
         <ProductShot />
         <HowItWorks />
         <Usage />
-        <Agent />
         <Features />
+        <Recipes />
+        <Compare />
         <Browser />
         <Handoffs />
+        <Agent />
         <Closing />
       </main>
       <SiteFooter />
@@ -47,7 +51,7 @@ export const Route = createFileRoute('/')({
     seo({
       title: 'Chaski · Notifications that run in a Worker of your own',
       description:
-        'Open-source notifications that run as a Worker of their own on your Cloudflare account: email, in-app and push for the web, iOS, macOS, Android and Windows, with templates, retries and a dashboard.',
+        'Open-source email, push and an in-app feed that run as a Worker on your Cloudflare account, without building the queues, retries, templates and preferences behind them. You pay Cloudflare, not per notification.',
       path: '/',
     }),
   component: Landing,

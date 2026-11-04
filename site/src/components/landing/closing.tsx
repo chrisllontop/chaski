@@ -1,4 +1,4 @@
-import { DocsButton, InstallChip } from '../actions';
+import { GetStartedButton, InstallChip } from '../actions';
 import { Mark } from '../icons';
 
 export const Closing = () => (
@@ -15,12 +15,11 @@ export const Closing = () => (
       Deploy it this afternoon.
     </h2>
     <p className="lede max-w-[520px]">
-      Free and open source under the MIT license. Create it with one command and follow the guide,
-      or hand it to your agent. Either way, your first notification goes out from a Worker of your
-      own.
+      Free and open source under the MIT license. Chaski 0.1 is in pre-release. Send your first
+      notification locally this afternoon, then deploy it when you are ready.
     </p>
     <div className="flex flex-wrap items-center justify-center gap-3 pt-5">
-      <DocsButton />
+      <GetStartedButton />
       <InstallChip initial="npm" />
     </div>
   </section>
