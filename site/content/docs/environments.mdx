@@ -85,7 +85,7 @@ its own. Each step runs the Wrangler command with `--env staging`. By hand, the 
 `chaski-staging` takes its secret with `npx wrangler deploy --env staging --secrets-file
 chaski-secret.env`, as [Install](/docs/install#deploy) shows. A `chaski-staging` that already runs
 without the secret gets it with `npx wrangler secret put CHASKI_SECRET --env staging`, after a
-deploy: until the Worker exists, `secret put` creates an empty one under its name.
+deploy, for the reason [Install](/docs/install#deploy) gives.
 
 Then turn on Cloudflare Access for its URL and set up its channels in its own dashboard, as
 [Install](/docs/install#turn-on-cloudflare-access) does for production. Settings never move

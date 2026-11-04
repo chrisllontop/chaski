@@ -3,27 +3,14 @@ title: Introduction
 description: Chaski is notification infrastructure that runs as a Worker of its own on your Cloudflare account, dashboard included.
 ---
 
-Chaski is a Worker of its own. You deploy it to your Cloudflare account next to your app, one per
-environment, and your app sends through it over a service binding. It runs on your own Cloudflare
-resources, so your data stays in your account, with no vendor in between.
-
-## What it does
-
-- **Email, push and in-app.** Email through Cloudflare Email Service, web push, push to iOS and
-  macOS through APNs, to Android through FCM and to Windows through WNS, and an in-app feed that
-  updates live.
-- **Templates** for the content of every notification, written in Liquid and edited in the
-  dashboard with a live preview.
-- **Preferences** that let each contact mute the notifications they don’t want.
-- **Scheduling** for notifications that go out later, with cancellation.
-- **Retries** for deliveries that fail along the way, and a replay for the ones that run out.
-- **A dashboard** at the Worker’s own URL, behind Cloudflare Access, where your team sets up the
-  channels and follows every delivery.
+Chaski sends email, push and an in-app feed for your app, from a Worker of its own on your
+Cloudflare account. The full list of what it covers is on [chaski.sh](https://chaski.sh). This
+page is the shape of it, and where each part is documented.
 
 ## How it fits together
 
 The Chaski Worker holds the database, the queue and everything else Chaski runs on. Your app’s
-Worker binds to it, and a send is one call:
+Worker binds to it, one Chaski per environment, and a send is one call:
 
 ```ts title="src/billing.ts"
 await env.CHASKI.send({
@@ -44,11 +31,29 @@ Three surfaces serve the rest:
 - **`userRoutes()`**, which your app mounts for its frontend: the signed-in user’s feed, devices
   and preferences, forwarded to Chaski for the user your app says is signed in.
 
-## Where to go next
+## Start here
 
-- [Install](/docs/install) deploys a Chaski Worker.
+- [Your first notification](/docs/first-notification) sends one on your machine, from a blank
+  project to a delivery in the local dashboard.
+- [Install](/docs/install) deploys that Chaski to your account, behind Cloudflare Access.
 - [Connect your app](/docs/connect) binds your app to it and mounts the user routes.
-- [Sending](/docs/sending) covers what a send does and how deliveries move.
+- [Set up with an agent](/docs/agents) hands the same setup to your coding agent instead.
+
+## Everyday guides
+
+- [Sending](/docs/sending), [Scheduling](/docs/scheduling) and [Templates](/docs/templates) cover
+  what goes out, when, and what it says, in each language your contacts read.
+- [Preferences](/docs/preferences) and [Channels](/docs/channels) cover what each contact can turn
+  off, and what each channel needs saved before it sends.
+- [Browser clients](/docs/browser-clients) gives your frontend the feed, push and preferences.
+- [Dashboard and sign-in](/docs/dashboard) and [Environments](/docs/environments) cover the team’s
+  side, one Chaski per environment.
+
+## When something is wrong
+
+- [Troubleshooting](/docs/troubleshooting) starts from the symptom and names what to change.
+- [Errors](/docs/errors) lists every code a call can throw or a route can answer.
+- [Configuration](/docs/configuration) and [API](/docs/api) are the reference the guides link to.
 
 Chaski is open source under the MIT license. Its code, issues and releases live on
 [GitHub](https://github.com/chrisllontop/chaski).
