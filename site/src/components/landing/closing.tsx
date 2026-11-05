@@ -14,10 +14,7 @@ export const Closing = () => (
     >
       Deploy it this afternoon.
     </h2>
-    <p className="lede max-w-[520px]">
-      Free and open source under the MIT license. Chaski 0.1 is in pre-release. Send your first
-      notification locally this afternoon, then deploy it when you are ready.
-    </p>
+    <p className="lede max-w-[520px]">Free and open source under the MIT license.</p>
     <div className="flex flex-wrap items-center justify-center gap-3 pt-5">
       <GetStartedButton />
       <InstallChip initial="npm" />

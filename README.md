@@ -43,10 +43,10 @@ resources, so your data stays in your account.
 ### 1. Create the project
 
 ```sh
-npx chaskijs@next init
+npx chaskijs init
 ```
 
-`@next` picks Chaski 0.1, in pre-release until it ships as `latest`. The command asks where the
+The command asks where the
 project lives (a folder of your app’s repository, such as `chaski/`, or a new repository), the
 Worker’s name, which names its resources, and whether to send email and attachments. Every answer
 has a flag (`--folder`, `--repo`, `--name`, `--no-email`, `--attachments`, `--public-url`), for

@@ -33,12 +33,12 @@ const Landing = () => {
         <ProductShot />
         <HowItWorks />
         <Usage />
+        <Agent />
         <Features />
         <Recipes />
         <Compare />
         <Browser />
         <Handoffs />
-        <Agent />
         <Closing />
       </main>
       <SiteFooter />

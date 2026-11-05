@@ -7,7 +7,7 @@ export const sendSample = `await env.CHASKI.send({
 // The commands' own output, as of chaskijs 0.1, trimmed to 26 lines so that with the shell's next
 // prompt they fill the panel's 27: what npm and Wrangler print is left out, and so are deploy's
 // notes between its steps. The terminal plays them back line by line (terminal.tsx).
-export const initSample = `$ npx chaskijs@next init
+export const initSample = `$ npx chaskijs init
 ? Where should the Chaski project live?
   1. A folder of this repository
   2. A new repository

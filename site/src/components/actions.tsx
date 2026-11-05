@@ -4,7 +4,7 @@ import { setupPrompt } from '~/lib/site';
 import { CopyStatus, useCopy } from './copy';
 import { ArrowRightIcon, CheckIcon, CopyIcon } from './icons';
 
-const INSTALL = 'npx chaskijs@next init';
+const INSTALL = 'npx chaskijs init';
 
 const WAYS = ['npm', 'agent'] as const;
 type Way = (typeof WAYS)[number];

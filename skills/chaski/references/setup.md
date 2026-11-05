@@ -57,7 +57,7 @@ terminal. Run it with the app’s package manager (`pnpm dlx`, `yarn dlx`, `bunx
 it installs with the one that runs it.
 
 ```sh
-npx chaskijs@next init chaski --folder --name chaski --public-url https://app.example.com/me/notifications
+npx chaskijs init chaski --folder --name chaski --public-url https://app.example.com/me/notifications
 ```
 
 - **`--folder`** or **`--repo`**, from step 2. `--repo` runs `git init` in the new folder.
@@ -69,9 +69,7 @@ npx chaskijs@next init chaski --folder --name chaski --public-url https://app.ex
   the user; leave the flag out until they know it, which only leaves emails without the open pixel.
   A placeholder fails every call.
 
-`@next` installs Chaski 0.1, in pre-release until it ships as `latest`; `npx chaskijs` alone runs
-an older version without these commands. Use npm only (no Git URLs, tarballs or local copies of
-the repository).
+Use npm only (no Git URLs, tarballs or local copies of the repository).
 
 `init` writes `package.json`, `wrangler.jsonc`, the one-line `src/index.ts`, `.gitignore` and
 `.dev.vars` (a random `CHASKI_SECRET`, `CHASKI_ENVIRONMENT=local`), installs `chaskijs`, `hono`
