@@ -16,13 +16,13 @@ const WAY_KEYS: Record<string, (index: number) => number> = {
   End: () => WAYS.length - 1,
 };
 
-export const DocsButton = () => (
+export const GetStartedButton = () => (
   <Link
     to="/docs/$"
-    params={{ _splat: '' }}
+    params={{ _splat: 'first-notification' }}
     className="group flex h-11 items-center gap-2 rounded-lg bg-primary px-5 text-[15px] leading-5 font-medium text-primary-foreground transition-colors duration-150 hover:bg-white motion-safe:transition-[background-color,scale] motion-safe:active:scale-[.98]"
   >
-    Read the docs
+    Get started
     <ArrowRightIcon className="motion-safe:transition-transform motion-safe:duration-150 motion-safe:group-hover:translate-x-0.5" />
   </Link>
 );

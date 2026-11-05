@@ -43,10 +43,10 @@ resources, so your data stays in your account.
 ### 1. Create the project
 
 ```sh
-npx chaskijs@next init
+npx chaskijs init
 ```
 
-`@next` picks Chaski 0.1, in pre-release until it ships as `latest`. The command asks where the
+The command asks where the
 project lives (a folder of your app’s repository, such as `chaski/`, or a new repository), the
 Worker’s name, which names its resources, and whether to send email and attachments. Every answer
 has a flag (`--folder`, `--repo`, `--name`, `--no-email`, `--attachments`, `--public-url`), for
@@ -303,13 +303,11 @@ delivering it. [Local development](https://chaski.sh/docs/local-development) has
 Paste this prompt into your coding agent, in the project that holds your app’s Worker:
 
 ```text
-Set up Chaski for this app: notifications that run as a Worker of their own, next to it. Follow https://chaski.sh/skill/SKILL.md step by step, and ask me before anything that touches my Cloudflare account.
+Set up Chaski for this app using https://chaski.sh/skill/SKILL.md. Ask me before you touch my Cloudflare account.
 ```
 
 The agent reads Chaski’s [agent skill](skills/chaski/SKILL.md) from chaski.sh, creates the Chaski
-project next to your app and connects your app to it, asking before anything that acts on your
-account. Any agent that can read a URL
-works.
+project next to your app and connects your app to it. Any agent that can read a URL works.
 
 To keep the skill in your project instead, add it with the
 [`skills` CLI](https://github.com/vercel-labs/skills), which installs it for Claude Code, Codex,

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { DocsButton, InstallChip } from '../actions';
+import { GetStartedButton, InstallChip } from '../actions';
 import { BellIcon, MailIcon, PhoneIcon } from '../icons';
 import { Code } from './code';
 import { sendSample } from './samples';
@@ -107,17 +107,19 @@ export const Hero = () => (
         id="hero-title"
         className="hero-in text-[44px] leading-[46px] font-semibold tracking-[-0.045em] text-balance [animation-delay:80ms] sm:text-6xl sm:leading-[62px] lg:text-[74px] lg:leading-[76px]"
       >
-        Notifications that run in a Worker of your own.
+        Notifications you own.
       </h1>
       <p className="hero-in max-w-[600px] text-[17px] leading-7 text-pretty text-muted-foreground [animation-delay:160ms] sm:text-[19px] sm:leading-[30px]">
-        Email, in-app and push notifications for the web, iOS, macOS, Android and Windows, with
-        templates, scheduling, retries and a dashboard. Deploy Chaski next to your app, on your own
-        Cloudflare account, and send with one call.
+        Stop building notification infrastructure. One call sends your receipts, password resets and
+        reminders by email, push and in-app, from your own Cloudflare account. No bill per message.
       </p>
       <div className="hero-in flex flex-wrap items-center gap-3 pt-2 [animation-delay:240ms]">
-        <DocsButton />
-        <InstallChip initial="agent" />
+        <GetStartedButton />
+        <InstallChip initial="npm" />
       </div>
+      <p className="hero-in font-mono text-xs leading-[18px] text-muted-foreground [animation-delay:300ms]">
+        Free and open source · Made for apps on Cloudflare
+      </p>
     </div>
     <RelayCard />
   </section>

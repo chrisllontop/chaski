@@ -29,5 +29,12 @@ export const ProductShot = () => (
       className="pointer-events-none absolute inset-x-0 bottom-0 h-[30%] bg-linear-to-b from-transparent to-background lg:h-[220px]"
       aria-hidden="true"
     />
+    <p className="relative flex flex-col gap-1 pt-5 text-center sm:flex-row sm:items-baseline sm:justify-between sm:text-left">
+      <span className="text-[15px] leading-5 font-medium">The dashboard your team opens</span>
+      <span className="text-sm leading-[22px] text-muted-foreground">
+        Deliveries per day, latency and the health of each type, before a user reports a missing
+        email.
+      </span>
+    </p>
   </section>
 );

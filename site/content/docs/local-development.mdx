@@ -54,9 +54,8 @@ Sends from your app, and the user routes it mounts, then work as they do deploye
 WebSocket included. The `CHASKI_PUBLIC_URL` above points the pixel of local emails at this port.
 
 <Callout title="Errors lose their code between the two sessions.">
-  A `ChaskiError` reaches your app as a plain `Error` whose message starts with `ChaskiError:`, so
-  `isChaskiError()` is `false` locally. Deployed Workers keep the `name` and the `code`; see
-  [Connect your app](/docs/connect#errors).
+  Between the two sessions `isChaskiError()` is `false`. Why, and what to write instead:
+  [Troubleshooting](/docs/troubleshooting#errors-lose-their-code-locally).
 </Callout>
 
 ## Seed the templates

@@ -1,0 +1,84 @@
+---
+title: Your first notification
+description: Create a local Chaski, give payment_received a template, send it from your app, and follow the delivery in the dashboard.
+---
+
+This guide sends one notification on your machine. Nothing reaches your Cloudflare account and no
+email reaches an inbox: the local dashboard shows the delivery, and the email lands on disk.
+Deploy when it works here, with [Install](/docs/install).
+
+## Create and run Chaski [step]
+
+```npm
+npx chaskijs init
+```
+
+Run it in the Chaski project it creates:
+
+```bash
+npx wrangler dev
+```
+
+The dashboard is at `http://localhost:8787`, signed in as the identity under `access.dev` in
+`wrangler.jsonc`. [Local development](/docs/local-development) has the details.
+
+## Turn on two channels [step]
+
+Open **Channels** in the local dashboard. Every channel starts off, so save a sender address for
+**Email** and turn **In-app** on. A channel with no saved settings is skipped on every send, with
+the reason recorded on the delivery.
+
+## Create the template [step]
+
+Under **Templates**, create one for the type `payment_received` and turn on email and in-app.
+Write what a person reads, with the values your app will send:
+
+```liquid title="Email subject"
+Payment of {{ amount }} received
+```
+
+```liquid title="Email body"
+<p>Thanks, {{ recipient.name }}. We received your payment of {{ amount }}.</p>
+```
+
+Give the in-app content a title and a message of the same kind, save sample data with the
+template, and check the preview. [Templates](/docs/templates) covers languages and formatting.
+
+## Connect your app [step]
+
+[Connect your app](/docs/connect) sets this up in full. The short version: bind your app’s Worker
+to the local Chaski by its Worker name, mount the user routes, then run your app on another port
+while Chaski runs:
+
+```bash
+npx wrangler dev --port 8788
+```
+
+A service binding finds a Worker another `wrangler dev` runs on the same machine by name, so your
+app reaches the local Chaski as it will reach the deployed one.
+
+## Send it [step]
+
+Send from a route you can call, such as the handler that records a payment:
+
+```ts title="src/billing.ts"
+await env.CHASKI.send({
+  type: 'payment_received',
+  recipient: { id: user.id, email: user.email, name: user.name },
+  payload: { amount: '$15.00' },
+  idempotencyKey: `payment:${payment.id}`,
+});
+```
+
+Call the route, then open **Deliveries** in the local dashboard and follow each delivery from
+`pending` to `sent`. [Read the emails](/docs/local-development#read-the-emails) shows where the
+local email went. A delivery that shows as skipped names its reason; when one does not go out at
+all, [Troubleshooting](/docs/troubleshooting) starts from that reason.
+
+## What to do next
+
+- [Install](/docs/install) deploys this Chaski to your account and puts its dashboard behind
+  Cloudflare Access.
+- [Preferences](/docs/preferences) gives your users a settings screen for what they receive.
+- [Scheduling](/docs/scheduling) sends the reminder before the invoice is due, and cancels it
+  when they pay.

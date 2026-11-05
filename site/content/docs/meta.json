@@ -2,6 +2,7 @@
   "pages": [
     "---Getting started---",
     "index",
+    "first-notification",
     "install",
     "connect",
     "agents",
@@ -15,6 +16,7 @@
     "browser-clients",
     "dashboard",
     "environments",
+    "troubleshooting",
     "---Reference---",
     "configuration",
     "api",

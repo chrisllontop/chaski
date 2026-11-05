@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import { cn } from 'cn';
 import { FileText, MoreHorizontal, Plus } from 'lucide-react';
 import { useState } from 'react';

@@ -1,0 +1,91 @@
+---
+title: Troubleshooting
+description: Start from the symptom. Each one names where Chaski records the reason, and what to change.
+---
+
+## A notification did not go out
+
+Open it under **Deliveries** in the dashboard. A channel that never sent is recorded as skipped,
+with the first reason that applies:
+
+| Reason | What to change |
+| --- | --- |
+| `channel_not_configured` | Save the channel’s settings on the **Channels** page. A channel with none is off. |
+| `no_template` | Give the type content for that channel in its [template](/docs/templates), and turn the channel on there. |
+| `muted_by_preferences` | The contact muted it, or it is muted by default. Send with `transactional: true` only when the contact must get it. |
+| `missing_email` | Send the contact’s address as `recipient.email`. |
+| `no_device_tokens` | Register a device for the contact before the send; see [Channels](/docs/channels#push). |
+
+Call `ready()` from your app for the same view without the dashboard: it lists the channels that
+are on, the paused ones, and the settings that stopped working under `problems`. See
+[API](/docs/api#chaskientrypoint).
+
+## A push did not arrive
+
+- **The subscription belongs to another key.** A browser subscribed with an earlier push key can
+  never receive this Chaski’s pushes. `client.push.enable()` replaces it; see
+  [Browser clients](/docs/browser-clients#web-push).
+- **The Apple token is in the wrong environment.** A development build’s token only works in
+  `sandbox`. When APNs refuses one as `BadDeviceToken` or `DeviceTokenNotForTopic`, Chaski forgets
+  the device and logs the reason to Workers Logs. Check the build’s environment and the app’s
+  bundle ID in the [APNs settings](/docs/configuration#push).
+- **The Windows channel expired.** WNS channels live 30 days, so the app registers its channel
+  again on every launch.
+
+## The dashboard answers “Chaski needs Cloudflare Access”
+
+Nothing is broken. The Worker’s URL is not covered by Cloudflare Access yet, so Chaski refuses to
+serve the dashboard to a request with no signed-in identity. Enable Access on the hostname from
+the Worker’s **Settings** › **Domains & Routes**, not from its own **Access** tab, which refuses
+the WebSocket the dashboard’s live updates use. [Install](/docs/install#turn-on-cloudflare-access)
+has the steps.
+
+## A channel shows as Failing
+
+Its saved settings stopped working after they were saved: a binding it needs left
+`wrangler.jsonc`, or `CHASKI_SECRET` changed and its credentials no longer open. Its deliveries
+fail with a `config` error that says the same, and the other channels carry on. Save the setting
+again on the **Channels** page. Keep `CHASKI_SECRET` as it is once credentials are saved under it.
+
+## Deliveries wait as held
+
+Someone paused the channel. A pause holds every delivery of that channel, including transactional
+and scheduled ones, and an [inline send](/docs/sending#inline) throws `channel_paused` while its
+email waits with the rest. **Resume** on the **Channels** page asks what to do with what the pause
+held; kept deliveries stay under the **Held** tab of **Deliveries**. See
+[Pause a channel](/docs/dashboard#pause-a-channel).
+
+## A send fails with an unknown type
+
+There is no template for that type, or none at all: on a fresh database, or after a deploy that
+forgot to load the template file, every send is refused. Create the template in the dashboard, or
+load your file with `templates().import()`. `ready()` counts the templates, which makes a health
+check notice before your users do.
+
+## Errors lose their code locally
+
+Between two local `wrangler dev` sessions, a `ChaskiError` reaches your app as a plain `Error`
+whose message starts with `ChaskiError:`, so `isChaskiError()` is `false`. Deployed Workers keep
+the `name` and the `code`; write the check for the deployed shape, as
+[Connect your app](/docs/connect#errors) shows.
+
+## A local schedule stays overdue after a restart
+
+The local Workflows engine does not wake an instance that was asleep when `wrangler dev` stopped,
+so the schedule stays pending past its time. Call `schedule()` again with the same
+`idempotencyKey` to restart its instance. Deployed Workflows do not have this limitation; see
+[Schedules across restarts](/docs/local-development#schedules-across-restarts).
+
+## Emails carry no open pixel
+
+The pixel loads from where your app mounts `userRoutes()`. Set `CHASKI_PUBLIC_URL` in the Chaski
+Worker’s vars to that absolute URL; without it, emails carry no pixel. If your app puts its routes
+behind a session, the pixel’s path has to pass it, since an email client loads it with no session:
+[Connect your app](/docs/connect#mount-the-user-routes) shows the extra mount.
+
+## A delivery is dead
+
+Temporary failures retry with backoff up to the queue consumer’s five attempts, then the delivery
+is `dead`. Fix the cause the last error names, then replay it from **Deliveries**. Keep
+`max_retries: 5` on the consumer, as [Install](/docs/install) declares it: Chaski counts on it to
+tell a delivery’s last attempt.

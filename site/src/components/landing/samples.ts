@@ -93,3 +93,29 @@ export const rpcSample = `await env.CHASKI.send({
   type: 'order_shipped',
   recipient: { id: order.userId },
 });`;
+
+export const receiptSample = `await env.CHASKI.send({
+  type: 'payment_received',
+  recipient: { id: payment.userId },
+  payload: { amount: payment.amount },
+  // A retried request sends only once.
+  idempotencyKey: \`payment:\${payment.id}\`,
+});`;
+
+export const resetSample = `await env.CHASKI.send({
+  type: 'password_reset',
+  recipient: { id: user.id, email },
+  payload: { link },
+  channels: ['email'],
+  transactional: true,
+  // Deliver before send() returns.
+  inline: true,
+});`;
+
+export const reminderSample = `await env.CHASKI.schedule({
+  type: 'trial_ending',
+  recipient: { id: trial.userId },
+  scheduledAt: trial.endsAt,
+  // Scheduling again moves it.
+  idempotencyKey: \`trial:\${trial.id}\`,
+});`;
