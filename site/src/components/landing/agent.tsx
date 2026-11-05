@@ -171,8 +171,8 @@ export const Agent = () => (
         set it up.
       </h2>
       <p className="lede">
-        One prompt, any coding agent. It follows the same guide you would, and asks before it
-        touches your Cloudflare account.
+        One prompt, any coding agent. It follows the same guide you would, checking each step before
+        the next.
       </p>
       <ol className="flex flex-col gap-5 pt-3">
         <li className="flex items-baseline gap-3">

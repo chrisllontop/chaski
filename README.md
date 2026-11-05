@@ -303,13 +303,11 @@ delivering it. [Local development](https://chaski.sh/docs/local-development) has
 Paste this prompt into your coding agent, in the project that holds your app’s Worker:
 
 ```text
-Set up Chaski for this app: notifications that run as a Worker of their own, next to it. Follow https://chaski.sh/skill/SKILL.md step by step, and ask me before anything that touches my Cloudflare account.
+Set up Chaski for this app using https://chaski.sh/skill/SKILL.md. Ask me before you touch my Cloudflare account.
 ```
 
 The agent reads Chaski’s [agent skill](skills/chaski/SKILL.md) from chaski.sh, creates the Chaski
-project next to your app and connects your app to it, asking before anything that acts on your
-account. Any agent that can read a URL
-works.
+project next to your app and connects your app to it. Any agent that can read a URL works.
 
 To keep the skill in your project instead, add it with the
 [`skills` CLI](https://github.com/vercel-labs/skills), which installs it for Claude Code, Codex,
