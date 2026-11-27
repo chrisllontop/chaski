@@ -29,9 +29,7 @@ Some flows move but lean on something their provider does that Chaski doesn’t:
 
 - click tracking;
 - bounce and complaint handling, with a suppression list;
-- `List-Unsubscribe` headers and a hosted unsubscribe page;
-- a sender address of their own: Chaski sends every email from the one sender address saved on
-  its **Channels** page, and a send can change only `fromName` and `replyTo`.
+- `List-Unsubscribe` headers and a hosted unsubscribe page.
 
 Chaski records opens, through a pixel the app’s `userRoutes()` mount serves. Name what each flow
 loses, and let the user decide whether it moves, or how the app covers it (an unsubscribe link to

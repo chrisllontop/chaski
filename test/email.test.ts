@@ -115,6 +115,19 @@ describe('email channel', () => {
     });
   });
 
+  it('applies a per-send sender address, with the configured name unless the send names one', async () => {
+    await seedTemplate('payment_received', 'email');
+    const sent = stubEmail();
+
+    await sendPayment({ email: { from: 'founder@host.test' } });
+    await sendPayment({ email: { from: 'founder@host.test', fromName: 'Ana from Host' } });
+
+    expect(sent.map((email) => email.from)).toEqual([
+      { email: 'founder@host.test', name: 'Fixture host' },
+      { email: 'founder@host.test', name: 'Ana from Host' },
+    ]);
+  });
+
   it('sends a bare address when no sender name is configured', async () => {
     useConfig({ channels: { email: { from: 'notifications@host.test' }, in_app: {} } });
     await seedTemplate('payment_received', 'email');

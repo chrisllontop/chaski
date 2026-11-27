@@ -167,7 +167,7 @@ the two Workers has a `compatibility_date` before `2026-04-21`.
 | `an inline send delivers one email: it needs transactional: true and channels: ['email']` | Add both, or drop `inline`. |
 | `the inline email would be skipped: <reason>` | The send recorded nothing; `missing_email` means the `recipient` has no `email`, `no_template` that the template has no enabled email content. |
 | `channel_paused`: `the email channel is paused: delivery <id> is held until someone sends or discards it in the dashboard` | Someone paused email under **Channels**. The email waits under **Deliveries**, **Held**; resuming the channel and sending it, or the same send with its `idempotencyKey` once email runs again, lets it go out. |
-| `delivery_failed`: `the email didn't go out: <provider error> (<code>, delivery <id>)` | An inline send the provider refused or couldn’t take; the delivery is `failed` in the dashboard with the same error. `sender_not_verified` and `sender_domain_not_available` are the setup’s to fix (the sender address on **Channels** must be on the domain onboarded to Email Service), `recipient_suppressed` the address’s. |
+| `delivery_failed`: `the email didn't go out: <provider error> (<code>, delivery <id>)` | An inline send the provider refused or couldn’t take; the delivery is `failed` in the dashboard with the same error. `sender_not_verified` and `sender_domain_not_available` are the setup’s to fix (the send’s `email.from`, else the sender address on **Channels**, must be on a domain onboarded to Email Service and allowed by `CHASKI_EMAIL`), `recipient_suppressed` the address’s. |
 
 Loading templates:
 
