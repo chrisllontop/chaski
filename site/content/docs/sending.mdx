@@ -29,7 +29,7 @@ the dashboard shows it as it moves.
 | `payload` | The values the template renders with. |
 | `channels` | Narrows the send to some of the template’s channels, such as `['email']`. |
 | `transactional` | Sends regardless of the contact’s preferences, for receipts and password resets. |
-| `email` | Per-send email options: `fromName`, `replyTo` and up to 10 `attachments`. |
+| `email` | Per-send email options: `from` (a sender address in place of the one on the **Channels** page, on a domain verified for Email Sending), `fromName`, `replyTo` and up to 10 `attachments`. |
 | `push` | Per-send push options: `silent: true` shows the alert without a sound, and `collapseId` replaces a push already shown with the same id. |
 | `locale` | The language of this send alone, ahead of the contact’s `recipient.locale`, which it doesn’t change; see [Languages](/docs/templates#languages). |
 | `data` | Up to 20 string values for your clients, such as your own event id. Every push and the feed item carry them as they came. |

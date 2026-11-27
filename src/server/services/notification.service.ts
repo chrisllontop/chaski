@@ -3,6 +3,7 @@ import type {
   AttachmentInput,
   Channel,
   DeliveryResult,
+  EmailOptions,
   SendOutcome,
   SendResult,
 } from '../../contract/contract';
@@ -94,11 +95,13 @@ const deliveryFailed = (delivery: DeliveryRow): ChaskiError => {
       );
 };
 
+export type EmailOverrides = Omit<EmailOptions, 'attachments'>;
+
 export const splitEmailOptions = (
-  email: { fromName?: string; replyTo?: string; attachments?: AttachmentInput[] } | undefined,
+  email: EmailOptions | undefined,
 ): {
   attachments: AttachmentInput[];
-  overrides: { fromName?: string; replyTo?: string } | null;
+  overrides: EmailOverrides | null;
 } => {
   const { attachments = [], ...overrides } = email ?? {};
   return {
@@ -131,7 +134,7 @@ export type DispatchInput = RequestedLocale & {
   payload: Record<string, unknown>;
   channels?: Channel[];
   transactional: boolean;
-  emailOverrides: { fromName?: string; replyTo?: string } | null;
+  emailOverrides: EmailOverrides | null;
   pushSilent: boolean;
   pushCollapseId: string | null;
   data: Record<string, string> | null;

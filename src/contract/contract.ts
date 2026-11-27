@@ -29,10 +29,12 @@ export const attachmentInputSchema = z
 export type AttachmentInput = z.infer<typeof attachmentInputSchema>;
 
 export const emailOptionsSchema = z.object({
+  from: z.string().email().optional(),
   fromName: z.string().max(256).optional(),
   replyTo: z.string().email().optional(),
   attachments: z.array(attachmentInputSchema).max(10).optional(),
 });
+export type EmailOptions = z.infer<typeof emailOptionsSchema>;
 
 // A wall-clock time without an explicit UTC offset names a different instant
 // in every timezone, so it is rejected instead of guessed.

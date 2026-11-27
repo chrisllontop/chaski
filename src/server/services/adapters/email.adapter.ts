@@ -7,10 +7,9 @@ import { AttachmentService } from '../attachment.service';
 import { BaseService } from '../base.service';
 import type { ContactSnapshot } from '../contact.service';
 import { EmailSenderService, senderAddress } from '../email-sender.service';
+import type { EmailOverrides } from '../notification.service';
 import { TemplateService } from '../template.service';
 import type { AdapterContext, AdapterResult } from './types';
-
-type EmailOverrides = { fromName?: string; replyTo?: string };
 
 export class EmailAdapter extends BaseService {
   protected static override name = 'email';
@@ -43,7 +42,10 @@ export class EmailAdapter extends BaseService {
       ? injectOpenPixel(renderedHtml, openPixelUrl(config.publicUrl, ctx.delivery.id))
       : renderedHtml;
 
-    const from = senderAddress(emailConfig.from, overrides.fromName ?? emailConfig.fromName);
+    const from = senderAddress(
+      overrides.from ?? emailConfig.from,
+      overrides.fromName ?? emailConfig.fromName,
+    );
     const replyTo = overrides.replyTo ?? emailConfig.replyTo;
 
     const stored = parseJson<StoredAttachment[]>(ctx.notification.attachments, []);

@@ -56,7 +56,7 @@ type SendRequest = {
   payload?: Record<string, unknown>;
   channels?: Array<'email' | 'in_app' | 'push'>;
   transactional?: boolean;
-  email?: { fromName?: string; replyTo?: string; attachments?: AttachmentInput[] };
+  email?: { from?: string; fromName?: string; replyTo?: string; attachments?: AttachmentInput[] };
   // silent shows the push without a sound, on Apple devices, on Windows and in browsers;
   // collapseId replaces a push already shown with the same id and becomes its tag.
   push?: { silent?: boolean; collapseId?: string };

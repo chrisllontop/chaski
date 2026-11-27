@@ -14,6 +14,7 @@ import { ContactService } from './contact.service';
 import {
   assertChannelsConfigured,
   assertKnownType,
+  type EmailOverrides,
   NotificationService,
   requestedLocaleOf,
   splitEmailOptions,
@@ -241,10 +242,7 @@ export class ScheduleService extends BaseService {
       payload: parseJson<Record<string, unknown>>(row.payload, {}),
       channels: row.channels ? parseJson<Channel[]>(row.channels, []) : undefined,
       transactional: row.transactional,
-      emailOverrides: parseJson<{ fromName?: string; replyTo?: string } | null>(
-        row.emailOverrides,
-        null,
-      ),
+      emailOverrides: parseJson<EmailOverrides | null>(row.emailOverrides, null),
       pushSilent: row.pushSilent,
       pushCollapseId: row.pushCollapseId,
       data: parseJson<Record<string, string> | null>(row.data, null),
