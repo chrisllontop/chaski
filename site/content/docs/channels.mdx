@@ -23,7 +23,7 @@ Email goes out through Cloudflare Email Service, from a domain you onboarded to 
 address. The address must be one the binding allows. The page says when the binding is
 missing.
 
-A send can override the sender name and the reply-to address, and attach up to 10 files when
+A send can override the sender address, the sender name and the reply-to address, and attach up to 10 files when
 `CHASKI_ATTACHMENTS` holds an R2 bucket. The HTML of every email carries a pixel, served through
 your app’s `userRoutes()`, which marks the delivery opened when the message is read; set
 `CHASKI_PUBLIC_URL` to that mount, and without it emails carry no pixel.
